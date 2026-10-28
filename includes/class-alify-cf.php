@@ -5,6 +5,7 @@ require_once __DIR__ . '/class-alify-cf-gallery.php';
 require_once __DIR__ . '/class-alify-cf-options.php';
 require_once __DIR__ . '/class-alify-cf-feedback.php';
 require_once __DIR__ . '/class-alify-cf-publication.php';
+require_once __DIR__ . '/class-alify-cf-transfer.php';
 
 final class Alify_CF {
     const GROUP = 'alify_field_group';
@@ -14,6 +15,7 @@ final class Alify_CF {
     public static function boot() {
         Alify_CF_Options::boot();
         Alify_CF_Publication::boot();
+        Alify_CF_Transfer::boot();
         add_action('init', array(__CLASS__, 'register'));
         add_action('admin_notices', array(__CLASS__, 'notices'));
         add_action('add_meta_boxes', array(__CLASS__, 'boxes'));
@@ -224,6 +226,58 @@ final class Alify_CF {
         }
     }
 
+    /** Shared editor/import validation. No writes occur here. */
+    public static function validate_schema($raw, $location, $id, &$errors) {
+        if (!is_string($location)) { $errors[] = 'Choose a valid location.'; return array(); }
+        if ((!isset(self::post_types()[$location]) && !Alify_CF_Options::is_location($location)) || in_array($location, array(self::GROUP, 'attachment'), true)) { $errors[] = 'Choose a valid post type or registered options page.'; }
+        if (!is_array($raw) || array_values($raw) !== $raw || count($raw) > 200) { $errors[] = 'Invalid field schema. A maximum of 200 fields is supported.'; return array(); }
+        $fields = array(); $names = array(); $keys = array();
+        foreach ($raw as $field) {
+            if (!is_array($field)) { $errors[] = 'Invalid field configuration.'; continue; }
+            foreach (array('name', 'type', 'label', 'key', 'instructions', 'choices') as $property) {
+                if (isset($field[$property]) && !is_string($field[$property])) { $errors[] = 'Invalid field setting: ' . $property; continue 2; }
+            }
+            $name = $field['name'] ?? '';
+            $type = $field['type'] ?? 'text';
+            if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || !isset(self::types()[$type]) || trim($field['label'] ?? '') === '') { $errors[] = 'Each field needs a label, supported type, and unique valid name: ' . $name; continue; }
+            $names[$name] = true;
+            $key = sanitize_key($field['key'] ?? '') ?: 'field_' . wp_generate_uuid4();
+            if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
+            $keys[$key] = true;
+            $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
+            if ($type === 'repeater') { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
+            $clean['default'] = in_array($type, array('repeater', 'gallery'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
+            $clean['condition'] = null;
+            if (!empty($field['condition'])) {
+                $rule = $field['condition'];
+                if (!is_array($rule) || !isset($rule['field'], $rule['operator'], $rule['value']) || !is_string($rule['field']) || !is_string($rule['operator']) || !is_string($rule['value']) || !in_array($rule['operator'], array('equals', 'not_equals', 'empty', 'not_empty'), true)) {
+                    $errors[] = 'Invalid conditional rule for ' . $name;
+                } else {
+                    $clean['condition'] = array('field' => sanitize_key($rule['field']), 'operator' => $rule['operator'], 'value' => sanitize_text_field($rule['value']));
+                }
+            }
+            $fields[] = $clean;
+        }
+        foreach ($fields as $field) {
+            if (!$field['condition']) { continue; }
+            $source = null;
+            foreach ($fields as $candidate) {
+                if ($candidate['key'] === $field['condition']['field']) { $source = $candidate; break; }
+            }
+            if (!$source || $source['type'] === 'repeater' || $source['key'] === $field['key'] || $source['condition']) {
+                $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
+            }
+        }
+        // Reserve names across published and draft groups on the same post type.
+        $others = get_posts(array('post_type' => self::GROUP, 'post_status' => array('publish', 'draft', 'pending', 'private', 'future'), 'numberposts' => -1, 'exclude' => array($id), 'meta_key' => self::LOCATION, 'meta_value' => $location));
+        foreach ($others as $other) {
+            foreach (self::schema($other->ID) as $field) {
+                if (isset($names[$field['name']])) { $errors[] = 'Field name "' . $field['name'] . '" is already used by group "' . $other->post_title . '". Use a different name.'; }
+            }
+        }
+        return $fields;
+    }
+
     public static function save($id, $post) {
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE || wp_is_post_revision($id) || !current_user_can('edit_post', $id)) { return; }
         if ($post->post_type === self::GROUP) {
@@ -233,52 +287,7 @@ final class Alify_CF {
             $location_raw = is_string($location_raw) ? wp_unslash($location_raw) : '';
             $location = strpos($location_raw, 'options:') === 0 ? $location_raw : sanitize_key($location_raw);
             $errors = array();
-            if ((!isset(self::post_types()[$location]) && !Alify_CF_Options::is_location($location)) || in_array($location, array(self::GROUP, 'attachment'), true)) { $errors[] = 'Choose a valid post type or registered options page.'; }
-            if (!is_array($raw) || count($raw) > 200) { self::error($id, array('Invalid field schema. A maximum of 200 fields is supported. Existing configuration was retained.')); return; }
-            $fields = array(); $names = array(); $keys = array();
-            foreach ($raw as $field) {
-                if (!is_array($field)) { $errors[] = 'Invalid field configuration.'; continue; }
-                foreach (array('name', 'type', 'label', 'key', 'instructions', 'choices') as $property) {
-                    if (isset($field[$property]) && !is_string($field[$property])) { $errors[] = 'Invalid field setting: ' . $property; continue 2; }
-                }
-                $name = $field['name'] ?? '';
-                $type = $field['type'] ?? 'text';
-                if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || !isset(self::types()[$type]) || trim($field['label'] ?? '') === '') { $errors[] = 'Each field needs a label, supported type, and unique valid name: ' . $name; continue; }
-                $names[$name] = true;
-                $key = sanitize_key($field['key'] ?? '') ?: 'field_' . wp_generate_uuid4();
-                if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
-                $keys[$key] = true;
-                $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
-                if ($type === 'repeater') { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
-                $clean['default'] = in_array($type, array('repeater', 'gallery'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
-                $clean['condition'] = null;
-                if (!empty($field['condition'])) {
-                    $rule = $field['condition'];
-                    if (!is_array($rule) || !isset($rule['field'], $rule['operator'], $rule['value']) || !is_string($rule['field']) || !is_string($rule['operator']) || !is_string($rule['value']) || !in_array($rule['operator'], array('equals', 'not_equals', 'empty', 'not_empty'), true)) {
-                        $errors[] = 'Invalid conditional rule for ' . $name;
-                    } else {
-                        $clean['condition'] = array('field' => sanitize_key($rule['field']), 'operator' => $rule['operator'], 'value' => sanitize_text_field($rule['value']));
-                    }
-                }
-                $fields[] = $clean;
-            }
-            foreach ($fields as $field) {
-                if (!$field['condition']) { continue; }
-                $source = null;
-                foreach ($fields as $candidate) {
-                    if ($candidate['key'] === $field['condition']['field']) { $source = $candidate; break; }
-                }
-                if (!$source || $source['type'] === 'repeater' || $source['key'] === $field['key'] || $source['condition']) {
-                    $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
-                }
-            }
-            // Reserve names across published and draft groups on the same post type.
-            $others = get_posts(array('post_type' => self::GROUP, 'post_status' => array('publish', 'draft', 'pending', 'private', 'future'), 'numberposts' => -1, 'exclude' => array($id), 'meta_key' => self::LOCATION, 'meta_value' => $location));
-            foreach ($others as $other) {
-                foreach (self::schema($other->ID) as $field) {
-                    if (isset($names[$field['name']])) { $errors[] = 'Field name "' . $field['name'] . '" is already used by group "' . $other->post_title . '". Use a different name.'; }
-                }
-            }
+            $fields = self::validate_schema($raw, $location, $id, $errors);
             if ($errors) { self::error($id, array_merge(array('Field configuration was not saved. Existing fields and location were retained.'), $errors)); return; }
             update_post_meta($id, self::SCHEMA, wp_slash($fields));
             update_post_meta($id, self::LOCATION, $location);

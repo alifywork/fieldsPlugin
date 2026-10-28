@@ -215,6 +215,59 @@ try {
     $response = rest_do_request($request);
     expect_same(true, in_array($response->get_status(), array(200, 201), true), 'Autosaves remain available before required fields are completed');
     expect_same(false, metadata_exists('post', $autosave_post, '_alify_cf_publish_text'), 'Autosave does not write missing custom field values');
+    // Configuration-only JSON transfer uses the same validator as the editor.
+    $_POST = array();
+    $source = fixture_post(Alify_CF::GROUP);
+    $transfer_fields = array(test_field('transfer_title'), test_field('transfer_show', 'true_false'), test_field('transfer_detail'), test_field('transfer_rows', 'repeater'), test_field('transfer_gallery', 'gallery'));
+    $transfer_fields[0]['default'] = "سلام \\ quote's";
+    $transfer_fields[2]['condition'] = array('field' => 'field_transfer_show', 'operator' => 'equals', 'value' => '1');
+    $transfer_fields[3]['sub_fields'] = array(test_field('name'), test_field('photos', 'gallery'));
+    configure_group($source, $transfer_fields, 'page'); $_POST = array();
+    $export_nonce = wp_create_nonce('alify_cf_export'); $import_nonce = wp_create_nonce('alify_cf_import');
+    $json = Alify_CF_Transfer::export_json($source, $export_nonce);
+    expect_same(true, is_string($json), 'Export returns JSON');
+    $document = json_decode($json, true);
+    expect_same(1, $document['version'], 'Versioned transfer format');
+    expect_same(Alify_CF::schema($source), $document['group']['fields'], 'Export includes complete conditional/repeater/gallery schema');
+    expect_same(false, isset($document['group']['ID']) || isset($document['values']), 'Export omits IDs and content values');
+    expect_same('alify_transfer_nonce', Alify_CF_Transfer::export_json($source, 'bad')->get_error_code(), 'Export nonce enforced');
+    expect_same('alify_transfer_group', Alify_CF_Transfer::export_json($initial_post_id, $export_nonce)->get_error_code(), 'Cannot export content post as group');
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json($json, $import_nonce)->get_error_code(), 'Existing names reject import rather than overwrite');
+    expect_same($document['group']['fields'], Alify_CF::schema($source), 'Conflict leaves source unchanged');
+    $document['group']['location'] = 'options:site';
+    $document['group']['ID'] = $source; $document['group']['post_status'] = 'publish'; $document['group']['meta_input'] = array('injected' => 'bad');
+    $imported = Alify_CF_Transfer::import_json(wp_json_encode($document), $import_nonce);
+    expect_same(true, is_int($imported), 'Valid transfer creates group'); $fixtures[] = $imported;
+    expect_same('draft', get_post_status($imported), 'Import always creates draft despite source status');
+    expect_same(false, $source === $imported, 'Import never uses source ID');
+    expect_same($document['group']['fields'], Alify_CF::schema($imported), 'Schema round trip preserves keys, defaults, conditions and local subfields');
+    expect_same('options:site', get_post_meta($imported, Alify_CF::LOCATION, true), 'Registered options location imported');
+    expect_same(false, metadata_exists('post', $imported, 'injected'), 'Arbitrary metadata not imported');
+    $before_import_count = (int) wp_count_posts(Alify_CF::GROUP)->draft;
+    foreach (array('', '{', '[]', 'null', str_repeat('x', Alify_CF_Transfer::MAX_BYTES + 1), '{"format":"alify-custom-field","version":2,"group":{}}') as $invalid) {
+        expect_same(true, is_wp_error(Alify_CF_Transfer::import_json($invalid, $import_nonce)), 'Malformed, oversized or unknown-version input rejected');
+    }
+    $valid_document = $document; $valid_document['group']['location'] = 'post';
+    foreach (array('missing_type', 'options:not_registered', 'attachment', Alify_CF::GROUP) as $location) {
+        $bad = $valid_document; $bad['group']['location'] = $location;
+        expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Unavailable location rejected');
+    }
+    $bad = $valid_document; $bad['group']['fields'][0]['type'] = 'unsupported';
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Unknown field type rejected');
+    $bad = $valid_document; $bad['group']['fields'][0]['condition'] = array('field' => 'missing', 'operator' => 'equals', 'value' => '1');
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Broken condition rejected');
+    $bad = $valid_document; $bad['group']['fields'][3]['sub_fields'][0]['type'] = 'repeater';
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Nested repeater rejected');
+    expect_same('alify_transfer_nonce', Alify_CF_Transfer::import_json(wp_json_encode($valid_document), 'bad')->get_error_code(), 'Import nonce enforced');
+    wp_set_current_user($editor);
+    expect_same('alify_transfer_forbidden', Alify_CF_Transfer::export_json($source, $export_nonce)->get_error_code(), 'Editor cannot export group');
+    expect_same('alify_transfer_forbidden', Alify_CF_Transfer::import_json(wp_json_encode($valid_document), $import_nonce)->get_error_code(), 'Editor cannot import group');
+    wp_set_current_user(0);
+    expect_same('alify_transfer_forbidden', Alify_CF_Transfer::import_json(wp_json_encode($valid_document), $import_nonce)->get_error_code(), 'Anonymous import denied');
+    wp_set_current_user($admin->ID);
+    expect_same($before_import_count, (int) wp_count_posts(Alify_CF::GROUP)->draft, 'Rejected imports leave no partial draft groups');
+    ob_start(); Alify_CF_Transfer::render(); $transfer_html = ob_get_clean();
+    expect_same(true, strpos($transfer_html, 'multipart/form-data') !== false && strpos($transfer_html, 'alify_transfer_nonce') !== false, 'Transfer UI provides nonce-protected upload form');
     echo "PASS: $count real WordPress assertions; WordPress $wp_version; PHP " . PHP_VERSION . '; ' . get_class($wpdb) . "\n";
 } finally {
     wp_set_current_user($admin->ID); $_POST = array();

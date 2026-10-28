@@ -67,6 +67,28 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         }, {base, id: fixture.rest});
         check(bypass.status, 400, 'Raw REST publish without fields validates saved data');
         check(bypass.body.code, 'alify_invalid_fields', 'Raw REST returns structured Alify error');
+        await page.goto(base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-transfer');
+        await page.locator('#alify-export-group').selectOption(String(fixture.group));
+        const downloadReady = page.waitForEvent('download');
+        await page.getByRole('button', {name: 'Download JSON'}).click();
+        const download = await downloadReady;
+        const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+        check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
+        check(exported.group.fields.length, 6, 'Export includes all browser fixture fields');
+        const originalExport = JSON.stringify(exported);
+        exported.group.location = 'page';
+        await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
+        await Promise.all([page.waitForURL('**/post.php?post=**&action=edit'), page.getByRole('button', {name: 'Import as draft'}).click()]);
+        const importedId = Number(new URL(page.url()).searchParams.get('post'));
+        fixture.imports = [...(fixture.imports || []), importedId];
+        fs.writeFileSync(process.env.ALIFY_BROWSER_FIXTURE, JSON.stringify(fixture), {mode: 0o600});
+        check(await page.locator('#original_post_status').inputValue(), 'draft', 'Uploaded JSON redirects to a new draft');
+        check(JSON.parse(await page.locator('#alify-schema').inputValue()), exported.group.fields, 'Actual upload preserves full field configuration');
+        await page.goto(base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-transfer');
+        await page.locator('#alify-json').fill(originalExport);
+        const conflictReady = page.waitForResponse(response => response.url().includes('admin-post.php') && response.status() === 400);
+        await page.getByRole('button', {name: 'Import as draft'}).click(); await conflictReady;
+        check((await page.locator('body').textContent()).includes('already used'), true, 'Actual conflicting paste fails without overwriting existing group');
         check(errors, [], 'No uncaught browser JS errors');
         console.log(`PASS: ${checks} real browser assertions (Classic, Gutenberg, media modal, repeater, gallery, raw REST).`);
     } finally { await context.close(); await browser.close(); }

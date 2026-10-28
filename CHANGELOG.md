@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Add an admin-only JSON Import / Export page, with JSON downloads, file upload and pasted-JSON import.
+- Introduce a bounded, versioned, single-group configuration format; import always creates a new draft, never overwrites or auto-publishes existing groups.
+- Reuse the editor schema validator for supported fields, repeater/condition rules, registered locations and name conflicts.
+- Preserve field keys and portable defaults while resetting site-local image/file defaults; never transfer content values, media files, source IDs or arbitrary metadata.
+- Require capability and nonce checks, reject malformed/oversized/unsupported documents before insertion, and remove newly created drafts if metadata verification fails.
+- Add real WordPress transfer regressions and real-browser download/upload/conflict flows to the SQLite/MySQL matrix.
+
 ## 0.6.3
 
 - Add native MySQL 8.0 CI targets for both PHP/WordPress pairs, including backend assertions and real Chromium Classic/Gutenberg/media flows alongside SQLite.

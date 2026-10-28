@@ -7,7 +7,7 @@ if (!defined('ALIFY_CF_TEST_SITE') || !ALIFY_CF_TEST_SITE) { throw new RuntimeEx
 $admin = get_user_by('login', 'alify-test-admin'); wp_set_current_user($admin->ID);
 if (is_file($file)) {
     $old = json_decode(file_get_contents($file), true);
-    foreach (array_merge(array($old['group'], $old['classic'], $old['block'], $old['rest'] ?? 0), $old['images']) as $id) { if ($id) { wp_delete_post($id, true); } }
+    foreach (array_merge(array($old['group'], $old['classic'], $old['block'], $old['rest'] ?? 0), $old['images'], $old['imports'] ?? array()) as $id) { if ($id) { wp_delete_post($id, true); } }
 }
 
 $user = get_user_by('login', 'alify-browser');

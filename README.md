@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.3 — native MySQL verification matrix**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.7.0 — field-group JSON import/export**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -243,13 +243,25 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 5. Try deleting the source or making it conditional; verify the group configuration is rejected until affected rules are fixed.
 6. Test groups containing identical legacy keys independently; rules must never read another group's controls.
 
+## Field-group JSON import / export
+
+Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
+
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`), one group per document, maximum **1 MiB**. Not an ACF JSON importer.
+- Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
+- Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
+- Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
+- Uses the same schema validator as the field editor, including 200-field/20-subfield caps, supported types, name/key and condition checks. Unavailable post types/options pages must be registered on the destination first.
+- Both actions require admin capability and a valid nonce. Invalid imports create no group; storage verification failures remove the newly created draft. Database-wide transactions/concurrent administration are not provided.
+- Upload and PHP request limits can be lower than 1 MiB. Exported configuration can contain sensitive labels/default text: review files before sharing.
+
 ## Current limits
 
 - Field names must start with a lowercase letter and contain only lowercase letters, numbers and underscores. Names are reserved across published, draft, pending, private and scheduled groups matching the same post type. Conflicts reject the entire configuration change, preserving its previous fields and location. Trashed groups do not reserve names; avoid restoring legacy conflicting groups without reviewing them.
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value; invalid new publication/scheduling is blocked. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested repeaters, Flexible Content, import/export, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
+- No nested repeaters, Flexible Content, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Validation feedback and input recovery
@@ -275,7 +287,7 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 ## Verification
 
-Automated checks for 0.6.3:
+Automated checks for 0.7.0:
 
 ```sh
 npm ci
