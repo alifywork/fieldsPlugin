@@ -265,7 +265,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional basic/gallery fields in the same field group; containers cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
+- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers and structured Link fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
 - Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
@@ -375,16 +375,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Previous verified baseline (0.13.0; Link development checks extend it):
+Automated checks for 0.14.0:
 
 ```sh
 npm ci
-npm test       # 35 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 37 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 287 assertions with isolated WordPress stubs
+php tests/php-unit.php # 314 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 230 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 245 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -405,7 +405,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 230 backend assertions, 76 browser assertions and 18 additional HTTP options persistence assertions in [CI run 40685608711](https://github.com/alifywork/fieldsPlugin/actions/runs/40685608711), with clean debug-log checks. Coverage includes actual options-page success/failure redirects, attempted-input recovery, correction, invalid nonce, incomplete forms and editor-role denial. Six independent CLI database inspections distinguish persisted values from recovery-rendered inputs and verify options/post isolation plus autoload-disabled storage. Existing container/media/JSON/conditional flows remain covered. These remote results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 245 backend assertions, 81 browser assertions and 18 additional HTTP options persistence assertions in [CI run 40686735083](https://github.com/alifywork/fieldsPlugin/actions/runs/40686735083), with clean debug-log checks. Coverage includes actual options-page success/failure redirects, attempted-input recovery, correction, invalid nonce, incomplete forms and editor-role denial. Six independent CLI database inspections distinguish persisted values from recovery-rendered inputs and verify options/post isolation plus autoload-disabled storage. Existing container/media/JSON/conditional flows remain covered. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 

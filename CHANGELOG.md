@@ -2,6 +2,8 @@
 
 ## 0.14.0
 
+- Feature checks pass on all four existing native-PHP targets: 245 backend, 81 browser and 18 additional HTTP persistence assertions; 314 isolated PHP assertions and 37 JS tests also pass.
+
 - Add atomic Link records (HTTP(S) URL, optional sanitized title and same/new-tab target) to the builder, post/Options controls and basic container subfields.
 - Add explicit Clear link, required URL validation, complete-payload checks and `alify_get_link()`; preserve saved records/containers on rejection and recover escaped attempts separately.
 - Reject executable/relative/credential-bearing URLs, malformed structures and unsupported targets. No URL fetching or automatic HTML rendering.
