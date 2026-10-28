@@ -6,7 +6,7 @@
     function syncOne(textarea) {
         const editor = editorFor(textarea);
         // Text-tab edits live in the textarea, not the inactive Visual editor.
-        if (editor && !editor.isHidden()) editor.save();
+        if (editor && editor.initialized && !editor.isHidden()) editor.save();
     }
     function sync() { document.querySelectorAll(selector).forEach(syncOne); }
     function enable(textarea) {
@@ -33,7 +33,7 @@
     }
     function focus(textarea) {
         const editor = editorFor(textarea);
-        if (editor && !editor.isHidden()) {
+        if (editor && editor.initialized && !editor.isHidden()) {
             editor.focus();
             const iframe = document.getElementById(textarea.id + '_ifr');
             if (iframe && textarea.hasAttribute('aria-invalid')) {

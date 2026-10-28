@@ -563,7 +563,7 @@ test('rich editor synchronizes Visual before form saves but preserves active Tex
     const dom = new JSDOM('<form><div class="alify-rich"><button type="button" data-rich-enable>Enable</button><textarea id="rich" data-rich-editor>Original</textarea></div></form>', {runScripts: 'outside-only'});
     const w = dom.window, d = w.document; let settings, active = false, hidden = false;
     const textarea = d.getElementById('rich');
-    const editor = {isHidden: () => hidden, save: () => { textarea.value = '<p>Visual</p>'; }, focus: () => {}};
+    const editor = {initialized: true, isHidden: () => hidden, save: () => { textarea.value = '<p>Visual</p>'; }, focus: () => {}};
     w.tinymce = {get: () => active ? editor : null};
     w.wp = {editor: {initialize(id, config) { assert.equal(id, 'rich'); settings = config; active = true; }}};
     w.eval(fs.readFileSync('assets/rich-text.js', 'utf8'));
@@ -571,6 +571,7 @@ test('rich editor synchronizes Visual before form saves but preserves active Tex
     assert.equal(d.querySelector('button').hidden, true);
     d.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); assert.equal(textarea.value, '<p>Visual</p>');
     hidden = true; textarea.value = '<p>Text edit</p>'; w.AlifyRichText.sync(); assert.equal(textarea.value, '<p>Text edit</p>');
+    hidden = false; editor.initialized = false; textarea.value = 'Pending initialization'; w.AlifyRichText.sync(); assert.equal(textarea.value, 'Pending initialization');
     w.close();
 });
 
@@ -586,4 +587,19 @@ test('WYSIWYG builder uses multiline defaults and excludes rich subfields', () =
     assert.equal(w.document.querySelector('[data-prop="default"]').tagName, 'TEXTAREA');
     set(w, 'type', 'repeater'); w.document.querySelector('[data-sub-action="add"]').click();
     assert.equal(w.document.querySelector('[data-sub-prop="type"] option[value="wysiwyg"]'), null); w.close();
+});
+
+
+test('rich editor tears down before metabox movement and recreates from saved textarea', () => {
+    const dom = new JSDOM('<div class="postbox"><div class="alify-rich"><button type="button" data-rich-enable>Enable</button><textarea id="rich" data-rich-editor>Initial</textarea></div></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document, handlers = {}; let active = false, initialized = 0, removed = 0;
+    const textarea = d.getElementById('rich');
+    const editor = {initialized: true, isHidden: () => false, save: () => { textarea.value = '<p>Latest</p>'; }};
+    w.tinymce = {get: () => active ? editor : null};
+    w.wp = {editor: {initialize() { active = true; initialized++; }, remove() { active = false; removed++; }}};
+    w.jQuery = () => ({on(name, selector, fn) { handlers[name] = fn; return this; }});
+    w.eval(fs.readFileSync('assets/rich-text.js', 'utf8')); d.querySelector('button').click();
+    const ui = {item: [d.querySelector('.postbox')]};
+    handlers.sortstart({}, ui); assert.equal(textarea.value, '<p>Latest</p>'); assert.equal(removed, 1);
+    handlers.sortstop({}, ui); assert.equal(initialized, 2); assert.equal(textarea.value, '<p>Latest</p>'); w.close();
 });
