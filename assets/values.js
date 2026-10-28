@@ -49,7 +49,7 @@
                 if (rule) {
                     const source = fields.find(item => item.dataset.fieldKey === rule.field);
                     visible = false;
-                    if (source && source.dataset.fieldType !== 'repeater' && !JSON.parse(source.dataset.condition || 'null')) {
+                    if (source && !['repeater', 'group'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
                         const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                         let values;
                         if (source.dataset.fieldType === 'gallery') {

@@ -39,3 +39,9 @@ function alify_the_option($name, $page = 'site') {
     $value = alify_get_option($name, $page);
     if (is_scalar($value)) { echo esc_html((string) $value); }
 }
+
+/** Return a Group field's saved associative array, or an empty array before save. */
+function alify_get_group($name, $post_id = 0) {
+    $value = alify_get_field($name, $post_id);
+    return is_array($value) ? $value : array();
+}

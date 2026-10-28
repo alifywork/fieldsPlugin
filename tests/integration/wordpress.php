@@ -279,6 +279,59 @@ try {
     expect_same($before_import_count, (int) wp_count_posts(Alify_CF::GROUP)->draft, 'Rejected imports leave no partial draft groups');
     ob_start(); Alify_CF_Transfer::render(); $transfer_html = ob_get_clean();
     expect_same(true, strpos($transfer_html, 'multipart/form-data') !== false && strpos($transfer_html, 'alify_transfer_nonce') !== false, 'Transfer UI provides nonce-protected upload form');
+    // Fixed Group objects across Classic, REST, options and configuration transfer.
+    $_POST = array(); wp_update_post(array('ID' => $group, 'post_status' => 'draft'));
+    $object_group = fixture_post(Alify_CF::GROUP);
+    $profile = test_field('profile', 'group', true);
+    $profile['sub_fields'] = array(test_field('name', 'text', true), test_field('enabled', 'true_false'), test_field('photos', 'gallery'), test_field('portrait', 'image'));
+    configure_group($object_group, array($profile)); $_POST = array();
+    expect_same('group', Alify_CF::schema($object_group)[0]['type'], 'Group schema persisted');
+    $object_post = fixture_post();
+    $profile_payload = array('__complete' => '1', 'fields' => array('name' => 'سلام Profile', 'enabled' => '1', 'photos' => array('__complete' => '1', 'ids' => array($image)), 'portrait' => (string) $image));
+    save_values($object_post, $object_group, array('profile' => $profile_payload));
+    $saved_profile = alify_get_group('profile', $object_post);
+    expect_same('سلام Profile', $saved_profile['name'], 'Group scalar stored in structured object');
+    expect_same(array($image), $saved_profile['photos'], 'Group gallery retains ordered IDs');
+    expect_same($image, $saved_profile['portrait'], 'Nested media retains integer in serialized Group');
+    $bad_profile = $profile_payload; $bad_profile['fields']['name'] = '';
+    save_values($object_post, $object_group, array('profile' => $bad_profile), 'publish');
+    expect_same('draft', get_post_status($object_post), 'Invalid Group blocks Classic publication');
+    expect_same($saved_profile, alify_get_group('profile', $object_post), 'Invalid Group preserves complete prior object');
+    $incomplete = $profile_payload; unset($incomplete['__complete']);
+    save_values($object_post, $object_group, array('profile' => $incomplete));
+    expect_same($saved_profile, alify_get_group('profile', $object_post), 'Truncated Group preserves object');
+    save_values($object_post, $object_group, array('profile' => $profile_payload), 'publish');
+    expect_same('publish', get_post_status($object_post), 'Corrected Group publishes');
+    $_POST = array(); $object_rest = fixture_post();
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $object_rest); $request->set_param('status', 'publish');
+    expect_same(400, rest_do_request($request)->get_status(), 'Raw REST cannot bypass missing required Group subfield');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $object_rest); $request->set_param('status', 'publish');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($object_group => array('__group_complete' => '1', 'profile' => $profile_payload))));
+    expect_same(200, rest_do_request($request)->get_status(), 'Group accepted in Gutenberg-style REST save');
+    expect_same($saved_profile, alify_get_group('profile', $object_rest), 'REST Group object persisted');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $object_rest); $request->set_param('status', 'publish');
+    expect_same(200, rest_do_request($request)->get_status(), 'Saved Group and nested gallery reconstructed for omitted REST payload');
+    $object_json = Alify_CF_Transfer::export_json($object_group, $export_nonce);
+    expect_same(true, is_string($object_json), 'Group configuration export supported');
+    $object_document = json_decode($object_json, true); $object_document['group']['location'] = 'options:transfer-tests';
+    $options_group = Alify_CF_Transfer::import_json(wp_json_encode($object_document), $import_nonce); $fixtures[] = $options_group;
+    expect_same(true, is_int($options_group), 'Group configuration imported as draft');
+    expect_same(Alify_CF::schema($object_group), Alify_CF::schema($options_group), 'Group schema and local keys round trip');
+    $_POST = array(); wp_update_post(array('ID' => $options_group, 'post_status' => 'publish'));
+    $option_request = array('alify_options_nonce' => wp_create_nonce('alify_options_transfer-tests'), 'alify_options_complete' => '1', 'alify_values' => array($options_group => array('__group_complete' => '1', 'profile' => $profile_payload)));
+    $object_errors = array();
+    expect_same(true, Alify_CF_Options::save('transfer-tests', $option_request, $object_errors), 'Group saved on registered options page');
+    expect_same($saved_profile, alify_get_option('profile', 'transfer-tests'), 'Options Group object matches post contract');
+    $option_request['alify_values'][$options_group]['profile'] = $bad_profile;
+    expect_same(false, Alify_CF_Options::save('transfer-tests', $option_request, $object_errors), 'Options invalid Group rejected atomically');
+    expect_same($saved_profile, alify_get_option('profile', 'transfer-tests'), 'Invalid options Group leaves prior object');
+    ob_start(); Alify_CF::values(get_post($object_post), get_post($object_group)); $object_html = ob_get_clean();
+    expect_same(true, strpos($object_html, '[profile][fields][name]') !== false && strpos($object_html, 'class="alify-group"') !== false, 'Native Group rendering namespaces subfields');
+    foreach (array('group', 'repeater') as $nested_type) {
+        $bad_schema = $profile; $bad_schema['sub_fields'][0]['type'] = $nested_type; $object_errors = array();
+        Alify_CF::validate_schema(array($bad_schema), 'page', 0, $object_errors);
+        expect_same(true, (bool) $object_errors, 'Nested container rejected by shared schema validator');
+    }
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
@@ -290,6 +343,7 @@ try {
     wp_set_current_user($admin->ID); $_POST = array();
     foreach (array_reverse($fixtures) as $id) { wp_delete_post($id, true); }
     delete_option('alify_cf_options_site');
+    delete_option('alify_cf_options_transfer-tests');
     Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }

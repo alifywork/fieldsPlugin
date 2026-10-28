@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.7.0 — field-group JSON import/export**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.8.0 — structured Group fields**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -243,6 +243,25 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 5. Try deleting the source or making it conditional; verify the group configuration is rejected until affected rules are fixed.
 6. Test groups containing identical legacy keys independently; rules must never read another group's controls.
 
+## Group fields
+
+A **Group** stores related basic subfields as one associative object rather than a list of rows. Add a Group in the field builder, then define 1–20 local subfields. The same local names can be used in different Groups without colliding with top-level fields.
+
+```php
+$profile = alify_get_group('profile', get_the_ID());
+echo esc_html($profile['name'] ?? '');
+// Options-page Groups use the normal options helper:
+$settings = alify_get_option('profile', 'site');
+```
+
+- Posts and options support Group text/choice/media/gallery subfields. Subfield media IDs are integers inside the serialized object; gallery IDs remain ordered integer arrays.
+- The whole Group is validated atomically. An invalid required subfield, unauthorized new attachment or incomplete payload retains the previous complete object. Post publication and core REST validation include Groups.
+- A required Group needs at least one nonempty subfield (an unchecked toggle does not count); individually required subfields must always validate when the Group is visible.
+- Optional checkbox/toggle-only Groups can be cleared. Missing completion markers never clear saved data.
+- Whole-Group conditional visibility is supported; Groups cannot be condition sources. Subfield conditions and nested Group/Repeater containers are not supported in this increment.
+- Group schemas and subfield keys participate in JSON transfer. Image/file defaults reset during transfer as with other fields. Errors/recovery are shown at the Group boundary, not individually per subfield.
+- `alify_get_field()` also returns the associative object. `alify_get_group()` returns an empty array before the first save; escape subfield output for its context. Renaming subfields does not migrate existing data.
+
 ## Field-group JSON import / export
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
@@ -261,7 +280,7 @@ Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`)
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value; invalid new publication/scheduling is blocked. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested repeaters, Flexible Content, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
+- No nested Groups/repeaters, Flexible Content, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Validation feedback and input recovery
@@ -287,13 +306,13 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 ## Verification
 
-Automated checks for 0.7.0:
+Automated checks for 0.8.0:
 
 ```sh
 npm ci
-npm test       # 23 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 24 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 160 assertions with isolated WordPress stubs
+php tests/php-unit.php # 175 assertions with isolated WordPress stubs
 ```
 
 Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 119 assertions per target:
@@ -322,7 +341,7 @@ The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all thirteen types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all fourteen types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.

@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery'}};
+    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -348,5 +348,22 @@ test('editor bridge renders structured server errors as text and rethrows reject
     assert.equal(w.document.querySelector('.alify-field-error').textContent, '<img src=x>Required');
     assert.equal(w.document.querySelector('img'), null);
     assert.equal(w.document.querySelector('[name="alify_values[7][title]"]').getAttribute('aria-invalid'), 'true');
+    w.close();
+});
+
+
+test('group builder provides basic subfields, excludes nested containers and copies independently', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Profile'); set(w, 'type', 'group');
+    d.querySelector('[data-sub-action="add"]').click();
+    const label = d.querySelector('[data-sub-prop="label"]'); label.value = 'Name'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].name, 'name');
+    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="group"]'), null);
+    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="repeater"]'), null);
+    assert.equal(d.querySelector('[data-prop="default"]'), null);
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
+    d.querySelector('[data-action="duplicate"]').click();
+    const duplicateLabel = d.querySelectorAll('[data-sub-prop="label"]')[1]; duplicateLabel.value = 'Changed'; duplicateLabel.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].label, 'Name');
     w.close();
 });

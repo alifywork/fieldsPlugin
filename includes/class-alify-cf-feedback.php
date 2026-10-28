@@ -36,6 +36,13 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'group') {
+            if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1' || !is_array($raw['fields'] ?? null)) { return $previous; }
+            $as_repeater = $field; $as_repeater['type'] = 'repeater';
+            $row = $raw['fields']; $row['__row_complete'] = '1';
+            $rows = self::display($as_repeater, array('__complete' => '1', 'rows' => array($row)), is_array($previous) ? array($previous) : array());
+            return $rows[0] ?? $previous;
+        }
         if ($field['type'] === 'repeater') {
             if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1' || !is_array($raw['rows'] ?? array()) || count($raw['rows'] ?? array()) > 50) { return $previous; }
             foreach ((array) $previous as $old_row) {

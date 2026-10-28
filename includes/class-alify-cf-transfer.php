@@ -30,7 +30,7 @@ final class Alify_CF_Transfer {
     private static function portable($fields) {
         foreach ($fields as &$field) {
             if (in_array($field['type'], array('image', 'file'), true)) { $field['default'] = ''; }
-            if ($field['type'] === 'repeater') { $field['sub_fields'] = self::portable($field['sub_fields']); }
+            if (in_array($field['type'], array('repeater', 'group'), true)) { $field['sub_fields'] = self::portable($field['sub_fields']); }
         }
         unset($field); return $fields;
     }
@@ -38,7 +38,7 @@ final class Alify_CF_Transfer {
         foreach ($fields as &$field) {
             if (!is_array($field)) { continue; }
             if (in_array($field['type'] ?? '', array('image', 'file'), true)) { $field['default'] = ''; }
-            if (($field['type'] ?? '') === 'repeater' && is_array($field['sub_fields'] ?? null)) { $field['sub_fields'] = self::portable_input($field['sub_fields']); }
+            if (in_array(($field['type'] ?? ''), array('repeater', 'group'), true) && is_array($field['sub_fields'] ?? null)) { $field['sub_fields'] = self::portable_input($field['sub_fields']); }
         }
         unset($field); return $fields;
     }
