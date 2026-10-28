@@ -6,7 +6,7 @@
 - Add actionable row-count/incomplete-structure messages while preserving atomic values and publication checks.
 - Keep rejected values, submitted row tokens, unknown layout names and attachment identities out of diagnostic messages.
 - Link container alerts and REST errors accessibly; clear stale error description references on edit while retaining help references.
-- Add isolated, backend and actual-browser regression coverage. Per-subfield inline placement, focus management and full accessibility auditing remain pending.
+- Verify four native-PHP SQLite/MySQL targets: 211 backend and 52 real-browser assertions per target, plus 258 isolated PHP assertions and 31 JS tests. Per-subfield inline placement, focus management and full accessibility auditing remain pending.
 
 ## 0.11.0
 

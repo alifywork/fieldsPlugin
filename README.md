@@ -269,7 +269,7 @@ Each persisted row is `['layout' => 'hero', 'fields' => ['title' => '...']]`. Te
 
 All rows validate atomically. Invalid subfields, unknown layouts, unauthorized new media or missing completion markers retain the previous complete list. A required Flexible field needs at least one valid row. A complete empty optional list clears it. Existing restricted media is retained only within its original layout's media pool, including reordering.
 
-Layout names/keys and definitions transfer through JSON; content does not. Destination sites need Flexible support (0.9.0+). Image/file defaults reset. Removing/renaming a layout does not migrate data: saved unknown rows show a warning and block replacement until their schema is restored or the editor explicitly removes them. Removing/renaming subfields similarly requires review; no data migration or revision restoration is provided. Errors/recovery are field-level, not per-row diagnostics.
+Layout names/keys and definitions transfer through JSON; content does not. Destination sites need Flexible support (0.9.0+). Image/file defaults reset. Removing/renaming a layout does not migrate data: saved unknown rows show a warning and block replacement until their schema is restored or the editor explicitly removes them. Removing/renaming subfields similarly requires review; no data migration or revision restoration is provided. Errors/recovery are field-level; diagnostic text names the first failing row/layout/subfield, but separate per-row inline placement is not yet provided.
 
 ## Group fields
 
@@ -346,12 +346,12 @@ Automated checks for 0.11.1:
 
 ```sh
 npm ci
-npm test       # 30 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 31 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 244 assertions with isolated WordPress stubs
+php tests/php-unit.php # 258 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 197 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 211 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -372,7 +372,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 197 backend and 45 Chromium assertions in [CI run 40673215985](https://github.com/alifywork/fieldsPlugin/actions/runs/40673215985), with clean debug-log checks. The browser checks include safe v2 export/import for bounded repeaters, configured Add/Remove boundaries across save/reload, Group/Flexible persistence and compound condition behavior in Classic/Gutenberg. These remote results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 211 backend and 52 Chromium assertions in [CI run 40676351950](https://github.com/alifywork/fieldsPlugin/actions/runs/40676351950), with clean debug-log checks. The browser checks include actual container error paths, rejection/correction flows and accessible REST error references, as well as row bounds, JSON transfer, Group/Flexible persistence and compound conditions. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 
