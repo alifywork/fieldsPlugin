@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', date_time: 'Date Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -783,4 +783,25 @@ test('Password is excluded as a conditional source even when revealed', () => {
     assert.equal(d.querySelector('[data-field-key="target"]').hidden, true);
     d.querySelector('[data-password-toggle]').click(); d.querySelector('[data-password-input]').dispatchEvent(new w.Event('input', {bubbles: true}));
     assert.equal(d.querySelector('[data-field-key="target"]').hidden, true); w.close();
+});
+
+test('Date Time builder exposes defaults and basic subfields', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Meeting'); set(w, 'type', 'date_time'); set(w, 'default', '2024-02-29T09:30');
+    assert.equal(schema(w)[0].default, '2024-02-29T09:30');
+    set(w, 'type', 'group'); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'date_time'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].type, 'date_time'); w.close();
+});
+test('Date Time conditional source normalizes native minutes/seconds and clearing', () => {
+    const w = conditionalEditor('date_time', 'equals', '2024-02-29 09:30:00', '<div class="alify-date-time"><input type="datetime-local" step="1" value="2024-02-29T09:30"><button type="button" data-date-time-clear>Clear</button></div>'), d = w.document;
+    const target = d.querySelector('[data-field-key="target"]'); assert.equal(target.hidden, false);
+    const input = d.querySelector('input[type="datetime-local"]'); input.value = '2024-02-29T09:30:45'; input.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(target.hidden, true); input.value = '2024-02-29T09:30:00'; input.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(target.hidden, false);
+    d.querySelector('[data-date-time-clear]').click(); assert.equal(input.value, ''); assert.equal(target.hidden, true); w.close();
+});
+test('Date Time source fails closed for forged invalid calendar/offset values', () => {
+    for (const value of ['2023-02-29T09:30', '2026-10-28T09:30Z', '0999-12-31T09:30']) {
+        const w = conditionalEditor('date_time', 'not_empty', '', `<input type="text" value="${value}">`);
+        assert.equal(w.document.querySelector('[data-field-key="target"]').hidden, true); w.close();
+    }
 });

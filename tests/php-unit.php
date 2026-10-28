@@ -820,4 +820,26 @@ same(false, strpos(wp_json_encode($recovery), 'sensitive') !== false, 'Feedback 
 $issue = ''; $location = null;
 same('', Alify_CF_Repeater::clean($password_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'masked_value' => array()))), null, false, $issue, $location), 'Malformed Password rejects whole Repeater');
 same(array('row' => 0, 'subfield' => 'masked_value'), $location, 'Password validation reports exact row/subfield');
+$date_time = field('meeting_at', 'date_time');
+same('Date Time', Alify_CF::types()['date_time'], 'Date Time is registered');
+foreach (array('2024-02-29T09:30' => '2024-02-29 09:30:00', '2026-10-28 09:30:45' => '2026-10-28 09:30:45', '1000-01-01T00:00' => '1000-01-01 00:00:00', '9999-12-31T23:59:59' => '9999-12-31 23:59:59', '2026-03-08T02:30' => '2026-03-08 02:30:00') as $raw => $expected) { same($expected, Alify_CF::clean_value($date_time, $raw), 'Date Time canonicalizes without timezone conversion'); }
+foreach (array('2023-02-29T09:30', '2026-04-31T09:30', '2026-01-00T09:30', '0999-12-31T23:59', '10000-01-01T00:00', '2026-10-28T24:00', '2026-10-28T09:60', '2026-10-28T09:30:60', '2026-10-28T09:30Z', '2026-10-28T09:30+05:00', '2026-10-28T09:30:00.5', '2026-10-28', "2026-10-28T09:30\n", array(), array('value'), false, 123, null) as $bad) {
+    $errors = array(); same(array(), Alify_CF::validate_values(array($date_time), array('meeting_at' => $bad), array('meeting_at' => '2026-10-28 09:30:00'), $errors), 'Date Time rejects malformed/nonexistent calendar values'); same(true, count($errors) > 0, 'Date Time rejection reports error');
+}
+$errors = array(); same(array('meeting_at' => ''), Alify_CF::validate_values(array($date_time), array('meeting_at' => ''), array(), $errors), 'Optional Date Time clears');
+$date_time['required'] = true; $errors = array(); same(array(), Alify_CF::validate_values(array($date_time), array('meeting_at' => ''), array(), $errors), 'Required Date Time rejects blank');
+$date_time['default'] = '2024-02-29T09:30'; $errors = array(); $schema = Alify_CF::validate_schema(array($date_time), 'post', 9999, $errors);
+same(array(), $errors, 'Date Time schema accepted'); same('2024-02-29 09:30:00', $schema[0]['default'], 'Date Time default canonicalized');
+$date_time['default'] = '2023-02-29T09:30'; $errors = array(); Alify_CF::validate_schema(array($date_time), 'post', 9999, $errors); same(true, count($errors) > 0, 'Invalid Date Time default rejects schema');
+$errors = array(); Alify_CF_Repeater::schema(array($date_time), $errors); same(true, count($errors) > 0, 'Invalid subfield default rejects schema');
+$date_time['default'] = ''; $date_rows = field('date_rows', 'repeater'); $date_rows['sub_fields'] = array($date_time);
+$issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($date_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'meeting_at' => array()))), null, false, $issue, $location), 'Malformed Date Time rejects whole container');
+same(array('row' => 0, 'subfield' => 'meeting_at'), $location, 'Date Time error locates subfield');
+$dependent = field('date_detail'); $dependent['condition'] = array('field' => $date_time['key'], 'operator' => 'equals', 'value' => '2024-02-29 09:30:00');
+same(true, Alify_CF::visible($dependent, array($date_time, $dependent), array($date_time['key'] => '2024-02-29 09:30:00')), 'Date Time is an eligible condition source');
+$date_recovery = Alify_CF_Feedback::group(array($date_time), array('meeting_at' => '2023-02-29T09:30'), array('meeting_at' => '2024-02-29 09:30:00'), array('meeting_at' => 'Invalid'));
+same('2024-02-29 09:30:00', $date_recovery['values']['meeting_at'], 'Unrepresentable Date Time recovery uses saved value, not an accidental blank');
+$date_recovery = Alify_CF_Feedback::group(array($date_rows), array('date_rows' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'meeting_at' => 'bad-date')))), array('date_rows' => array(array('meeting_at' => '2024-02-29 09:30:00'))), array('date_rows' => 'Invalid'));
+same(array(array('meeting_at' => '2024-02-29 09:30:00')), $date_recovery['values']['date_rows'], 'Unrepresentable Date Time subfield uses saved container recovery');
 echo "PASS: $count PHP contract assertions\n";

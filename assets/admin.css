@@ -52,3 +52,6 @@
 .alify-password { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .alify-password input { flex: 1; min-width: 140px; max-width: 480px; }
 .alify-password .description { flex-basis: 100%; }
+
+.alify-date-time { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.alify-date-time .description { flex-basis: 100%; }

@@ -48,6 +48,7 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'date_time') { $clean = Alify_CF_Date_Time::clean($raw); return $raw === '' ? '' : ($clean !== '' ? $clean : $previous); }
         if ($field['type'] === 'relationship') {
             $clean = Alify_CF_Relationship::clean($raw, is_array($previous) ? $previous : array(), true);
             return is_array($clean) ? $clean : $previous;
@@ -99,6 +100,8 @@ final class Alify_CF_Feedback {
                 if (!is_array($row) || ($row['__row_complete'] ?? '') !== '1') { return $previous; }
                 $out = array();
                 foreach ($field['sub_fields'] as $sub) {
+                    $date_raw = array_key_exists($sub['name'], $row) ? $row[$sub['name']] : '';
+                    if ($sub['type'] === 'date_time' && $date_raw !== '' && Alify_CF_Date_Time::clean($date_raw) === '') { return $previous; }
                     if ($sub['type'] === 'gallery' && (!is_array($row[$sub['name']] ?? null) || ($row[$sub['name']]['__complete'] ?? '') !== '1')) { return $previous; }
                     $out[$sub['name']] = self::display($sub, $row[$sub['name']] ?? '', $sub['default'], $allowed_media);
                 }

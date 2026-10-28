@@ -52,6 +52,11 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await chooseRelationship();
         check(await value('related').inputValue(), String(fixture.reference), 'Actual AJAX selector writes chosen post/page ID');
         check(await page.locator('.alify-relation-item').count(), 2, 'Relationship AJAX picker prevents duplicate references');
+        const dateTime = page.locator('.alify-date-time');
+        check(await value('meeting_at').inputValue(), '', 'Optional Date Time starts empty');
+        await value('meeting_at').fill('2024-02-29T09:30:45');
+        check(await value('meeting_detail').isVisible(), true, 'Native Date Time matches canonical conditional value');
+        await value('meeting_detail').fill('Meeting detail retained');
         const password = page.locator('.alify-password');
         const classicPassword = '  Classic <b>&%20 "demo"  ';
         check(await value('masked').getAttribute('type'), 'password', 'Password starts masked');
@@ -150,6 +155,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('masked').inputValue(), classicPassword, 'Password preserves exact value across Classic save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Reload resets Password to masked');
         await password.locator('[data-password-clear]').click();
+        check(await value('meeting_at').inputValue(), '2024-02-29T09:30:45', 'Date Time seconds survive Classic save/reload');
+        await dateTime.locator('[data-date-time-clear]').click();
         await range.locator('[data-range-clear]').click();
         await buttons.locator('[data-radio-clear]').click();
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), '0', 'Radio choice survives Classic save/reload');
@@ -167,6 +174,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('related').inputValue(), '', 'Explicit post reference clear survives save/reload');
         check(await page.locator('.alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
         check(await value('masked').inputValue(), '', 'Optional Password clear survives Classic save/reload');
+        check(await value('meeting_at').inputValue(), '', 'Date Time clear survives Classic save/reload');
+        check(await value('meeting_detail').inputValue(), 'Meeting detail retained', 'Hidden Date Time dependent retains saved value');
         check(await value('amount').inputValue(), '', 'Optional Range clear survives Classic save/reload');
         check(await value('range_details').inputValue(), 'Range details retained', 'Hidden Range dependent preserves saved value');
         check(await buttons.locator('input:checked').count(), 0, 'Optional Button Group clear survives Classic save/reload');
@@ -208,6 +217,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
         await value('subtitle').fill('Block subtitle');
+        await value('meeting_at').fill('2026-10-28T16:45:59');
         await value('masked').fill('Block masked fixture');
         await value('amount').fill('1.5');
         await buttons.locator('label').filter({has: page.locator('input[value="b"]')}).locator('span').click();
@@ -259,6 +269,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('amount').inputValue(), '1.5', 'Range survives same-request Gutenberg REST save');
         check(await value('masked').inputValue(), 'Block masked fixture', 'Password survives same-request Gutenberg REST save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Gutenberg reload keeps Password masked');
+        check(await value('meeting_at').inputValue(), '2026-10-28T16:45:59', 'Date Time seconds survive Gutenberg same-request REST save');
         check(await value('details').inputValue(), 'Block ALL', 'ALL target survives Gutenberg REST save/reload');
         check(await value('alternate').inputValue(), 'Block ANY', 'ANY target survives Gutenberg REST save/reload');
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/block', 'Link components survive same-request Gutenberg REST save/reload');
@@ -279,7 +290,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 2, 'Row-bound schema exports as v2 for safe older-importer rejection');
-        check(exported.group.fields.length, 21, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 23, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
@@ -323,6 +334,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await chooseRelationship();
         await setRich('<p>Options <strong>copy</strong></p>');
         await optionValue('options_title').fill('Saved title');
+        await optionValue('options_meeting').fill('2026-10-28T16:45:59');
         await optionValue('options_masked').fill('Options masked fixture');
         await optionValue('options_amount').fill('1.500');
         await buttons.locator('label').filter({has: page.locator('input[value="a"]')}).locator('span').click();
@@ -335,6 +347,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await buttons.locator('input:checked').inputValue(), 'a', 'Button Group survives Options HTTP save/reload');
         check(await optionValue('options_amount').inputValue(), '1.5', 'Range canonical decimal survives Options HTTP save');
         check(await optionValue('options_masked').inputValue(), 'Options masked fixture', 'Password survives Options HTTP save/reload');
+        check(await optionValue('options_meeting').inputValue(), '2026-10-28T16:45:59', 'Date Time survives Options HTTP save/reload');
         check(page.url(), optionsURL, 'Options form redirects to its registered page');
         check(await page.locator('.notice-success').count(), 1, 'Actual options save shows success notice');
         check(await optionValue('options_related').inputValue(), String(fixture.reference), 'Selected post reference survives Options HTTP save/reload');

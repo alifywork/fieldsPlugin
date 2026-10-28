@@ -96,6 +96,19 @@
             toggle.setAttribute('aria-pressed', String(show)); toggle.textContent = show ? 'Hide value' : 'Show value';
         }
     });
+    function dateTimeValue(input) {
+        const match = input && input.value.match(/^([1-9][0-9]{3})-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])[T ]([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?$/);
+        if (!match || match[0] !== input.value) return '';
+        const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+        if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[3])) return '';
+        return match[1] + '-' + match[2] + '-' + match[3] + ' ' + match[4] + ':' + match[5] + ':' + (match[6] || '00');
+    }
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-date-time-clear]');
+        if (!button || button.disabled) return;
+        const input = button.closest('.alify-date-time').querySelector('input');
+        input.value = ''; input.dispatchEvent(new Event('input', {bubbles: true})); input.focus();
+    });
     function rangeUnits(text) {
         if (!/^-?(?:0|[1-9][0-9]{0,6})(?:\.[0-9]{1,3})?$/.test(text)) return null;
         const parts = text.replace('-', '').split('.');
@@ -213,6 +226,8 @@
                             } else if (['checkbox', 'true_false', 'radio', 'button_group'].includes(source.dataset.fieldType)) {
                                 values = inputs.filter(input => input.checked).map(input => input.value);
                                 if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
+                            } else if (source.dataset.fieldType === 'date_time') {
+                                values = [dateTimeValue(inputs[0])];
                             } else if (source.dataset.fieldType === 'range') {
                                 values = [rangeValue(source.querySelector('[data-range-number]')) ?? ''];
                             } else values = inputs.length ? [inputs[0].value] : [''];

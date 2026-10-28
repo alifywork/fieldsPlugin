@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.22.0
+
+- Add Date Time (`date_time`) with native second-precision editing and canonical `YYYY-MM-DD HH:MM:SS` strings. Accept native `T`/canonical space separators; omitted seconds become `00`.
+- Define floating wall-clock semantics: no timezone/offset/UTC conversion, no implicit DST normalization. Validate real Gregorian dates in years 1000–9999 and reject malformed values, offsets, fractions and invalid defaults.
+- Integrate posts/Options/basic containers, required/optional clearing, canonical conditional sources/targets, core REST validation and schema JSON. Recover unrepresentable invalid inputs from saved values/containers instead of accidental blanks.
+- Local feature checks: 572 PHP assertions, 60 JS tests and 433 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser verification is recorded after completion.
+- Complete Combined Date Time increment; next is configurable Date/Time display and return formats.
+
 ## 0.21.0
 
 - Add Password as exact UTF-8 plaintext with editor masking, keyboard-operable show/hide and optional clearing. Reject non-strings, control characters, invalid UTF-8 and values over 1024 bytes. This is not encryption, authentication or secret storage; warn in the editor/docs.

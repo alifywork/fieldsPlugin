@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.21.0 — Password field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.22.0 — Date Time field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -31,7 +31,18 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Password**. Next: **Combined Date Time**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Combined Date Time**. Next: **Date/Time display and return formats**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+
+## Combined Date Time field
+
+**Date Time (`date_time`)** uses a native `datetime-local` input with second precision. Storage and PHP getters use **`YYYY-MM-DD HH:MM:SS`**. Native `YYYY-MM-DDTHH:MM[:SS]` and canonical space-separated strings are accepted; omitted seconds become `00`.
+
+- **Floating wall-clock contract:** no timezone ID/offset, UTC conversion or timestamp is stored. Site/browser timezone changes do not shift the value. DST gaps/folds are not resolved or rejected as instants: for example `2026-03-08 02:30:00` remains that wall-clock value even where that time does not occur. Applications needing an instant must explicitly choose a timezone and handle ambiguity; do not append `Z` or assume UTC.
+- Years **1000–9999**, real Gregorian calendar dates, hours `00–23`, minutes/seconds `00–59`. Reject impossible dates, leap seconds, fractions, offsets/`Z`, whitespace padding, non-strings and malformed payloads. Nothing silently rolls over. Invalid schema defaults reject the schema update; valid defaults canonicalize.
+- Supported on posts/Options/basic Group, Repeater and Flexible subfields. Required rejects blank; optional fields have **Clear value**. Invalid values retain previous scalar/container/Options data under existing save-safety contracts.
+- Conditional source/target support compares canonical values (e.g. `2024-02-29 09:30:00`), not native `T` input strings. Hidden dependent values remain saved. Classic/Gutenberg/core REST use the same server validator.
+- Invalid dates that cannot be represented by the native input recover from saved values rather than appearing as accidental clears; containers with such invalid dates recover saved rows, with parent diagnostics when row correspondence is lost.
+- Schema JSON transfers defaults, conditions and basic subfields; destination plugins need **0.22.0+**. Use `alify_get_field()` / `alify_get_option()` for canonical strings. Browser locale controls the native UI; configurable PHP display/return formats are the **next** roadmap increment, not part of this release.
 
 ## Password field
 
@@ -482,16 +493,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.21.0:
+Automated checks for 0.22.0:
 
 ```sh
 npm ci
-npm test       # 57 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 60 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 519 assertions with isolated WordPress stubs
+php tests/php-unit.php # 572 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 408 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 433 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -517,7 +528,7 @@ The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all 25 types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all 26 types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.
