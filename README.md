@@ -107,12 +107,12 @@ Date, Time and Date Time now have separate **Editor display preview** and **Form
 
 ## Relationship field
 
-**Relationship (`relationship`)** selects an ordered list of up to **50 unique posts/pages**. It reuses Post Object's permission-filtered search and adds Move earlier/later, Remove reference and Clear all references. Supported on posts, Options Pages and basic Group/Repeater/Flexible subfields.
+**Relationship (`relationship`)** selects an ordered list of up to **50 unique references** (posts/pages by default; configured CPTs supported). It reuses Post Object's permission-filtered search and adds Move earlier/later, Remove reference and Clear all references. Supported on posts, Options Pages and basic Group/Repeater/Flexible subfields.
 
 - Values are stored as ordered integer-ID arrays. Duplicate IDs keep their first occurrence. The raw submitted list is capped at 50 before deduplication; excess items are rejected, never truncated.
 - The form/REST payload is `{__complete: '1', ids: [42, 51]}`. An explicit clear sends the marker with an empty/omitted `ids` list. Missing markers, malformed/non-list IDs, unavailable targets or new unreadable references reject the entire list; a container subfield failure retains its whole container. Options saves remain page-atomic.
 - Existing saved unreadable references may be retained/reordered or explicitly removed; their titles remain redacted. Deleted targets must be removed/replaced rather than silently discarded.
-- Required means at least one reference. This increment has fixed 0–50 limits (required minimum 1), empty defaults, no custom post types, no bidirectional updates, no configurable cardinality and no cross-site ID migration.
+- Required means at least one reference; configured minimum can require more when nonempty. Legacy limits are 0–50; v0.26 adds CPT/status filters and cardinality settings (see Reference configuration). Defaults, bidirectional writes and cross-site ID migration remain unsupported.
 - Relationship can be conditionally shown, but is not a condition source in this increment. JSON transfers schemas only with empty defaults; destination plugins need **0.17.0+**.
 
 ```php
@@ -126,9 +126,9 @@ foreach ($posts as $related) {
 
 ## Post Object field
 
-**Post Object (`post_object`)** is a single post/page reference with a searchable selector, type filter, Previous/Next pages and explicit Clear selection. It works on post/Options fields and as a basic Group/Repeater/Flexible subfield. References store canonical IDs, not copied content or titles. WordPress scalar post-meta reads return a string ID; serialized container/Options values retain integer IDs.
+**Post Object (`post_object`)** defaults to a single post/page reference with a searchable selector, type filter, Previous/Next pages and explicit Clear selection. It works on post/Options fields and as a basic Group/Repeater/Flexible subfield. References store canonical IDs, not copied content or titles. WordPress scalar post-meta reads return a string ID; serialized container/Options values retain integer IDs.
 
-- This increment supports **posts and pages only**, with publish/private/draft/pending/future statuses. Attachments, revisions, trash, auto-drafts and custom post types are excluded. For ordered multi-selection, use the Relationship field.
+- Legacy schemas support **posts and pages**, with publish/private/draft/pending/future statuses. Version 0.26 adds configured CPT/status filters and optional ordered multi-selection (see Reference configuration). Attachments, revisions, trash and auto-drafts remain excluded.
 - Search requires authentication, a user-scoped nonce and `edit_posts`, `edit_pages` or `manage_options`. Each result also passes object-level read permissions; password-protected targets require password access or edit permission. Only IDs, readable titles and types are returned—no content or unfiltered totals.
 - Queries fetch at most 20 candidates per page, pages 1–100. Permission-filtered pages can be empty; Next does not imply that another readable result exists. Refine the search instead of expecting exhaustive browsing. Search terms are capped at 200 bytes.
 - New references require read access. An unchanged pre-existing reference (or the same saved container's reference moved between rows) can be retained after access loss, without disclosing its title. Deleted/unsupported targets are rejected until explicitly cleared/replaced; saved content is not silently rewritten.
@@ -568,7 +568,7 @@ Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests us
 | 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
 | 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
 
-Both integration runs had clean WordPress debug logs. The previous 0.25.0 configuration batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40708689961](https://github.com/alifywork/fieldsPlugin/actions/runs/40708689961): 528 backend / 168 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
+Both integration runs had clean WordPress debug logs. The 0.26.0 reference batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40709951548](https://github.com/alifywork/fieldsPlugin/actions/runs/40709951548): 558 backend / 175 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
 
 ```sh
 # Requires Git/Bash and a native PHP executable with SQLite extensions.
