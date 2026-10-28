@@ -2,6 +2,8 @@
 
 ## 0.16.0
 
+- Feature checks pass on all four existing native-PHP targets: 285 backend, 91 browser and 24 HTTP persistence assertions; 348 isolated PHP assertions and 44 JS tests also pass.
+
 - Add single Post Object references with AJAX search, post/page filtering, bounded pagination and explicit clearing on posts, Options Pages and basic container subfields.
 - Require search nonce/authoring capability and per-object read/password access; never return unreadable titles, content or unfiltered totals. Discard stale search responses and reset pagination when queries change.
 - Validate canonical IDs/statuses; retain prior scalar/container on rejection and allow unchanged saved references after access loss without revealing their title.
