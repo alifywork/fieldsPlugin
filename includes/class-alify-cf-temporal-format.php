@@ -37,6 +37,7 @@ final class Alify_CF_Temporal_Format {
         return $date->format(self::selected($field, $key));
     }
     public static function field($field, $value) {
+        if (Alify_CF_Choice::supported($field['type'])) { return Alify_CF_Choice::format($field, $value); }
         if (self::formats($field['type'])) { return self::format($field, $value); }
         if (!is_array($value)) { return $value; }
         if ($field['type'] === 'group') {

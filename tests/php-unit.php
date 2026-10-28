@@ -869,4 +869,27 @@ $formatted_group['type'] = 'repeater'; same(array(array('day' => '29/02/2024', '
 $errors = array(); same(array(), Alify_CF_Temporal_Format::settings(field('legacy', 'date'), $errors), 'Legacy schema settings retain shape');
 same('', Alify_CF_Temporal_Format::format($formatted_date, '2023-02-29'), 'Impossible legacy date does not normalize');
 same('', Alify_CF_Temporal_Format::format($formatted_time, '24:00'), 'Invalid legacy time does not normalize');
+// Choice batch: layouts, defaults, multi/searchable Select and formatted returns.
+$multi = field('choice_many', 'select'); $multi['multiple'] = true; $multi['searchable'] = true; $multi['return_format'] = 'array'; $multi['choices'] = "0 : Zero\na : Alpha\nb : Beta";
+$errors = array(); same(array('return_format' => 'array', 'multiple' => true, 'searchable' => true), Alify_CF_Choice::settings($multi, $errors), 'Multi/search/return settings validated together');
+$multi_payload = array('__complete' => '1', 'values' => array('b', '0', 'a', 'b'));
+same(array('0', 'a', 'b'), Alify_CF::clean_value($multi, $multi_payload), 'Multi Select stores unique keys in definition order including zero');
+foreach (array('', array(), array('values' => array('a')), array('__complete' => '1', 'values' => null), array('__complete' => '1', 'values' => 'a'), array('__complete' => '1', 'values' => array('unknown')), array('__complete' => '1', 'values' => array('key' => 'a')), array('__complete' => '1', 'values' => array(true)), array('__complete' => '1', 'values' => array_fill(0, 101, 'a'))) as $bad) {
+    $errors = array(); same(array(), Alify_CF::validate_values(array($multi), array('choice_many' => $bad), array('choice_many' => array('a')), $errors), 'Malformed/incomplete/unknown/over-limit multi Select retains whole field'); same(true, count($errors) > 0, 'Invalid multi Select reports error');
+}
+$errors = array(); same(array('choice_many' => array()), Alify_CF::validate_values(array($multi), array('choice_many' => array('__complete' => '1')), array(), $errors), 'Complete empty multi Select clears');
+$multi['required'] = true; $errors = array(); same(array(), Alify_CF::validate_values(array($multi), array('choice_many' => array('__complete' => '1')), array(), $errors), 'Required multi Select rejects clear');
+$multi['default'] = "b\n0"; $errors = array(); $multi_schema = Alify_CF::validate_schema(array($multi), 'post', 9999, $errors); same(array(), $errors, 'Multi Select default settings accepted'); same(array('0', 'b'), $multi_schema[0]['default'], 'Multi defaults normalize key order');
+$checks = field('choice_checks', 'checkbox'); $checks['layout'] = 'horizontal'; $checks['default'] = "b\na"; $checks['return_format'] = 'label';
+$errors = array(); $checked_schema = Alify_CF_Repeater::schema(array($checks), $errors); same(array('a', 'b'), $checked_schema[0]['default'], 'Checkbox subfield defaults accept key-per-line input'); same('horizontal', $checked_schema[0]['layout'], 'Checkbox subfield layout preserved');
+$checks['default'] = 'unknown'; $errors = array(); Alify_CF::validate_schema(array($checks), 'post', 9999, $errors); same(true, count($errors) > 0, 'Unknown default key rejects entire schema');
+foreach (array(array('layout' => 'diagonal', 'type' => 'radio'), array('multiple' => 'yes', 'type' => 'select'), array('searchable' => array(), 'type' => 'select'), array('return_format' => 'html', 'type' => 'checkbox')) as $bad) { $errors = array(); Alify_CF_Choice::settings($bad, $errors); same(true, count($errors) > 0, 'Invalid choice configuration rejected'); }
+same(array(array('value' => '0', 'label' => 'Zero'), array('value' => 'a', 'label' => 'Alpha')), Alify_CF_Choice::format($multi, array('0', 'a')), 'Multi return format produces records');
+same(array('Alpha', 'Beta'), Alify_CF_Choice::format($checks, array('a', 'b')), 'Checkbox return format produces labels');
+$one = field('single', 'radio'); $one['return_format'] = 'array'; same(array('value' => 'a', 'label' => 'Alpha'), Alify_CF_Choice::format($one, 'a'), 'Scalar choice formatted return record'); same(null, Alify_CF_Choice::format($one, 'deleted-key'), 'Unknown saved key formats to null without rewriting storage');
+$rows = field('many_rows', 'repeater'); $rows['sub_fields'] = array($multi); $issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'choice_many' => array()))), null, false, $issue, $location), 'Incomplete multi Select rejects entire row container');
+same(array('row' => 0, 'subfield' => 'choice_many'), $location, 'Multi Select error identifies exact row/subfield');
+same(array('__complete' => '1', 'values' => array('a')), Alify_CF_Publication::stored_payload($multi, array('a')), 'Stored multi Select packs for omitted-payload publication validation');
+$dependent = field('multi_detail'); $dependent['condition'] = array('field' => $multi['key'], 'operator' => 'equals', 'value' => '0'); same(true, Alify_CF::visible($dependent, array($multi, $dependent), array($multi['key'] => array('0', 'b'))), 'Multi Select condition source uses key membership');
 echo "PASS: $count PHP contract assertions\n";

@@ -48,6 +48,7 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if (Alify_CF_Choice::multiple($field)) { $clean = Alify_CF_Choice::clean($field, $raw); return is_array($clean) ? $clean : $previous; }
         if ($field['type'] === 'date_time') { $clean = Alify_CF_Date_Time::clean($raw); return $raw === '' ? '' : ($clean !== '' ? $clean : $previous); }
         if ($field['type'] === 'relationship') {
             $clean = Alify_CF_Relationship::clean($raw, is_array($previous) ? $previous : array(), true);

@@ -825,3 +825,37 @@ test('Temporal previews match presets without rewriting inputs, names or conditi
         d.querySelector('input').value = ''; d.querySelector('input').dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(d.querySelector('output').textContent, ''); w.close();
     }
 });
+
+test('Choice batch builder persists checkbox defaults/layout and Select multiple/search/return settings', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Checks'); set(w, 'type', 'checkbox');
+    set(w, 'choices', 'a : Alpha\nb : Beta'); set(w, 'default', 'a\nb'); set(w, 'layout', 'horizontal'); set(w, 'return_format', 'label');
+    assert.equal(schema(w)[0].default, 'a\nb'); assert.equal(schema(w)[0].layout, 'horizontal'); assert.equal(schema(w)[0].return_format, 'label');
+    set(w, 'type', 'select'); let multiple = d.querySelector('[data-prop="multiple"]'); multiple.checked = true; multiple.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.querySelector('[data-prop="default"]').tagName, 'TEXTAREA');
+    const search = d.querySelector('[data-prop="searchable"]'); search.checked = true; search.dispatchEvent(new w.Event('input', {bubbles: true})); set(w, 'return_format', 'array');
+    assert.equal(schema(w)[0].multiple, true); assert.equal(schema(w)[0].searchable, true); assert.equal(schema(w)[0].return_format, 'array');
+    set(w, 'type', 'group'); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'select'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    multiple = d.querySelector('[data-sub-prop="multiple"]'); multiple.checked = true; multiple.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.querySelector('[data-sub-prop="default"]').tagName, 'TEXTAREA'); assert.equal(schema(w)[0].sub_fields[0].multiple, true); w.close();
+});
+function multiMarkup() {
+    return '<div class="alify-select"><input type="search" data-select-search><input type="hidden" name="alify_values[7][choices][__complete]" value="1"><select multiple name="alify_values[7][choices][values][]"><option value="0">Zero</option><option value="a" selected>Alpha</option><option value="b">Beta</option></select><button type="button" data-select-clear>Clear</button><span class="alify-select-status"></span></div>';
+}
+test('Searchable multi Select keeps selected options visible and conditions read all selected keys', () => {
+    const w = conditionalEditor('select', 'equals', 'b', multiMarkup()), d = w.document, target = d.querySelector('[data-field-key="target"]');
+    const search = d.querySelector('[data-select-search]'); search.value = 'Beta'; search.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.querySelector('option[value="0"]').hidden, true); assert.equal(d.querySelector('option[value="a"]').hidden, false); assert.equal(target.hidden, true);
+    d.querySelector('option[value="b"]').selected = true; d.querySelector('select').dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(target.hidden, false);
+    d.querySelector('[data-select-clear]').click(); assert.equal(d.querySelector('select').selectedOptions.length, 0); assert.equal(target.hidden, true);
+    assert.equal(d.querySelector('[name$="[__complete]"]').value, '1'); assert.equal(search.value, ''); w.close();
+});
+test('Gutenberg serializes all multi Select values and explicit empty lists, not first selected only', async () => {
+    const w = editorBridge(), d = w.document; d.querySelector('.alify-values').insertAdjacentHTML('beforeend', multiMarkup());
+    d.querySelector('option[value="b"]').selected = true; let sent;
+    await w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, options => { sent = options.data.alify_fields; return Promise.resolve({}); });
+    assert.deepEqual(Array.from(sent.groups['7'].choices.values), ['a', 'b']); assert.equal(sent.groups['7'].choices.__complete, '1');
+    Array.from(d.querySelector('select').options).forEach(option => { option.selected = false; });
+    await w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, options => { sent = options.data.alify_fields; return Promise.resolve({}); });
+    assert.deepEqual(Array.from(sent.groups['7'].choices.values), []); assert.equal(sent.groups['7'].choices.__complete, '1'); w.close();
+});

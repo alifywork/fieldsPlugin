@@ -16,6 +16,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
     let checks = 0, persistenceChecks = 0;
     const check = (actual, expected, label) => { assert.deepEqual(actual, expected, label); checks++; };
     const value = name => page.locator(`[name="alify_values[${fixture.group}][${name}]"]`);
+    const multi = page.locator(`select[name="alify_values[${fixture.group}][choice_multi][values][]"]`);
+    const selectedMulti = () => multi.evaluate(select => Array.from(select.selectedOptions).map(option => option.value));
     async function setRich(html) {
         const textarea = page.locator('textarea[data-rich-editor]');
         const id = await textarea.getAttribute('id');
@@ -48,6 +50,15 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('#user_login').fill(fixture.username); await page.locator('#user_pass').fill(fixture.password);
         await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
         await page.goto(`${base}/wp-admin/post.php?post=${fixture.classic}&action=edit&alify_classic=1`);
+        check(await selectedMulti(), ['b'], 'Multi Select defaults initialize native selected keys');
+        check(await page.locator(`[name="alify_values[${fixture.group}][choice_checks][]"][value="b"]`).isChecked(), true, 'Checkbox array defaults initialize checked keys');
+        check(await page.locator(`[name="alify_values[${fixture.group}][choice_checks][]"]`).first().locator('../..').evaluate(node => getComputedStyle(node).display), 'flex', 'Horizontal Checkbox layout is rendered');
+        check(await page.locator('.alify-radio:not(.alify-button-group)').evaluate(node => getComputedStyle(node).display), 'flex', 'Horizontal Radio layout is rendered');
+        await multi.locator('..').locator('[data-select-search]').fill('Alpha');
+        check(await multi.locator('option[value="0"]').evaluate(option => option.hidden), true, 'Local search filters unselected nonmatches');
+        check(await multi.locator('option[value="b"]').evaluate(option => option.hidden), false, 'Local search never hides selected keys');
+        await multi.locator('..').locator('[data-select-search]').fill(''); await multi.selectOption(['0', 'a']);
+        check(await value('choice_detail').isVisible(), true, 'Multi Select condition reads selected zero key, not search/marker'); await value('choice_detail').fill('Multi condition content');
         await chooseReference();
         await chooseRelationship();
         check(await value('related').inputValue(), String(fixture.reference), 'Actual AJAX selector writes chosen post/page ID');
@@ -159,6 +170,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('masked').inputValue(), classicPassword, 'Password preserves exact value across Classic save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Reload resets Password to masked');
         await password.locator('[data-password-clear]').click();
+        check(await selectedMulti(), ['0', 'a'], 'Native multi Select survives Classic save/reload');
+        await multi.locator('..').locator('[data-select-clear]').click(); check(await value('choice_detail').isVisible(), false, 'Clearing multi Select updates conditions');
         check(await value('meeting_at').inputValue(), '2024-02-29T09:30:45', 'Date Time seconds survive Classic save/reload');
         await dateTime.locator('[data-date-time-clear]').click();
         await range.locator('[data-range-clear]').click();
@@ -179,6 +192,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-link input[type="url"]').inputValue(), '', 'Explicit Link clear survives actual save/reload');
         check(await value('related').inputValue(), '', 'Explicit post reference clear survives save/reload');
         check(await page.locator('.alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
+        check(await selectedMulti(), [], 'Explicit multi Select clear survives Classic save/reload without reapplying defaults');
+        check(await value('choice_detail').inputValue(), 'Multi condition content', 'Hidden multi-choice dependent retains saved value');
         check(await value('masked').inputValue(), '', 'Optional Password clear survives Classic save/reload');
         check(await dateTime.locator('[data-temporal-preview]').textContent(), '', 'Clearing Date Time also clears display preview');
         check(await value('meeting_at').inputValue(), '', 'Date Time clear survives Classic save/reload');
@@ -223,6 +238,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         if (await welcome.count()) await welcome.getByRole('button', {name: 'Close', exact: true}).click();
         await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
+        await multi.selectOption(['a', 'b']);
         await value('subtitle').fill('Block subtitle');
         await value('meeting_at').fill('2026-10-28T16:45:59');
         await value('masked').fill('Block masked fixture');
@@ -274,6 +290,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), 'b', 'Radio survives same-request Gutenberg REST save/reload');
         check(await buttons.locator('input:checked').inputValue(), 'b', 'Button Group survives Gutenberg REST save/reload');
         check(await value('amount').inputValue(), '1.5', 'Range survives same-request Gutenberg REST save');
+        check(await selectedMulti(), ['a', 'b'], 'Gutenberg serializes every native multi selection into same-request REST save');
         check(await value('masked').inputValue(), 'Block masked fixture', 'Password survives same-request Gutenberg REST save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Gutenberg reload keeps Password masked');
         check(await dateTime.locator('[data-temporal-preview]').textContent(), '28 Oct 2026 4:45 PM', 'Configured Date Time preview survives Gutenberg reload');
@@ -298,7 +315,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 3, 'Temporal-format schema exports as v3 for safe older-importer rejection');
-        check(exported.group.fields.length, 24, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 27, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});

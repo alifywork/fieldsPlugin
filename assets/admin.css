@@ -58,3 +58,10 @@
 
 .alify-temporal { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .alify-temporal-display { color: #50575e; }
+
+.alify-choice-horizontal { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+.alify-choice-horizontal .alify-choice { display: inline-flex; gap: 5px; align-items: center; }
+.alify-select { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.alify-select-search { flex-basis: 100%; display: flex; gap: 8px; align-items: center; }
+.alify-select select { min-width: 180px; max-width: 100%; }
+.alify-select-status { flex-basis: 100%; }

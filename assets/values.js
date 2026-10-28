@@ -96,6 +96,31 @@
             toggle.setAttribute('aria-pressed', String(show)); toggle.textContent = show ? 'Hide value' : 'Show value';
         }
     });
+    function filterChoices(root) {
+        const search = root.querySelector('[data-select-search]'), select = root.querySelector('select');
+        if (!select) return;
+        const term = search ? search.value.toLocaleLowerCase() : '';
+        let shown = 0;
+        Array.from(select.options).forEach(option => {
+            option.hidden = option.value !== '' && !option.selected && !!term && !(option.textContent + ' ' + option.value).toLocaleLowerCase().includes(term);
+            if (!option.hidden && option.value !== '') shown++;
+        });
+        const status = root.querySelector('.alify-select-status');
+        if (status) status.textContent = term ? shown + ' choices shown (selected values stay visible).' : '';
+    }
+    function selectEdited(event) {
+        const root = event.target.closest('.alify-select'); if (root) filterChoices(root);
+    }
+    document.addEventListener('input', selectEdited); document.addEventListener('change', selectEdited);
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-select-clear]');
+        if (!button || button.disabled) return;
+        const root = button.closest('.alify-select'), select = root.querySelector('select'), search = root.querySelector('[data-select-search]');
+        Array.from(select.options).forEach(option => { option.selected = false; });
+        if (!select.multiple) select.value = '';
+        if (search) search.value = '';
+        filterChoices(root); select.dispatchEvent(new Event('change', {bubbles: true})); select.focus();
+    });
     function dateTimeValue(input) {
         const match = input && input.value.match(/^([1-9][0-9]{3})-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])[T ]([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9])(?:\.0{1,3})?)?$/);
         if (!match || match[0] !== input.value) return '';
@@ -243,7 +268,9 @@
                         if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
                             const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                             let values;
-                            if (source.dataset.fieldType === 'gallery') {
+                            if (source.dataset.fieldType === 'select') {
+                                const select = source.querySelector('select'); values = select ? Array.from(select.selectedOptions).map(option => option.value).filter(value => value !== '') : [''];
+                            } else if (source.dataset.fieldType === 'gallery') {
                                 values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
                             } else if (['checkbox', 'true_false', 'radio', 'button_group'].includes(source.dataset.fieldType)) {
                                 values = inputs.filter(input => input.checked).map(input => input.value);

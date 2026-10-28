@@ -103,7 +103,7 @@ Date, Time and Date Time now have separate **Editor display preview** and **Form
 - Unknown keys, arrays, booleans and other malformed values are rejected by value validation. Existing scalar/container/Options data is retained under the normal save-safety contract.
 - Can be a conditional source or target. Browser rules read the checked radio, not the empty submission sentinel; hidden dependent values remain preserved.
 - Classic forms and the Gutenberg core-save bridge submit the same single-key contract. JSON transfers choice definitions/defaults/conditions and basic subfields; destination plugins need **0.18.0+**.
-- `alify_get_field('mode', $post_id)` / `alify_get_option('mode')` return the choice key, not its label. Custom “other” choices, horizontal layout and configurable return formats are not implemented yet.
+- `alify_get_field('mode', $post_id)` / `alify_get_option('mode')` return the choice key, not its label. Custom “other” choices are not supported; layout/opt-in formatted returns are configurable (see below).
 
 ## Relationship field
 
@@ -462,7 +462,7 @@ $settings = alify_get_option('profile', 'site');
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
 
-- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`, `2` or `3`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; schemas without these features continue to use their existing version.
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`, `2`, `3` or `4`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; schemas without these features continue to use their existing version.
 - Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
 - Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
 - Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
@@ -508,18 +508,28 @@ The **first failing location per container** appears in the parent alert and bes
 
 Messages never include rejected scalar values, submitted row tokens, unknown layout names or attachment identities. Container alerts have accessible description references; REST-created errors link to controls, and editing clears stale invalid/error references without removing existing help descriptions. This is targeted accessibility hardening, not a completed accessibility audit.
 
+## Rich choice settings (0.24.0)
+
+- **Radio / Checkbox:** vertical (default) or wrapping horizontal layout. Checkbox defaults accept one configured key per line in the builder (JSON uses a list); defaults apply only when no saved value exists.
+- **Select:** optional multiple selection, up to **100 submitted keys**. Defaults use one key per line when multiple is enabled. Lists are deduplicated and stored in configured-choice order; key `0` remains valid. Native multi-select keyboard behavior applies (Ctrl/Cmd or Shift as appropriate).
+- **Searchable Select:** local, case-insensitive key/label filtering, not a remote/Select2 picker. Selected options stay visible, filtering never changes selected values, and optional fields have a clear-selection button. Native option rendering is browser-controlled.
+- **Return format:** `value` (default), `label`, or `array` (a `{value, label}` PHP array). Only the opt-in `alify_get_formatted_field()` / `alify_get_formatted_option()` apply this setting, including basic container subfields. Checkbox/multiple Select return a list of labels or records. Raw getters, storage and conditions **always use keys**. Unknown previously saved keys become `null` for formatted single choices or are omitted from formatted lists; raw getters remain available for inspection.
+- Same settings work on post/Options roots and supported Group/Repeater/Flexible basic subfields. Choice defaults/settings are validated atomically; unknown defaults are rejected. Changing single/multiple mode is a schema change, **not** a stored-data migration.
+- Gutenberg and Classic collect all selected options. Programmatic write-bridge submissions for multiple Select require `{"__complete":"1","values":["a","b"]}`; `{"__complete":"1"}` explicitly clears an optional selection. Incomplete/malformed/unknown-key/over-limit submissions retain the previous field/container (Options retains the whole page); required selections cannot be cleared. This is the existing authenticated editor write bridge, not a general public write API.
+- Rich choice settings/defaults require **schema JSON v4 / plugin 0.24.0+**; imports still accept versions 1–4. No custom-choice creation, asynchronous search or nested containers.
+
 ## Verification
 
-Automated checks for 0.23.0:
+Automated checks for 0.24.0:
 
 ```sh
 npm ci
-npm test       # 62 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 65 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 650 assertions with isolated WordPress stubs
+php tests/php-unit.php # 689 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 460 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 494 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|

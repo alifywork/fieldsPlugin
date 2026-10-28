@@ -1,5 +1,6 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
+require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-temporal-format.php';
 require_once __DIR__ . '/class-alify-cf-date-time.php';
 require_once __DIR__ . '/class-alify-cf-password.php';
@@ -203,13 +204,11 @@ final class Alify_CF {
             case 'textarea':
                 echo '<textarea' . $attrs . $required . ' rows="4">' . esc_textarea(is_scalar($value) ? $value : '') . '</textarea>'; break;
             case 'select':
-                echo '<select' . $attrs . $required . '><option value="">Select an option</option>';
-                foreach (self::choices($field) as $key => $label) { echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>'; }
-                echo '</select>'; break;
+                Alify_CF_Choice::render_select($field, $value, $id, $input, $error_id); break;
             case 'button_group':
             case 'radio':
                 $buttons = $field['type'] === 'button_group';
-                echo '<fieldset class="alify-radio' . ($buttons ? ' alify-button-group' : '') . '" id="' . esc_attr($id) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '') . '><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend><input type="hidden" name="' . esc_attr($input) . '" value="">';
+                echo '<fieldset class="alify-radio' . ($buttons ? ' alify-button-group' : (($field['layout'] ?? '') === 'horizontal' ? ' alify-choice-horizontal' : '')) . '" id="' . esc_attr($id) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '') . '><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend><input type="hidden" name="' . esc_attr($input) . '" value="">';
                 if ($buttons) { echo '<div class="alify-button-options">'; }
                 $index = 0;
                 foreach (self::choices($field) as $key => $label) {
@@ -219,7 +218,7 @@ final class Alify_CF {
                 if (empty($field['required'])) { echo '<button type="button" class="button-link" data-radio-clear>Clear selection</button>'; }
                 echo '</fieldset>'; break;
             case 'checkbox':
-                echo '<fieldset id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
+                echo '<fieldset class="' . (($field['layout'] ?? '') === 'horizontal' ? 'alify-choice-horizontal' : '') . '" id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
                 foreach (self::choices($field) as $key => $label) { echo '<label class="alify-choice"><input type="checkbox" name="' . esc_attr($input) . '[]" value="' . esc_attr($key) . '" ' . checked(in_array((string) $key, (array) $value, true), true, false) . '> ' . esc_html($label) . '</label>'; }
                 echo '</fieldset>'; break;
             case 'color':
@@ -238,6 +237,7 @@ final class Alify_CF {
     }
 
     public static function clean_value($field, $value) {
+        if (Alify_CF_Choice::multiple($field)) { return Alify_CF_Choice::clean($field, $value); }
         if ($field['type'] === 'date_time') { return Alify_CF_Date_Time::clean($value); }
         if ($field['type'] === 'password') { return Alify_CF_Password::clean($value); }
         if ($field['type'] === 'range') { return Alify_CF_Range::clean($field, $value); }
@@ -298,7 +298,7 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if ($type === 'repeater') {
@@ -307,6 +307,7 @@ final class Alify_CF {
             }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
             $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
+            if ($type === 'checkbox' || Alify_CF_Choice::multiple($clean)) { $clean['default'] = Alify_CF_Choice::defaults($clean, $field['default'] ?? '', $errors); }
             if ($type === 'date_time' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Date Time default must be a valid wall-clock date/time.'; }
             if ($type === 'password') { $clean['choices'] = ''; if (($field['default'] ?? '') !== '') { $errors[] = 'Password defaults are not supported. Clear the default before saving.'; } }
             if ($type === 'range' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Range default must be within bounds and aligned to its step: ' . $name; }
@@ -402,6 +403,7 @@ final class Alify_CF {
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
             $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if ($field['type'] === 'range' && array_key_exists($field['name'], $values) && $values[$field['name']] !== '' && Alify_CF_Range::units($values[$field['name']]) === null) { $invalid = true; }
+            if (Alify_CF_Choice::multiple($field) && $value === '') { $invalid = true; }
             if ($field['type'] === 'date_time' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if ($field['type'] === 'password' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if ($field['type'] === 'wysiwyg') { $invalid = !is_string($submitted); }

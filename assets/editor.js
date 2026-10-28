@@ -16,7 +16,8 @@
             }
             if (input.name.endsWith('[]')) {
                 if (!Object.prototype.hasOwnProperty.call(target, last)) target[last] = [];
-                target[last].push(input.value);
+                if (input.tagName === 'SELECT' && input.multiple) target[last].push(...Array.from(input.selectedOptions).map(option => option.value));
+                else target[last].push(input.value);
             } else target[last] = input.value;
         });
         return {complete: '1', groups: root};
