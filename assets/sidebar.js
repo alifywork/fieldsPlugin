@@ -16,7 +16,7 @@
         const [data, setData] = wp.element.useState(null), [error, setError] = wp.element.useState(''), [version, changed] = wp.element.useState(0);
         wp.element.useEffect(() => { let active = true; setData(null); wp.apiFetch({path: '/alify/v1/posts/' + post}).then(value => { if (active) setData(value); }).catch(() => { if (active) setError('Fields are unavailable for this object.'); }); return () => { active = false; }; }, [post]);
         wp.element.useEffect(() => {
-            const sync = event => { if (event.target?.closest('.alify-values')) changed(value => value + 1); };
+            const sync = event => { if (event.target?.closest?.('.alify-values')) changed(value => value + 1); };
             document.addEventListener('input', sync); document.addEventListener('change', sync); document.addEventListener('alify:visibility', sync);
             const observer = new MutationObserver(() => changed(value => value + 1)); observer.observe(document.body, {childList: true, subtree: true});
             return () => { observer.disconnect(); document.removeEventListener('input', sync); document.removeEventListener('change', sync); document.removeEventListener('alify:visibility', sync); };

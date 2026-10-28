@@ -20,10 +20,11 @@ final class Alify_CF_Translation {
     }
     public static function policy($name, $mode) { if (!is_string($name) || !preg_match('/^[a-z][a-z0-9_]*$/D', $name) || !in_array($mode, array('translate', 'copy', 'ignore'), true) || count(self::$policy) >= 200) { return new WP_Error('alify_translation', 'Use a valid field name and translate/copy/ignore mode (200 policies maximum).'); } self::$policy[$name] = $mode; return true; }
     public static function get($name, $source, $language) {
-        if (!Alify_CF_Integrations::enabled('POLYLANG') || !function_exists('pll_get_post') || !is_string($language) || !preg_match('/^[a-zA-Z0-9_-]{1,32}$/D', $language)) { return null; }
+        if (!is_string($name) || !preg_match('/^[a-z][a-z0-9_]*$/D', $name) || (!is_int($source) && !is_string($source)) || !ctype_digit((string) $source) || !Alify_CF_Integrations::enabled('POLYLANG') || !function_exists('pll_get_post') || !is_string($language) || !preg_match('/^[a-zA-Z0-9_-]{1,32}$/D', $language)) { return null; }
         if ((self::$policy[$name] ?? 'translate') === 'ignore') { return null; } $target = pll_get_post($source, $language); return $target ? alify_get_field($name, $target) : null;
     }
     public static function copy($source, $target, $names) {
+        foreach (array($source, $target) as $id) { if ((!is_int($id) && !is_string($id)) || !ctype_digit((string) $id) || (int) $id < 1) { return new WP_Error('alify_translation', 'Use positive source and target post IDs.'); } }
         if (!Alify_CF_Integrations::enabled('POLYLANG') || !function_exists('pll_get_post_language') || !function_exists('pll_get_post') || !current_user_can('edit_post', $source) || !current_user_can('edit_post', $target)) { return new WP_Error('alify_forbidden', 'Translation adapter and edit permission for both posts are required.'); }
         $from = get_post($source); $to = get_post($target); $language = pll_get_post_language($target);
         if (!$from || !$to || (int) $source === (int) $target || $from->post_type !== $to->post_type || !$language || (int) pll_get_post($source, $language) !== (int) $target || !is_array($names) || !$names || count($names) > 200) { return new WP_Error('alify_translation', 'Use linked translations of the same type and 1–200 explicit field names.'); }

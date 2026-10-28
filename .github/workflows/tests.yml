@@ -114,6 +114,9 @@ jobs:
           coverage: none
       - name: Native WordPress 6.9 Abilities and core development contracts
         run: bash tests/integration/run.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Install pinned provider fixtures outside the checkout
         run: |
           curl --fail --location --retry 3 https://github.com/woocommerce/woocommerce/releases/download/10.3.6/woocommerce.zip -o /tmp/woocommerce.zip
@@ -121,6 +124,8 @@ jobs:
           unzip -q /tmp/woocommerce.zip -d "$ALIFY_WP_ROOT/wp-content/plugins"
           git clone --depth 1 --branch 3.9.1 https://github.com/polylang/polylang.git "$ALIFY_WP_ROOT/wp-content/plugins/polylang"
           composer install --working-dir="$ALIFY_WP_ROOT/wp-content/plugins/polylang" --no-dev --no-interaction --no-progress --no-scripts --prefer-dist
+          npm ci --prefix "$ALIFY_WP_ROOT/wp-content/plugins/polylang" --ignore-scripts --no-audit --no-fund
+          npm run build --prefix "$ALIFY_WP_ROOT/wp-content/plugins/polylang"
           mkdir -p "$(dirname "$ALIFY_PROVIDER_VENDOR")"
           composer require --working-dir="$(dirname "$ALIFY_PROVIDER_VENDOR")" timber/timber:2.3.3 --no-interaction --no-progress --no-scripts --prefer-dist
       - name: Native HPOS, Polylang, Timber and Abilities contracts

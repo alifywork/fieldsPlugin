@@ -29,7 +29,7 @@ final class Alify_CF_Transfer {
     }
     private static function advanced_conditions($condition) { if (!is_array($condition)) { return false; } foreach ($condition['rules'] ?? array($condition) as $node) { if (isset($node['rules']) || in_array($node['operator'] ?? '', array('contains', 'starts_with', 'ends_with'), true)) { return true; } } return false; }
     /** Older importers must reject row-bound schemas rather than silently drop their limits. */
-    public static function minimum_version($fields, $location, $rules = array()) { return max(isset(Alify_CF_Objects::locations()[$location]) || $location === 'attachment' || $rules ? 9 : 1, self::version(is_array($fields) ? $fields : array())); }
+    public static function minimum_version($fields, $location, $rules = array()) { return max($location === 'woo_order' ? 12 : 1, isset(Alify_CF_Objects::locations()[$location]) || $location === 'attachment' || $rules ? 9 : 1, self::version(is_array($fields) ? $fields : array())); }
     private static function version($fields, $subfields = false) {
         $version = 1;
         foreach ($fields as $field) {
