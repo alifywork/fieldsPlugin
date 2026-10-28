@@ -11,7 +11,7 @@ final class Alify_CF_Widgets {
     public static function get($name, $id) {
         global $wp_registered_widgets;
         if (!is_string($name) || !preg_match('/^[a-z][a-z0-9_]*$/D', $name) || !is_string($id) || !preg_match('/^([a-zA-Z0-9_-]{1,80})-([1-9][0-9]*)$/D', $id, $match) || (string) (int) $match[2] !== $match[2]) { return null; }
-        $widget = $wp_registered_widgets[$id]['callback'][0] ?? null; if (!($widget instanceof WP_Widget) || $widget->id_base !== $match[1]) { return null; } $data = get_option($widget->option_name, array()); return $data[(int) $match[2]]['_alify_cf'][$name] ?? null;
+        $widget = $wp_registered_widgets[$id]['callback'][0] ?? null; if (!($widget instanceof WP_Widget) || $widget->id_base !== $match[1]) { return null; } $data = get_option($widget->option_name, array()); foreach (Alify_CF::groups('widget', 'widget:' . $id) as $group) { foreach (Alify_CF::schema($group->ID) as $field) { if ($field['name'] === $name && !Alify_CF_Editor_Fields::presentation($field['type'])) { return $data[(int) $match[2]]['_alify_cf'][$name] ?? null; } } } return null;
     }
     public static function render($widget, $return, $instance) {
         if (!current_user_can('edit_theme_options') || (function_exists('wp_use_widgets_block_editor') && wp_use_widgets_block_editor()) || !Alify_CF::groups('widget')) { return; }

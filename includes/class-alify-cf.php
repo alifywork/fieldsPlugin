@@ -54,6 +54,7 @@ final class Alify_CF {
         add_action('admin_notices', array(__CLASS__, 'notices'));
         add_action('add_meta_boxes', array(__CLASS__, 'boxes'));
         add_action('save_post', array(__CLASS__, 'save'), 10, 2);
+        add_action('edit_attachment', function($id) { $post = get_post($id); if ($post && $post->post_type === 'attachment') { self::save($id, $post); } });
         add_action('admin_enqueue_scripts', array(__CLASS__, 'assets'));
         add_filter('manage_' . self::GROUP . '_posts_columns', array(__CLASS__, 'columns'));
         add_action('manage_' . self::GROUP . '_posts_custom_column', array(__CLASS__, 'column'), 10, 2);
