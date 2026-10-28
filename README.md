@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.32.0 — reusable definitions and explicit ACF content migration**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.33.0 — row-scoped conditions and opt-in interactive maps**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -32,6 +32,34 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Development queue
 
 See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.32.0 adds reusable schema snapshots and a separate explicit ACF content migration planner; 0.31.0 added guarded post-field migrations and a declared-subset ACF schema importer; 0.30.0 added conditional dependencies and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+
+## Scoped conditions and interactive maps (0.33.0)
+
+### Independent Group / Repeater / Flexible-layout conditions
+
+Basic children now support `condition` using the same eligible source types, operators, nested ALL/ANY limits, cycle checks and 16-link maximum as root fields. A source must be a **sibling in the same Group or the same individual row/layout**. No ancestor/root, other-row, cross-layout or cross-group lookup. Hidden sources never match any operator; required children validate only when visible. Root container required/cardinality rules still apply. Nested containers remain unsupported.
+
+The builder exposes **Scoped sibling conditions (advanced JSON)** beside each subfield, with its internal key shown. Example: `{"field":"field_local_toggle","operator":"equals","value":"1"}`. Use local keys, not labels/names. Reusable definitions remap these keys when materialized; JSON/PHP configurations retain the conditions. **Portable schema v11 / plugin 0.33.0+** is required, recursively including Flexible children. Earlier-version declarations reject before import/runtime Local JSON loading; versions 1–10 remain supported for their existing features.
+
+Editor submissions ignore hidden child inputs and preserve their old values. Each rendered conditional row carries a **server-generated origin MAC** for its original canonical content, not its visual position. Sorting/duplication retains the intended hidden values; stale/forged origins fail the whole container rather than guessing by row index. New rows carry an empty origin and use schema defaults for hidden children. Origin MACs are identity aids, not authorization: ordinary object capabilities/nonces still apply.
+
+PHP/REST explicit writes reject attempts to change hidden children atomically. Unchanged hidden values in a complete canonical payload are accepted; for omitted hidden values in reordered/edited rows, include `__row_origin` from `Alify_CF_Scoped_Conditions::origin($original_row)` on a Repeater row, or inside a Flexible row's `fields`. Generate it from the **original** canonical row, before edits. Group has one unambiguous previous object. A hidden value without identity or an explicitly unchanged canonical representation refuses to guess. Use `Alify_CF_Publication::stored_payload()` to reconstruct structured child markers; origin metadata is never stored in canonical values or exported as content. These rules also protect Options and shared object editors using the same cleaners. Recovery/revision restoration still validates current visibility/schema and is not an unconditional historical overwrite.
+
+### Explicit-consent Google Maps / Places picker
+
+Manual coordinate/address/zoom inputs remain the default. To enable the optional picker, define trusted site configuration (never put production keys in Git):
+
+```php
+define('ALIFY_CF_GOOGLE_MAPS_KEY', 'your-browser-restricted-key');
+define('ALIFY_CF_GOOGLE_MAPS_PICKER', true);
+```
+
+Restrict the browser key to the intended domains/APIs and configure Google Maps JavaScript / Places access and billing. This is a **public browser key**, not secret server storage. The existing explicit Maps Embed output can use its own appropriate key restrictions.
+
+- No Google script/request is started by this plugin until an editor clicks **Enable interactive map/search**. Consent is per rendered picker/page; saved coordinates do not automatically enable Google on reload. If another plugin already loaded a compatible Google SDK, that SDK can be reused.
+- Use modern Places autocomplete, click the map or drag the blue point. Selected coordinates/address/zoom populate the normal local inputs; the normal form save, permissions and strict canonical validation persist them. A map click/drag clears an old address rather than mislabeling the new point. No device geolocation, automatic background geocoding or arbitrary provider-host requests.
+- The provider receives enabled map coordinates and typed searches. Google is a third party and subject to its own terms/billing/privacy policies. The SDK is shared per page; manual inputs remain available if loading/configuration fails. Deferred stale place results cannot replace intervening manual edits or removed/hidden controls. Removed dynamic rows dispose adapter listeners/points.
+- Saving/rendering a manual field does not require Google. The new picker changes no stored schema/value shape (Map fields still have the existing v9 minimum); existing Embed rendering remains separate. Provider checks use controlled SDK/Places fixtures, **not live Google service/billing certification**.
 
 ## Reusable definitions and separate ACF content migration (0.32.0)
 
@@ -122,7 +150,7 @@ A hidden source is **unavailable**, not an empty value: none of its leaves match
 
 **Relationship, multiple Post Object, Taxonomy, User and Page Link** can now be condition sources. Single sources compare their canonical ID/token; lists use ANY-selected-token matching. `equals` means exact key/ID/token membership, `not_equals` means no item matches, and `empty`/`not_empty` inspect the selection. Existing literal/pattern operators compare individual canonical token strings, not display labels, URLs or formatted object returns. Search text, complete markers and picker buttons never count as selections. Selection permissions and reference validation remain unchanged; conditions do not grant object access.
 
-Password, WYSIWYG, custom scalar callbacks, Group/Repeater/Flexible, Link and Google Map remain ineligible sources. Cross-group references and per-row/subfield conditions remain unsupported. Chains/new reference-source semantics require **schema JSON v10**; downgrade attempts reject before import, and Local JSON supports versions 1–10 with the same gate.
+Password, WYSIWYG, custom scalar callbacks, Group/Repeater/Flexible, Link and Google Map remain ineligible sources. Cross-group references remain unsupported; v0.33.0 adds independent sibling subfield scopes as described above. Chains/new reference-source semantics require **schema JSON v10**; downgrade attempts reject before import, and Local JSON supports versions 1–11 with their feature gates.
 
 ### Native dynamic-block API
 
@@ -193,7 +221,7 @@ Repeater `page_size` is 0 (off) or 1–50. Pagination hides existing DOM rows bu
 
 Flexible layouts support `min_rows`/`max_rows` (0–50) and `disabled`. Limits are validated on the server before cleaning; disabled layouts prohibit row-count growth while existing rows remain editable. Picker/Add/Clone/Remove controls reflect those limits. No nested containers, layout renaming/migration or unlimited content promise is implied.
 
-Conditional operators now include **`glob`**, alongside literal contains/prefix/suffix. This is an anchored, case-sensitive, literal ASCII pattern, **not regex/PCRE**: only `*` is special (zero or more characters); `.`, `?`, brackets and backslashes are literal. Pattern: 1–256 printable ASCII characters and at most four stars. Source: at most 4,096 ASCII characters (tabs/CR/LF allowed). Non-ASCII/over-budget inputs do not match. Matching uses bounded literal searches on both PHP and JavaScript, never evaluates user-supplied regex, and supports selected scalar lists with ANY-item semantics. Version 0.30.0 adds root conditional chains and reference-selection sources; dynamic subfield conditions remain pending.
+Conditional operators now include **`glob`**, alongside literal contains/prefix/suffix. This is an anchored, case-sensitive, literal ASCII pattern, **not regex/PCRE**: only `*` is special (zero or more characters); `.`, `?`, brackets and backslashes are literal. Pattern: 1–256 printable ASCII characters and at most four stars. Source: at most 4,096 ASCII characters (tabs/CR/LF allowed). Non-ASCII/over-budget inputs do not match. Matching uses bounded literal searches on both PHP and JavaScript, never evaluates user-supplied regex, and supports selected scalar lists with ANY-item semantics. Version 0.30.0 adds root conditional chains and reference-selection sources; v0.33.0 adds scoped sibling subfield conditions.
 
 ### Explicit remote output
 
@@ -446,7 +474,7 @@ foreach (alify_get_rows('projects') as $project) {
 - The server validates positive integer IDs, image attachment type, existence and trash status. Newly selected IDs require attachment edit permission; existing IDs can be retained/reordered without that permission. The Add Images button requires `upload_files`; removal does not.
 - An invalid image, missing completion marker or truncated submission retains the **whole previous gallery**. An invalid gallery in a repeater retains the whole repeater; an invalid gallery on an options page rejects the whole page save. Host input-variable limits still apply to large galleries/repeaters.
 - Deleted/unavailable images are shown with a warning label; remove them before saving a visible gallery. This avoids silently dropping stale content.
-- Top-level galleries support conditional logic as sources and targets. Equality means selected-ID membership; empty/not-empty checks the selection count. Hidden galleries preserve their stored values. Subfield conditions remain unsupported.
+- Top-level galleries support conditional logic as sources and targets. Equality means selected-ID membership; empty/not-empty checks the selection count. Hidden galleries preserve their stored values. v0.33.0 adds local sibling subfield conditions.
 - Converting an existing field to/from Gallery does not migrate its old value. Structural changes should be tested on a backup/staging site.
 
 ### Gallery staging checks
@@ -549,7 +577,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 ### Repeater limits and save behavior
 
-- **Single level only**, maximum **20 subfields** and **50 rows** per repeater. No pagination, row duplication, drag sorting, nested repeaters or subfield conditional rules yet; row ordering uses accessible move buttons.
+- **Single level only**, maximum **20 subfields** and **50 rows** per repeater. DOM pagination, duplication and drag/keyboard ordering are available; v0.33.0 adds local sibling conditions. Nested repeaters remain unsupported.
 - A whole repeater can be a conditional target. It cannot be a condition source. Hidden repeaters preserve all saved rows and skip validation.
 - Each row is sanitized against its schema, including required and media checks. A newly selected media ID requires attachment edit permission; existing repeater attachment IDs may survive reordering without that permission.
 - If any row is invalid, **all previous rows for that repeater are retained** and the existing save-error notice identifies the repeater. Other valid fields may still save. Errors are displayed at repeater level, not against individual subfields. Best-effort rejected-input recovery is available as described below.
@@ -590,7 +618,7 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 
 ## Flexible Content
 
-Choose **Flexible Content** and define 1–10 uniquely named layouts, each containing 1–20 basic subfields (including media/gallery). Editors choose a layout, add rows and move/remove them. A field holds at most 50 rows in any mixture of its layouts. There are no nested containers or layout/subfield conditions in this increment; whole-field visibility is supported, but Flexible fields cannot be condition sources.
+Choose **Flexible Content** and define 1–10 uniquely named layouts, each containing 1–20 basic subfields (including media/gallery). Editors choose a layout, add rows and move/remove them. A field holds at most 50 rows in any mixture of its layouts. There are no nested containers or layout-level conditions; v0.33.0 supports conditions between basic siblings inside each row/layout; whole-field visibility is supported, but Flexible fields cannot be condition sources.
 
 ```php
 foreach (alify_get_layouts('sections', get_the_ID()) as $row) {
@@ -623,7 +651,7 @@ $settings = alify_get_option('profile', 'site');
 - The whole Group is validated atomically. An invalid required subfield, unauthorized new attachment or incomplete payload retains the previous complete object. Post publication and core REST validation include Groups.
 - A required Group needs at least one nonempty subfield (an unchecked toggle does not count); individually required subfields must always validate when the Group is visible.
 - Optional checkbox/toggle-only Groups can be cleared. Missing completion markers never clear saved data.
-- Whole-Group conditional visibility is supported; Groups cannot be condition sources. Subfield conditions and nested Group/Repeater containers are not supported in this increment.
+- Whole-Group conditional visibility is supported; Groups cannot be condition sources. v0.33.0 adds sibling subfield conditions; nested Group/Repeater containers remain unsupported.
 - Group schemas and subfield keys participate in JSON transfer (the destination needs Group support, version 0.8.0+). Image/file defaults reset during transfer as with other fields. Errors/recovery are shown at the Group boundary, not individually per subfield.
 - `alify_get_field()` also returns the associative object. `alify_get_group()` returns an empty array before the first save; escape subfield output for its context. Renaming subfields does not migrate existing data.
 
@@ -729,7 +757,7 @@ All three work on post/Options roots and supported basic container subfields. Us
 
 Single values clear with `''`; multiple editor-bridge payloads use `{"__complete":"1","ids":[...]}` and explicit empty `{"__complete":"1"}`. Malformed, truncated, unknown or disallowed values retain the previous field/container; Options retains the whole page. Required values cannot clear. Raw IDs/tokens remain available even where formatted records are privacy-filtered: **raw metadata is not an authorization API**, so themes must enforce their own access policy and context-escape output.
 
-Defaults, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets and, since 0.30.0, canonical token sources. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v10 within their feature gates, and exports contain configuration, not selected site-local IDs or user records.
+Defaults, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets and, since 0.30.0, canonical token sources. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v11 within their feature gates, and exports contain configuration, not selected site-local IDs or user records.
 
 ## Bundled editor and developer features (0.28.0)
 
@@ -791,7 +819,7 @@ All exposure flags default off. Root-field builder checkboxes control `api_read`
 - New literal, case-sensitive operators `contains`, `starts_with`, `ends_with` compare each scalar/selected item; an empty comparison never matches. Comparison strings are limited to 1,000 bytes. Arbitrary regex is not implemented; bounded ASCII glob patterns are available in 0.29.0+. Version 0.30.0 adds acyclic sibling chains and reference-token sources; scoped subfield/cross-group conditions remain pending. Cycles are rejected.
 - **Schema JSON v8 / plugin 0.28.0+** gates new editor/exposure/filter settings, nested/extended conditions, custom types and dynamic rich subfields. The original v0.28 importer accepted v1–v8; the current importer also accepts v9/v10 within their gates. Older destinations must reject v8 rather than silently discard these settings. Schema transfer is not selected-ID/content migration.
 
-The entire 77-item roadmap is **not** complete. Versions 0.29/0.30 add scoped object editors, revisions/forms, conditional dependencies and scalar blocks. Deeper containers, migrations, row-scoped conditions, interactive maps, native post-field sidebar/datastore and dedicated integrations/distribution remain tracked in `DEVELOPMENT-ROADMAP.md`.
+The entire 77-item roadmap is **not** complete. Versions 0.29/0.30 add scoped object editors, revisions/forms, conditional dependencies and scalar blocks. Deeper containers, bidirectional relationships, native post-field sidebar/datastore and dedicated integrations/distribution remain tracked in `DEVELOPMENT-ROADMAP.md`.
 
 ## Verification
 
@@ -804,7 +832,9 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Verified in [CI run 40767256561](https://github.com/alifywork/fieldsPlugin/actions/runs/40767256561): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium ACF content planning/apply/media remapping/rollback and reusable-definition save/insert/group persistence/delete/nonce flows, with clean WordPress debug logs. Roadmap: **65/77 complete within declared scopes; 12 pending**, not all development finished.
+**Current bundle (0.33.0):** 805 PHP contracts on PHP 7.4/8.3, 93 JavaScript tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions locally. Four-target native CI verification pending at this commit. Roadmap: **67/77 complete within declared scopes; 10 pending**.
+
+**Previous bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Verified in [CI run 40767256561](https://github.com/alifywork/fieldsPlugin/actions/runs/40767256561): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium ACF content planning/apply/media remapping/rollback and reusable-definition save/insert/group persistence/delete/nonce flows, with clean WordPress debug logs. At that release: **65/77 complete within declared scopes; 12 pending**.
 
 **Previous bundle (0.31.0):** 805 PHP contracts on both runtimes, 84 JavaScript tests, and local SQLite runs with 963 assertions on WordPress 6.2/PHP 7.4 and 966 on WordPress 6.8.3/PHP 8.3. [CI run 40762878282](https://github.com/alifywork/fieldsPlugin/actions/runs/40762878282) passes all four native PHP/WordPress SQLite/MySQL targets, including real Chromium migration plan/apply/rollback and ACF inspection/new-draft import, with clean WordPress debug logs. At that release: **63/77 scoped items complete; 14 pending.**
 

@@ -22,8 +22,13 @@ final class Alify_CF_External {
     }
     public static function render($field, $value, $id, $input) {
         if ($field['type'] === 'oembed') { echo '<input type="url" id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" value="' . esc_attr(is_string($value) ? $value : '') . '" placeholder="HTTPS YouTube or Vimeo video URL"' . (!empty($field['required']) ? ' required' : '') . '><p class="description">Only public YouTube/Vimeo video URLs. Saving never contacts providers; explicit theme rendering does.</p>'; return; }
-        $value = is_array($value) ? $value : array(); echo '<fieldset id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
+        $value = is_array($value) ? $value : array(); echo '<fieldset class="alify-map" id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
         foreach (array('lat' => 'Latitude', 'lng' => 'Longitude', 'address' => 'Address', 'zoom' => 'Zoom (1–20)') as $key => $label) { echo '<label>' . esc_html($label) . ' <input id="' . esc_attr($id . '-' . $key) . '" name="' . esc_attr($input . '[' . $key . ']') . '" value="' . esc_attr($value[$key] ?? ($key === 'zoom' ? 15 : '')) . '"' . ($key === 'address' ? ' maxlength="500"' : ($key === 'zoom' ? ' type="number" min="1" max="20" step="1"' : ' type="number" step="0.000001" min="-' . ($key === 'lat' ? 90 : 180) . '" max="' . ($key === 'lat' ? 90 : 180) . '"' . (!empty($field['required']) ? ' required' : ''))) . '></label> '; }
+        if (defined('ALIFY_CF_GOOGLE_MAPS_PICKER') && ALIFY_CF_GOOGLE_MAPS_PICKER === true && defined('ALIFY_CF_GOOGLE_MAPS_KEY') && is_string(ALIFY_CF_GOOGLE_MAPS_KEY) && preg_match('/^[a-zA-Z0-9_-]{10,200}$/D', ALIFY_CF_GOOGLE_MAPS_KEY)) {
+            wp_enqueue_script('alify-cf-map', plugins_url('assets/map.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
+            wp_localize_script('alify-cf-map', 'AlifyMap', array('key' => ALIFY_CF_GOOGLE_MAPS_KEY));
+            echo '<div class="alify-map-picker"><button type="button" class="button" data-map-activate>Enable interactive map/search</button><p class="description">Optional: enabling sends your map coordinates and searches to Google. No device location is collected. Google Maps JavaScript/Places access and billing must be configured. Manual inputs work without it.</p><div data-map-search></div><div data-map-canvas style="height:300px" hidden></div><p data-map-status role="status"></p></div>';
+        }
         echo '<input type="hidden" name="' . esc_attr($input . '[__complete]') . '" value="1"></fieldset><p class="description">Coordinates are stored locally. Optional Google preview needs ALIFY_CF_GOOGLE_MAPS_KEY (restrict the browser key to your domains). No automatic geocoding or location collection.</p>';
     }
     public static function embed($url) {

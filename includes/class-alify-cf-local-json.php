@@ -20,7 +20,7 @@ final class Alify_CF_Local_JSON {
         foreach (array_slice($paths, 0, 100) as $path) {
             if (is_link($path) || !is_file($path) || !is_readable($path) || filesize($path) > 1048576) { continue; }
             $json = file_get_contents($path); $value = json_decode($json, true, 32);
-            if (!is_array($value) || ($value['format'] ?? '') !== 'alify-local-json' || ($value['version'] ?? null) !== 1 || !is_int($value['schema_version'] ?? null) || $value['schema_version'] < 1 || $value['schema_version'] > 10 || !is_string($value['key'] ?? null) || !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $value['key']) || basename($path) !== $value['key'] . '.json' || isset($out[$value['key']]) || !is_array($value['group'] ?? null) || !in_array($value['status'] ?? '', array('publish', 'draft', 'pending', 'private', 'future', 'trash'), true)) { continue; }
+            if (!is_array($value) || ($value['format'] ?? '') !== 'alify-local-json' || ($value['version'] ?? null) !== 1 || !is_int($value['schema_version'] ?? null) || $value['schema_version'] < 1 || $value['schema_version'] > 11 || !is_string($value['key'] ?? null) || !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $value['key']) || basename($path) !== $value['key'] . '.json' || isset($out[$value['key']]) || !is_array($value['group'] ?? null) || !in_array($value['status'] ?? '', array('publish', 'draft', 'pending', 'private', 'future', 'trash'), true)) { continue; }
             $out[$value['key']] = array('data' => $value, 'hash' => hash('sha256', $json));
         }
         return $out;

@@ -274,8 +274,9 @@
         try { return byKey.size === fields.length && fields.every(field => height(keyOf(field)) <= 16); } catch (_) { return false; }
     }
     function refreshConditions() {
-        document.querySelectorAll('.alify-values').forEach(group => {
-            const fields = Array.from(group.querySelectorAll('.alify-value'));
+        document.querySelectorAll('.alify-values, [data-condition-scope]').forEach(group => {
+            const scoped = group.hasAttribute('data-condition-scope');
+            const fields = Array.from(group.querySelectorAll(scoped ? '.alify-sub-value' : '.alify-value')).filter(field => field.closest(scoped ? '[data-condition-scope]' : '.alify-values') === group);
             const trees = new Map(fields.map(field => { let rule; try { rule = JSON.parse(field.dataset.condition || 'null'); } catch (_) { rule = {invalid: true}; } return [field, rule]; }));
             const graphValid = validDependencies(fields, field => field.dataset.fieldKey, field => trees.get(field)), memo = new Map();
             function visibility(field) {
@@ -333,7 +334,7 @@
                 memo.set(field, visible); return visible;
             }
             fields.forEach(field => {
-                const visible = graphValid ? visibility(field) : !trees.get(field);
+                const visible = !(scoped && group.closest('.alify-value[hidden]')) && (graphValid ? visibility(field) : !trees.get(field));
                 field.hidden = !visible;
                 field.querySelectorAll('input, select, textarea, button').forEach(input => {
                     if (field.dataset.fieldType === 'wysiwyg' && input.closest('.wp-editor-wrap')) {

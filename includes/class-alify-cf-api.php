@@ -87,6 +87,7 @@ final class Alify_CF_API {
             if (!$touches) { continue; }
             $clean = Alify_CF::validate_values($schema, $payload, $previous, $errors);
             foreach ($values as $name => $unused) { if (isset($known[$name]) && array_key_exists($name, $payload) && !array_key_exists($name, $clean)) { $errors[] = 'Requested field is hidden or invalid: ' . $name; } }
+            foreach ($schema as $field) { $name = $field['name']; if (array_key_exists($name, $values) && array_key_exists($name, $clean) && !Alify_CF_Scoped_Conditions::audit($field, $values[$name], $clean[$name])) { $errors[] = 'Requested hidden subfield change is not writable: ' . $name; } }
             foreach ($clean as $name => $value) { if (array_key_exists($name, $values)) { $updates[$name] = $value; } }
         }
         if (array_diff_key($values, $known)) { $errors[] = 'Unknown field names are not writable.'; }

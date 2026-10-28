@@ -11,6 +11,7 @@ require_once __DIR__ . '/class-alify-cf-blocks.php';
 require_once __DIR__ . '/class-alify-cf-objects.php';
 require_once __DIR__ . '/class-alify-cf-widgets.php';
 require_once __DIR__ . '/class-alify-cf-external.php';
+require_once __DIR__ . '/class-alify-cf-scoped-conditions.php';
 require_once __DIR__ . '/class-alify-cf-location-rules.php';
 require_once __DIR__ . '/class-alify-cf-local-json.php';
 require_once __DIR__ . '/class-alify-cf-forms.php';
