@@ -16,11 +16,12 @@ if ($user) { wp_set_password($password, $user->ID); $uid = $user->ID; }
 else { $uid = wp_insert_user(array('user_login' => 'alify-browser', 'user_pass' => $password, 'role' => 'administrator')); }
 function browser_field($name, $type = 'text', $required = false) { return array('key' => 'field_' . $name, 'name' => $name, 'label' => ucfirst($name), 'type' => $type, 'required' => $required, 'choices' => "a : Alpha\nb : Beta", 'instructions' => '', 'default' => ''); }
 $group = wp_insert_post(array('post_type' => Alify_CF::GROUP, 'post_status' => 'draft', 'post_title' => 'Browser fields'));
-$details = browser_field('details', 'text', true); $details['condition'] = array('field' => 'field_show_details', 'operator' => 'equals', 'value' => '1');
+$details = browser_field('details', 'text', true); $details['condition'] = array('relation' => 'all', 'rules' => array(array('field' => 'field_show_details', 'operator' => 'equals', 'value' => '1'), array('field' => 'field_tags', 'operator' => 'equals', 'value' => 'a')));
+$alternate = browser_field('alternate', 'text', true); $alternate['condition'] = array('relation' => 'any', 'rules' => array(array('field' => 'field_show_details', 'operator' => 'equals', 'value' => '1'), array('field' => 'field_tags', 'operator' => 'equals', 'value' => 'b')));
 $team = browser_field('team', 'repeater'); $team['sub_fields'] = array(browser_field('name', 'text', true), browser_field('photo', 'image'));
 $profile = browser_field('profile', 'group'); $profile['sub_fields'] = array(browser_field('name', 'text', true), browser_field('tags', 'checkbox', true), browser_field('portrait', 'image'));
 $flexible = browser_field('sections', 'flexible'); $flexible['layouts'] = array(array('key' => 'layout_browser_hero', 'name' => 'hero', 'label' => 'Hero', 'sub_fields' => array(browser_field('title', 'text', true), browser_field('photos', 'gallery'))), array('key' => 'layout_browser_text', 'name' => 'text', 'label' => 'Text', 'sub_fields' => array(browser_field('body', 'textarea', true))));
-$fields = array(browser_field('subtitle', 'text', true), browser_field('tags', 'checkbox', true), browser_field('show_details', 'true_false'), $details, browser_field('photos', 'gallery'), $team, $profile, $flexible);
+$fields = array(browser_field('subtitle', 'text', true), browser_field('tags', 'checkbox', true), browser_field('show_details', 'true_false'), $details, browser_field('photos', 'gallery'), $team, $profile, $flexible, $alternate);
 $_POST = wp_slash(array('alify_schema_nonce' => wp_create_nonce('alify_schema_' . $group), 'alify_schema' => wp_json_encode($fields), 'alify_location' => 'post'));
 wp_update_post(array('ID' => $group, 'post_status' => 'publish')); $_POST = array();
 $classic = wp_insert_post(array('post_title' => 'Browser classic', 'post_status' => 'draft', 'post_author' => $uid));

@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.9.0 — bounded Flexible Content**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.10.0 — compound conditional logic**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -225,7 +225,8 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **one rule**, referencing an **unconditional non-repeater field in the same group**. AND/OR groups, cross-group references and conditional chains are not implemented.
+- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional basic/gallery fields in the same field group; containers cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
+- Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
 - Checkbox/Gallery equality tests whether the comparison key/image ID is selected; inequality tests absence. An unchecked True / False field counts as empty; number/text `0` does not.
@@ -326,7 +327,7 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 ## Verification
 
-Automated checks for 0.9.0:
+Automated checks for 0.10.0:
 
 ```sh
 npm ci

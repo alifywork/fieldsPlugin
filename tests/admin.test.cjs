@@ -399,3 +399,37 @@ test('flexible editor adds, reorders and clears layout rows with unique submissi
     d.querySelector('[data-flex-action="remove"]').click(); assert.equal(d.querySelectorAll('.alify-flex-row').length, 0);
     w.close();
 });
+
+
+test('compound builder adds/removes rules, selects ANY and deep-copies conditions', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Source');
+    const sourceKey = schema(w)[0].key;
+    d.getElementById('alify-add').click();
+    const target = d.querySelectorAll('.alify-card')[1];
+    target.querySelector('[data-prop="label"]').value = 'Target'; target.querySelector('[data-prop="label"]').dispatchEvent(new w.Event('input', {bubbles: true}));
+    const enabled = target.querySelector('[data-condition-prop="enabled"]'); enabled.checked = true; enabled.dispatchEvent(new w.Event('input', {bubbles: true}));
+    let cards = () => d.querySelectorAll('.alify-card');
+    function chooseRule(index, prop, value) { const node = cards()[1].querySelectorAll('.alify-condition-rule')[index].querySelector(`[data-condition-prop="${prop}"]`); node.value = value; node.dispatchEvent(new w.Event('input', {bubbles: true})); }
+    chooseRule(0, 'field', sourceKey);
+    cards()[1].querySelector('[data-condition-action="add"]').click(); chooseRule(1, 'field', sourceKey); chooseRule(1, 'value', 'a');
+    const relation = cards()[1].querySelector('[data-condition-relation]'); relation.value = 'any'; relation.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[1].condition.relation, 'any'); assert.equal(schema(w)[1].condition.rules.length, 2);
+    cards()[1].querySelector('[data-action="duplicate"]').click();
+    const copyValue = cards()[2].querySelector('[data-condition-prop="value"]'); copyValue.value = 'copy'; copyValue.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.notEqual(schema(w)[1].condition.rules[0].value, 'copy');
+    cards()[1].querySelectorAll('[data-condition-action="remove"]')[1].click(); assert.equal(schema(w)[1].condition.rules.length, 1);
+    w.close();
+});
+test('compound live conditions enforce ALL/ANY, disable hidden required values and fail closed on missing sources', () => {
+    const rule = relation => JSON.stringify({relation, rules: [{field: 'field_show', operator: 'equals', value: '1'}, {field: 'field_kind', operator: 'equals', value: 'a'}]});
+    const dom = new JSDOM(`<div class="alify-values"><div class="alify-value" data-field-key="field_show" data-field-type="true_false"><input type="checkbox" value="1"></div><div class="alify-value" data-field-key="field_kind" data-field-type="select"><select><option value="a">A</option><option value="b">B</option></select></div><div id="target" class="alify-value" data-field-key="field_detail" data-field-type="text"><input required value="keep"></div></div>`, {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document, target = d.getElementById('target'); target.dataset.condition = rule('all');
+    w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    assert.equal(target.hidden, true); assert.equal(target.querySelector('input').disabled, true);
+    const toggle = d.querySelector('[type="checkbox"]'); toggle.checked = true; toggle.dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(target.hidden, false);
+    const choice = d.querySelector('select'); choice.value = 'b'; choice.dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(target.hidden, true);
+    target.dataset.condition = rule('any'); choice.dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(target.hidden, false);
+    const missing = JSON.parse(rule('any')); missing.rules[1].field = 'missing'; target.dataset.condition = JSON.stringify(missing); choice.dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(target.hidden, true);
+    assert.equal(target.querySelector('input').value, 'keep'); w.close();
+});

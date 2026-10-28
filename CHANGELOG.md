@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0
+
+- Add flat compound conditional logic with ALL/ANY matching and 1–10 rules per top-level field.
+- Add rule add/remove and relation controls; preserve legacy single-rule schema shape and independently clone compound rule sets when duplicating fields.
+- Share bounded PHP condition parsing/evaluation across Classic, REST publication, options and rejected-input recovery; retain hidden values even for forged payloads.
+- Validate every source, rejecting self-references, missing fields, conditional chains, container sources and nested/oversized rule sets.
+- Transfer compound conditions through the existing versioned JSON format; destination sites need compound support.
+- Expand PHP, jsdom, real WordPress and browser regression coverage. Subfield/layout conditions and nested rule groups remain out of scope.
+
 ## 0.9.0
 
 - Add bounded Flexible Content with 1–10 named layouts, 1–20 basic subfields per layout and up to 50 mixed ordered rows.

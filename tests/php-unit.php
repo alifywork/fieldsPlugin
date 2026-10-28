@@ -521,4 +521,42 @@ ob_start(); Alify_CF_Flexible::render($flex, $flex_saved, 'flex', 'content'); $f
 same(true, strpos($flex_html, 'data-flex-template="hero"') !== false && strpos($flex_html, '[rows][0][layout]') !== false, 'Flexible templates and row layout markers rendered');
 ob_start(); Alify_CF_Flexible::render($flex, array(array('layout' => 'removed', 'fields' => array())), 'flex', 'content'); $flex_html = ob_get_clean();
 same(true, strpos($flex_html, 'Unknown saved layout') !== false, 'Removed saved layouts never silently disappear');
+// Compound rules are flat, bounded and backward compatible with single rules.
+$toggle = field('show_detail', 'true_false'); $choice = field('kind', 'select'); $detail = field('compound_detail', 'text', true);
+$rules = array(array('field' => $toggle['key'], 'operator' => 'equals', 'value' => '1'), array('field' => $choice['key'], 'operator' => 'equals', 'value' => 'a'));
+$detail['condition'] = array('relation' => 'all', 'rules' => $rules); $schema = array($toggle, $choice, $detail);
+$errors = array(); $validated = Alify_CF::validate_schema($schema, 'page', 0, $errors);
+same(array(), $errors, 'ALL rule set schema accepted');
+same($detail['condition'], $validated[2]['condition'], 'Compound condition shape retained');
+same(true, Alify_CF::visible($detail, $schema, array($toggle['key'] => '1', $choice['key'] => 'a')), 'ALL true when both match');
+same(false, Alify_CF::visible($detail, $schema, array($toggle['key'] => '1', $choice['key'] => 'b')), 'ALL false when one fails');
+$detail['condition']['relation'] = 'any'; $schema[2] = $detail;
+same(true, Alify_CF::visible($detail, $schema, array($toggle['key'] => '0', $choice['key'] => 'a')), 'ANY true when one matches');
+same(false, Alify_CF::visible($detail, $schema, array($toggle['key'] => '0', $choice['key'] => 'b')), 'ANY false when neither matches');
+$legacy = $rules[0]; $errors = array();
+same($legacy, Alify_CF_Conditions::clean($legacy, $errors, 'detail'), 'Legacy single rule retains original shape');
+foreach (array(array('relation' => 'xor', 'rules' => $rules), array('relation' => 'all', 'rules' => array()), array('relation' => 'all', 'rules' => array_fill(0, 11, $rules[0])), array('relation' => 'any', 'rules' => array(array('relation' => 'all', 'rules' => $rules))), array('relation' => 'all', 'rules' => array('bad')), array('relation' => 'all', 'rules' => array(array('field' => array(), 'operator' => 'equals', 'value' => '1')))) as $invalid) {
+    $errors = array(); Alify_CF_Conditions::clean($invalid, $errors, 'detail');
+    same(true, (bool) $errors, 'Malformed, oversized or nested condition set rejected');
+}
+$bad_detail = $detail; $bad_detail['condition']['rules'][1]['field'] = 'missing'; $errors = array();
+Alify_CF::validate_schema(array($toggle, $choice, $bad_detail), 'page', 0, $errors);
+same(true, (bool) $errors, 'Missing source in ANY set rejected');
+$bad_detail['condition']['rules'][1]['field'] = $bad_detail['key']; $errors = array();
+Alify_CF::validate_schema(array($toggle, $choice, $bad_detail), 'page', 0, $errors);
+same(true, (bool) $errors, 'Compound self reference rejected');
+$conditional_source = $choice; $conditional_source['condition'] = $rules[0]; $errors = array();
+Alify_CF::validate_schema(array($toggle, $conditional_source, $detail), 'page', 0, $errors);
+same(true, (bool) $errors, 'Conditional source chain rejected within compound set');
+$detail['condition']['relation'] = 'all'; $schema[2] = $detail; $errors = array();
+$updates = Alify_CF::validate_values($schema, array('show_detail' => '0', 'kind' => 'a', 'compound_detail' => 'forged'), array('compound_detail' => 'Keep'), $errors);
+same(false, array_key_exists('compound_detail', $updates), 'Hidden compound target ignores forged submitted value');
+same(array(), $errors, 'Hidden required compound target does not create validation error');
+$errors = array(); Alify_CF::validate_values($schema, array('show_detail' => '1', 'kind' => 'a'), array(), $errors);
+same(true, (bool) $errors, 'Visible required compound target validated');
+$recovered = Alify_CF_Feedback::group($schema, array('show_detail' => '0', 'kind' => 'a', 'compound_detail' => 'forged'), array('compound_detail' => 'Keep'), array());
+same('Keep', $recovered['values']['compound_detail'], 'Compound hidden recovery preserves saved value');
+$gallery_source = field('condition_photos', 'gallery'); $checkbox_source = field('condition_tags', 'checkbox');
+$detail['condition'] = array('relation' => 'all', 'rules' => array(array('field' => $gallery_source['key'], 'operator' => 'equals', 'value' => '50'), array('field' => $checkbox_source['key'], 'operator' => 'not_empty', 'value' => '')));
+same(true, Alify_CF::visible($detail, array($gallery_source, $checkbox_source, $detail), array($gallery_source['key'] => array(50), $checkbox_source['key'] => array('a'))), 'Compound gallery membership and checkbox emptiness agree');
 echo "PASS: $count PHP contract assertions\n";

@@ -3,6 +3,7 @@ if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-repeater.php';
 require_once __DIR__ . '/class-alify-cf-group.php';
 require_once __DIR__ . '/class-alify-cf-flexible.php';
+require_once __DIR__ . '/class-alify-cf-conditions.php';
 require_once __DIR__ . '/class-alify-cf-gallery.php';
 require_once __DIR__ . '/class-alify-cf-options.php';
 require_once __DIR__ . '/class-alify-cf-feedback.php';
@@ -118,26 +119,9 @@ final class Alify_CF {
         return $choices;
     }
 
-    /** One rule, referencing an unconditional sibling by stable key. */
+    /** Flat ALL/ANY conditions, referencing unconditional siblings by stable keys. */
     public static function visible($field, $schema, $values) {
-        $rule = $field['condition'] ?? null;
-        if (!$rule) { return true; }
-        $source = null;
-        foreach ($schema as $candidate) {
-            if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
-        }
-        if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible'), true) || !empty($source['condition'])) { return false; }
-        $value = $values[$source['key']] ?? '';
-        $items = is_array($value) ? array_map('strval', $value) : array((string) $value);
-        $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0'));
-        $matches = in_array((string) $rule['value'], $items, true);
-        switch ($rule['operator']) {
-            case 'equals': return $matches;
-            case 'not_equals': return !$matches;
-            case 'empty': return $empty;
-            case 'not_empty': return !$empty;
-            default: return false;
-        }
+        return Alify_CF_Conditions::visible($field, $schema, $values);
     }
 
     public static function values($post, $group, $option_values = null, $feedback = null) {
@@ -257,25 +241,19 @@ final class Alify_CF {
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
             $clean['default'] = in_array($type, array('repeater', 'gallery', 'group', 'flexible'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
-            $clean['condition'] = null;
-            if (!empty($field['condition'])) {
-                $rule = $field['condition'];
-                if (!is_array($rule) || !isset($rule['field'], $rule['operator'], $rule['value']) || !is_string($rule['field']) || !is_string($rule['operator']) || !is_string($rule['value']) || !in_array($rule['operator'], array('equals', 'not_equals', 'empty', 'not_empty'), true)) {
-                    $errors[] = 'Invalid conditional rule for ' . $name;
-                } else {
-                    $clean['condition'] = array('field' => sanitize_key($rule['field']), 'operator' => $rule['operator'], 'value' => sanitize_text_field($rule['value']));
-                }
-            }
+            $clean['condition'] = Alify_CF_Conditions::clean($field['condition'] ?? null, $errors, $name);
             $fields[] = $clean;
         }
         foreach ($fields as $field) {
             if (!$field['condition']) { continue; }
-            $source = null;
-            foreach ($fields as $candidate) {
-                if ($candidate['key'] === $field['condition']['field']) { $source = $candidate; break; }
-            }
-            if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible'), true) || $source['key'] === $field['key'] || $source['condition']) {
-                $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
+            foreach (Alify_CF_Conditions::rules($field['condition']) as $rule) {
+                $source = null;
+                foreach ($fields as $candidate) {
+                    if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
+                }
+                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible'), true) || $source['key'] === $field['key'] || $source['condition']) {
+                    $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
+                }
             }
         }
         // Reserve names across published and draft groups on the same post type.

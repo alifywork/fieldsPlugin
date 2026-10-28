@@ -26,9 +26,9 @@
         return layout ? parent.layouts[Number(layout.dataset.layoutIndex)] : parent;
     }
     function conditionUI(field) {
-        const rule = field.condition;
+        const condition = field.condition, rules = condition ? (condition.rules || [condition]) : [];
         const sources = fields.filter(item => item.key !== field.key && !['repeater', 'group', 'flexible'].includes(item.type) && !item.condition);
-        return `<div class="alify-condition"><label><input type="checkbox" data-condition-prop="enabled" ${rule ? 'checked' : ''}> Enable conditional logic</label>${rule ? `<p>Show this field when an unconditional field in this group matches:</p><div class="alify-grid"><label class="alify-control"><span>Source field</span><select data-condition-prop="field"><option value="">Choose field</option>${sources.map(item => `<option value="${escape(item.key)}" ${item.key === rule.field ? 'selected' : ''}>${escape(item.label || item.name || 'Untitled field')}</option>`).join('')}</select></label><label class="alify-control"><span>Comparison</span><select data-condition-prop="operator">${Object.entries({equals: 'Is equal to', not_equals: 'Is not equal to', empty: 'Is empty', not_empty: 'Is not empty'}).map(([key, label]) => `<option value="${key}" ${key === rule.operator ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="alify-control"><span>Comparison value</span><input data-condition-prop="value" value="${escape(rule.value)}" ${['empty', 'not_empty'].includes(rule.operator) ? 'disabled' : ''}><small>Use a choice key, attachment ID, or 1 / 0 for True / False. Checkbox/Gallery comparisons match a selected key or image ID.</small></label></div>` : ''}</div>`;
+        return `<div class="alify-condition"><label><input type="checkbox" data-condition-prop="enabled" ${condition ? 'checked' : ''}> Enable conditional logic</label>${condition ? `<p>Show this field when rules match unconditional siblings:</p><label>Match <select data-condition-relation><option value="all" ${condition.relation !== 'any' ? 'selected' : ''}>ALL rules (AND)</option><option value="any" ${condition.relation === 'any' ? 'selected' : ''}>ANY rule (OR)</option></select></label>${rules.map((rule, index) => `<div class="alify-condition-rule" data-rule-index="${index}"><div class="alify-grid"><label class="alify-control"><span>Source field</span><select data-condition-prop="field"><option value="">Choose field</option>${sources.map(item => `<option value="${escape(item.key)}" ${item.key === rule.field ? 'selected' : ''}>${escape(item.label || item.name || 'Untitled field')}</option>`).join('')}</select></label><label class="alify-control"><span>Comparison</span><select data-condition-prop="operator">${Object.entries({equals: 'Is equal to', not_equals: 'Is not equal to', empty: 'Is empty', not_empty: 'Is not empty'}).map(([key, label]) => `<option value="${key}" ${key === rule.operator ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="alify-control"><span>Comparison value</span><input data-condition-prop="value" value="${escape(rule.value)}" ${['empty', 'not_empty'].includes(rule.operator) ? 'disabled' : ''}><small>Choice key, attachment ID or 1/0 for a toggle. Checkbox/Gallery rules match a selected key/ID.</small></label></div><button type="button" class="button-link-delete" data-condition-action="remove" ${rules.length <= 1 ? 'disabled' : ''}>Remove rule</button></div>`).join('')}<button type="button" class="button" data-condition-action="add" ${rules.length >= 10 ? 'disabled' : ''}>+ Add Rule</button>` : ''}</div>`;
     }
     function render(openKey) {
         list.innerHTML = fields.map((field, i) => `<details class="alify-card" data-key="${escape(field.key)}" ${field.key === openKey ? 'open' : ''}>
@@ -62,12 +62,16 @@
             if (subProp === 'type') { render(event.target.closest('.alify-card').dataset.key); return; }
             sync(); return;
         }
+        if (event.target.hasAttribute('data-condition-relation')) {
+            const field = fields.find(item => item.key === event.target.closest('.alify-card').dataset.key);
+            field.condition = {relation: event.target.value, rules: field.condition.rules || [field.condition]}; sync(); return;
+        }
         const conditionProp = event.target.dataset.conditionProp;
         if (conditionProp) {
             const card = event.target.closest('.alify-card');
             const field = fields.find(item => item.key === card.dataset.key);
             if (conditionProp === 'enabled') field.condition = event.target.checked ? {field: '', operator: 'equals', value: ''} : null;
-            else field.condition[conditionProp] = event.target.value;
+            else { const rules = field.condition.rules || [field.condition]; rules[Number(event.target.closest('.alify-condition-rule').dataset.ruleIndex)][conditionProp] = event.target.value; }
             sync();
             if (conditionProp !== 'value') render(field.key);
             return;
@@ -88,6 +92,14 @@
         sync();
     });
     list.addEventListener('click', event => {
+        const conditionAction = event.target.dataset.conditionAction;
+        if (conditionAction && !event.target.disabled) {
+            const field = fields.find(item => item.key === event.target.closest('.alify-card').dataset.key);
+            const condition = field.condition, rules = condition.rules || [condition];
+            if (conditionAction === 'add' && rules.length < 10) rules.push({field: '', operator: 'equals', value: ''});
+            if (conditionAction === 'remove' && rules.length > 1) rules.splice(Number(event.target.closest('.alify-condition-rule').dataset.ruleIndex), 1);
+            field.condition = {relation: condition.relation || 'all', rules}; render(field.key); return;
+        }
         const layoutAction = event.target.dataset.layoutAction;
         if (layoutAction) {
             const parent = fields.find(item => item.key === event.target.closest('.alify-card').dataset.key);
@@ -117,7 +129,7 @@
         const index = fields.findIndex(field => field.key === event.target.closest('.alify-card').dataset.key);
         const field = fields[index];
         if (action === 'remove') { if (!window.confirm(`Delete “${field.label || 'Untitled field'}”? Existing saved values will not be deleted.`)) return; fields.splice(index, 1); }
-        if (action === 'duplicate') fields.splice(index + 1, 0, {...field, layouts: (field.layouts || []).map(layout => ({...layout, sub_fields: (layout.sub_fields || []).map(sub => ({...sub}))})), sub_fields: (field.sub_fields || []).map(sub => ({...sub})), condition: field.condition ? {...field.condition} : null, key: key(), label: field.label + ' (copy)', name: uniqueName((field.name || 'field') + '_copy')});
+        if (action === 'duplicate') fields.splice(index + 1, 0, {...field, layouts: (field.layouts || []).map(layout => ({...layout, sub_fields: (layout.sub_fields || []).map(sub => ({...sub}))})), sub_fields: (field.sub_fields || []).map(sub => ({...sub})), condition: field.condition ? JSON.parse(JSON.stringify(field.condition)) : null, key: key(), label: field.label + ' (copy)', name: uniqueName((field.name || 'field') + '_copy')});
         if (action === 'up' && index > 0) [fields[index - 1], fields[index]] = [field, fields[index - 1]];
         if (action === 'down' && index < fields.length - 1) [fields[index + 1], fields[index]] = [field, fields[index + 1]];
         render(field.key);
@@ -133,9 +145,12 @@
                 event.preventDefault(); render(field.key); window.alert('Every field needs a label and a unique valid field name.'); list.querySelector(`[data-key="${field.key}"] input`).focus(); return;
             }
             if (field.condition) {
-                const source = fields.find(item => item.key === field.condition.field);
-                if (!source || ['repeater', 'group', 'flexible'].includes(source.type) || source.key === field.key || source.condition) {
-                    event.preventDefault(); render(field.key); window.alert('Conditional logic must reference an unconditional field in the same group. Fix or disable rules referencing removed fields.'); return;
+                const rules = field.condition.rules || [field.condition];
+                if (!rules.length || rules.length > 10 || rules.some(rule => {
+                    const source = fields.find(item => item.key === rule.field);
+                    return !source || ['repeater', 'group', 'flexible'].includes(source.type) || source.key === field.key || source.condition;
+                })) {
+                    event.preventDefault(); render(field.key); window.alert('Use 1–10 rules referencing unconditional siblings. Fix removed sources, self-references or chains.'); return;
                 }
             }
             if (field.type === 'flexible') {

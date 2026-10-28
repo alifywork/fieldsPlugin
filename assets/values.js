@@ -47,21 +47,30 @@
                 try { rule = JSON.parse(field.dataset.condition || 'null'); } catch (_) { rule = null; }
                 let visible = true;
                 if (rule) {
-                    const source = fields.find(item => item.dataset.fieldKey === rule.field);
-                    visible = false;
-                    if (source && !['repeater', 'group', 'flexible'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
-                        const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
-                        let values;
-                        if (source.dataset.fieldType === 'gallery') {
-                            values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
-                        } else if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
-                            values = inputs.filter(input => input.checked).map(input => input.value);
-                            if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
-                        } else values = inputs.length ? [inputs[0].value] : [''];
-                        const empty = !values.length || (values.length === 1 && (values[0] === '' || (source.dataset.fieldType === 'true_false' && values[0] === '0')));
-                        const matches = values.includes(rule.value);
-                        visible = ({equals: matches, not_equals: !matches, empty, not_empty: !empty})[rule.operator] === true;
-                    }
+                    const rawRules = rule.rules || [rule];
+                    const rules = Array.isArray(rawRules) && rawRules.length <= 10 ? rawRules : [];
+                    const matches = rules.map(rule => {
+                        if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
+                        const source = fields.find(item => item.dataset.fieldKey === rule.field);
+                        let matched = false;
+                        if (source && !['repeater', 'group', 'flexible'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
+                            const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
+                            let values;
+                            if (source.dataset.fieldType === 'gallery') {
+                                values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
+                            } else if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
+                                values = inputs.filter(input => input.checked).map(input => input.value);
+                                if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
+                            } else values = inputs.length ? [inputs[0].value] : [''];
+                            const empty = !values.length || (values.length === 1 && (values[0] === '' || (source.dataset.fieldType === 'true_false' && values[0] === '0')));
+                            const matches = values.includes(rule.value);
+                            matched = ({equals: matches, not_equals: !matches, empty, not_empty: !empty})[rule.operator] === true;
+                        }
+                        return matched;
+                    });
+                    // Invalid references fail closed, including an ANY set containing one.
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
+                    visible = !!rules.length && (!rule.rules || ['all', 'any'].includes(rule.relation)) && validSources && (rule.relation === 'any' ? matches.some(Boolean) : matches.every(Boolean));
                 }
                 field.hidden = !visible;
                 field.querySelectorAll('input, select, textarea, button').forEach(input => { input.disabled = !visible; });

@@ -378,6 +378,52 @@ try {
     $flex_option_request['alify_values'][$flex_options_group]['blocks'] = $bad_flex;
     expect_same(false, Alify_CF_Options::save('flex-tests', $flex_option_request, $flex_errors), 'Options unknown layout rejected');
     expect_same($saved_flex, alify_get_option('blocks', 'flex-tests'), 'Invalid options Flexible preserves all rows');
+    // Compound conditions enforce the same visibility across PHP, REST and options.
+    $_POST = array(); wp_update_post(array('ID' => $flex_group, 'post_status' => 'draft'));
+    $condition_group = fixture_post(Alify_CF::GROUP); $condition_post = fixture_post();
+    $switch = test_field('condition_switch', 'true_false'); $kind = test_field('condition_kind', 'select');
+    $all_target = test_field('all_detail', 'text', true); $any_target = test_field('any_detail', 'text', true);
+    $condition_rules = array(array('field' => $switch['key'], 'operator' => 'equals', 'value' => '1'), array('field' => $kind['key'], 'operator' => 'equals', 'value' => 'a'));
+    $all_target['condition'] = array('relation' => 'all', 'rules' => $condition_rules);
+    $any_target['condition'] = array('relation' => 'any', 'rules' => $condition_rules);
+    configure_group($condition_group, array($switch, $kind, $all_target, $any_target));
+    expect_same($all_target['condition'], Alify_CF::schema($condition_group)[2]['condition'], 'ALL condition stored in real metadata');
+    expect_same($any_target['condition'], Alify_CF::schema($condition_group)[3]['condition'], 'ANY condition stored in real metadata');
+    save_values($condition_post, $condition_group, array('condition_switch' => '1', 'condition_kind' => 'a', 'all_detail' => 'All saved', 'any_detail' => 'Any saved'));
+    expect_same('All saved', alify_get_field('all_detail', $condition_post), 'Visible ALL target saves');
+    save_values($condition_post, $condition_group, array('condition_switch' => '0', 'condition_kind' => 'b', 'all_detail' => 'forged', 'any_detail' => 'forged'), 'publish');
+    expect_same('publish', get_post_status($condition_post), 'Hidden required compound fields do not block Classic publication');
+    expect_same('All saved', alify_get_field('all_detail', $condition_post), 'Forged hidden ALL value ignored');
+    expect_same('Any saved', alify_get_field('any_detail', $condition_post), 'Forged hidden ANY value ignored');
+    $condition_rest = fixture_post(); $_POST = array();
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $condition_rest); $request->set_param('status', 'publish');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($condition_group => array('__group_complete' => '1', 'condition_switch' => '0', 'condition_kind' => 'a', 'all_detail' => 'forged'))));
+    $response = rest_do_request($request);
+    expect_same(400, $response->get_status(), 'ANY visible required target blocks REST publication when empty');
+    expect_same('draft', get_post_status($condition_rest), 'Compound REST rejection preserves draft');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($condition_group => array('__group_complete' => '1', 'condition_switch' => '0', 'condition_kind' => 'a', 'all_detail' => 'forged', 'any_detail' => 'Corrected'))));
+    expect_same(200, rest_do_request($request)->get_status(), 'Corrected ANY target publishes through REST');
+    expect_same(false, metadata_exists('post', $condition_rest, '_alify_cf_all_detail'), 'REST cannot write hidden ALL field even with forged payload');
+    expect_same('Corrected', alify_get_field('any_detail', $condition_rest), 'Visible ANY field persisted');
+    $condition_json = Alify_CF_Transfer::export_json($condition_group, $export_nonce);
+    expect_same(true, is_string($condition_json), 'Compound schema exports');
+    $condition_doc = json_decode($condition_json, true); $condition_doc['group']['location'] = 'options:condition-tests';
+    Alify_CF_Options::register('condition-tests', 'Condition tests');
+    $condition_options_group = Alify_CF_Transfer::import_json(wp_json_encode($condition_doc), $import_nonce); $fixtures[] = $condition_options_group;
+    expect_same(Alify_CF::schema($condition_group), Alify_CF::schema($condition_options_group), 'Compound ALL/ANY schema round trip');
+    $_POST = array(); wp_update_post(array('ID' => $condition_options_group, 'post_status' => 'publish'));
+    $condition_option_request = array('alify_options_nonce' => wp_create_nonce('alify_options_condition-tests'), 'alify_options_complete' => '1', 'alify_values' => array($condition_options_group => array('__group_complete' => '1', 'condition_switch' => '0', 'condition_kind' => 'b')));
+    $condition_errors = array();
+    expect_same(true, Alify_CF_Options::save('condition-tests', $condition_option_request, $condition_errors), 'Hidden compound targets skipped on options page');
+    $condition_option_request['alify_values'][$condition_options_group]['condition_kind'] = 'a';
+    expect_same(false, Alify_CF_Options::save('condition-tests', $condition_option_request, $condition_errors), 'Visible required ANY target rejects options atomically');
+    expect_same('b', alify_get_option('condition_kind', 'condition-tests'), 'Failed compound options save leaves prior source value');
+    $condition_errors = array();
+    $condition_option_request['alify_values'][$condition_options_group]['any_detail'] = 'Options corrected';
+    expect_same(true, Alify_CF_Options::save('condition-tests', $condition_option_request, $condition_errors), 'Corrected compound options save succeeds');
+    $bad_condition_fields = Alify_CF::schema($condition_group); $bad_condition_fields[2]['condition']['rules'][0]['field'] = 'missing';
+    configure_group($condition_group, $bad_condition_fields);
+    expect_same($all_target['condition'], Alify_CF::schema($condition_group)[2]['condition'], 'Invalid compound schema preserves previous complete configuration');
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
@@ -391,6 +437,7 @@ try {
     delete_option('alify_cf_options_site');
     delete_option('alify_cf_options_transfer-tests');
     delete_option('alify_cf_options_flex-tests');
+    delete_option('alify_cf_options_condition-tests');
     Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }

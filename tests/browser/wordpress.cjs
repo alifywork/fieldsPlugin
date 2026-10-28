@@ -62,6 +62,21 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-group .alify-media input[type="hidden"]').inputValue(), String(fixture.images[0]), 'Group native image selection persists');
         check(await page.locator('.alify-row [type="text"]').evaluateAll(nodes => nodes.map(node => node.value)), ['Second member', 'First member'], 'Repeater row order survives reload');
         check(await page.locator('.alify-gallery-item').evaluateAll(nodes => nodes.map(node => Number(node.dataset.imageId))), [fixture.images[1], fixture.images[0]], 'Gallery order survives real save');
+        await value('show_details').check();
+        check(await value('details').isVisible(), true, 'ALL target appears when both sources match');
+        check(await value('alternate').isVisible(), true, 'ANY target appears when one source matches');
+        await value('details').fill('Classic ALL saved'); await value('alternate').fill('Classic ANY saved');
+        await saveClassic();
+        await value('show_details').uncheck();
+        check(await value('details').isDisabled(), true, 'Hidden ALL required input disabled in actual browser');
+        check(await value('alternate').isVisible(), false, 'ANY target hides when both sources fail');
+        await saveClassic();
+        check(await value('details').inputValue(), 'Classic ALL saved', 'Hidden compound target retains stored value after actual save');
+        await page.locator(`[name="alify_values[${fixture.group}][tags][]"][value="b"]`).check();
+        check(await value('alternate').isVisible(), true, 'ANY target reacts to checkbox membership source');
+        check(await value('details').isVisible(), false, 'ALL remains hidden with only checkbox source matching');
+        await value('alternate').fill('Classic ANY changed'); await saveClassic();
+        check(await value('alternate').inputValue(), 'Classic ANY changed', 'Visible ANY correction persists');
         await page.goto(`${base}/wp-admin/post.php?post=${fixture.block}&action=edit`);
         const welcome = page.getByRole('dialog', {name: 'Welcome to the editor'});
         if (await welcome.count()) await welcome.getByRole('button', {name: 'Close', exact: true}).click();
@@ -82,12 +97,16 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-field-error').count() > 0, true, 'Gutenberg renders server field errors');
         await page.locator(`[name="alify_values[${fixture.group}][tags][]"][value="a"]`).check();
         await page.locator('.alify-group [type="checkbox"][value="a"]').check();
+        await value('show_details').check();
+        await value('details').fill('Block ALL'); await value('alternate').fill('Block ANY');
         await page.locator('.editor-post-publish-button').click();
         await page.waitForFunction(() => wp.data.select('core/editor').getCurrentPost().status === 'publish');
         check(await page.evaluate(() => wp.data.select('core/editor').getCurrentPost().status), 'publish', 'Gutenberg correction publishes');
         await page.reload();
         check(await page.locator('.alify-group [type="text"]').inputValue(), 'Block profile', 'Group text survives actual Gutenberg REST save/reload');
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Gutenberg flexible body', 'Flexible content survives Gutenberg REST save/reload');
+        check(await value('details').inputValue(), 'Block ALL', 'ALL target survives Gutenberg REST save/reload');
+        check(await value('alternate').inputValue(), 'Block ANY', 'ANY target survives Gutenberg REST save/reload');
         const bypass = await page.evaluate(async ({base, id}) => {
             const response = await fetch(base + '/?rest_route=/wp/v2/posts/' + id, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-WP-Nonce': wpApiSettings.nonce}, body: JSON.stringify({status: 'publish'})});
             return {status: response.status, body: await response.json()};
@@ -101,7 +120,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const download = await downloadReady;
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
-        check(exported.group.fields.length, 8, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 9, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
