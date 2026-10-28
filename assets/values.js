@@ -257,9 +257,9 @@
         refreshRows(repeater);
         repeater.dispatchEvent(new Event('change', {bubbles: true}));
     });
-    function validPattern(pattern) { return typeof pattern === 'string' && /^[\x20-\x7e]{1,256}$/.test(pattern) && (pattern.match(/\*/g) || []).length <= 4; }
+    function validPattern(pattern) { return typeof pattern === 'string' && pattern.length >= 1 && pattern.length <= 256 && !/[^\x20-\x7e]/.test(pattern) && (pattern.match(/\*/g) || []).length <= 4; }
     function glob(text, pattern) {
-        if (!validPattern(pattern) || !/^[\x09\x0a\x0d\x20-\x7e]{0,4096}$/.test(text)) return false;
+        if (!validPattern(pattern) || typeof text !== 'string' || text.length > 4096 || /[^\x09\x0a\x0d\x20-\x7e]/.test(text)) return false;
         if (!pattern.includes('*')) return text === pattern;
         const parts = pattern.split('*'); let offset = 0;
         for (let index = 0; index < parts.length; index++) { const part = parts[index]; if (!part) continue; let position;
