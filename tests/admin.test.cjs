@@ -1059,3 +1059,14 @@ test('nested invalid controls reveal every ancestor page and collapsed row witho
     for (const id of ['outer', 'inner']) { assert.equal(d.querySelector('#' + id).hidden, false); assert.equal(d.querySelector('#' + id).classList.contains('alify-row-collapsed'), false); }
     d.dispatchEvent(new w.Event('alify:visibility')); assert.equal(d.querySelector('#outer').hidden, false); assert.equal(d.querySelector('#inner').hidden, false); assert.deepEqual(Array.from(new w.FormData(d.querySelector('form')), item => Array.from(item)), [['first', 'First'], ['inner-first', 'Inner first'], ['inner-last', 'Kept']]); w.close();
 });
+
+test('sidebar waits for a hydrated post, resets prior errors and ignores obsolete requests', async () => {
+    const dom = new JSDOM('', {runScripts: 'outside-only'}), w = dom.window;
+    let post = 0, render, stateIndex = 0, effects = [], registered = false; const states = [], requests = [];
+    const select = name => name === 'core/editor' ? {getCurrentPostId: () => post} : registered ? {getDraft: () => ({})} : undefined;
+    w.wp = {data: {select, registerStore() { registered = true; }, useSelect: callback => callback(select)}, element: {createElement: () => null, useState(initial) { const index = stateIndex++; if (!(index in states)) states[index] = initial; return [states[index], next => { states[index] = typeof next === 'function' ? next(states[index]) : next; }]; }, useEffect(callback) { effects.push(callback); }}, apiFetch: request => new Promise((resolve, reject) => requests.push({request, resolve, reject})), components: {}, editPost: {}, plugins: {registerPlugin(name, settings) { render = settings.render; }}};
+    w.eval(fs.readFileSync('assets/sidebar.js', 'utf8')); const mount = () => { stateIndex = 0; effects = []; render(); return effects[0](); }, flush = () => new Promise(resolve => setImmediate(resolve));
+    let cleanup = mount(); assert.equal(requests.length, 0); cleanup(); post = 11; cleanup = mount(); requests[0].reject(new Error('Previous object denied')); await flush(); assert.equal(states[1], 'Fields are unavailable for this object.');
+    cleanup(); post = 12; cleanup = mount(); assert.equal(states[1], ''); requests[1].resolve({schema: {}, values: {}}); await flush(); assert.equal(states[1], '');
+    cleanup(); post = 13; cleanup = mount(); cleanup(); post = 14; cleanup = mount(); requests[3].resolve({schema: {}, values: {}}); requests[2].reject(new Error('Obsolete failure')); await flush(); assert.equal(states[1], ''); assert.equal(requests[3].request.path, '/alify/v1/posts/14'); cleanup(); w.close();
+});
