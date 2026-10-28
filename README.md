@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.31.0 — guarded migrations and ACF schema import**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.32.0 — reusable definitions and explicit ACF content migration**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -31,7 +31,60 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.31.0 adds explicit guarded post-field migrations and a declared-subset ACF schema importer; 0.30.0 added conditional dependencies and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.32.0 adds reusable schema snapshots and a separate explicit ACF content migration planner; 0.31.0 added guarded post-field migrations and a declared-subset ACF schema importer; 0.30.0 added conditional dependencies and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+
+## Reusable definitions and separate ACF content migration (0.32.0)
+
+### Reusable schema snapshots / Clone composition
+
+The native field-group builder now has **Reusable field definitions** controls. Save the current validated fields under a new key/title, choose a definition and a name prefix such as `home_`, then **Insert reusable fields**. Review and save the field group normally. Insertion validates the combined schema—including other applicable groups—before changing the editor. Failed/stale asynchronous responses retain current edits. Saving a reusable definition itself does not save the field group. Existing definitions cannot be overwritten accidentally; explicitly delete a managed definition before replacing it.
+
+- Copies have independently generated deterministic keys and prefixed root names; local container-child names remain local. Internal sibling conditions are remapped to the new keys. Name/key collisions, unavailable dependencies, external condition references and recursive Clone dependencies reject.
+- **Snapshot semantics, not live inheritance:** saved groups and exports contain ordinary materialized fields. Updating/deleting a source does not rewrite existing copies, metadata or layouts. No automatic content/name migration is implied. Trusted PHP macro registrations must keep their library dependencies available and register definitions before groups.
+- PHP definitions and managed administrator snapshots occupy separate ownership slots: at most **50 each**; managed snapshots share one private nonautoload option capped at **1 MiB**. A composition is bounded by **eight structural/composition levels, 2,000 visited nodes, 200 fields per list and 1 MiB expanded output**; ordinary existing container limits still apply (20 basic children, 10 Flexible layouts, 50 rows). These are composition safeguards, not new nested-container support or larger content-row limits. Prefixed names are at most 80 bytes, prefixes at most 40.
+- Library composition does not weaken field privacy/REST/public-output flags. Existing settings are copied—review exposure controls before saving. Conditions must be self-contained within their sibling definition. Library records are configuration, not content or callbacks. Materialized JSON/PHP/Local JSON remains portable without the source library; exporting/synchronizing the reusable registry itself is not implemented.
+
+```php
+// Trusted PHP, before registering groups. Use explicit keys for condition sources.
+alify_register_field_library('contact', 'Contact details', [
+    ['key' => 'field_contact_email', 'name' => 'email',
+     'label' => 'Email', 'type' => 'email'],
+]);
+alify_register_field_group([
+    'key' => 'page_contacts', 'title' => 'Page contacts', 'location' => 'page',
+    'fields' => [
+        ['clone' => 'contact', 'prefix' => 'home_'],
+        ['clone' => 'contact', 'prefix' => 'work_'],
+    ],
+]);
+// Or obtain concrete fields (array / WP_Error) for an explicit composition:
+$fields = alify_clone_fields('contact', 'billing_');
+```
+
+Macros are PHP composition input only, **not a new stored field type or JSON schema dialect**. Library insertion/deletion uses authenticated `manage_options` AJAX, a dedicated nonce and an editable field-group ID. Managed writes serialize through an option lock; an interrupted lock requires verified administrator recovery, never automatic expiry. Helpers return `WP_Error` on failure.
+
+### Separate ACF content migration — opt-in declared raw metadata
+
+In **Field Groups → Migrations & ACF Import**, use **ACF content migration**, not the schema importer. Destination Alify fields must already be active/published. This copies an explicitly selected **subset of existing posts in the current database**; it does not run ACF, discover every field or interpret formatted ACF objects. Declare each source name, exact `field_…` reference key, raw type and destination name. The administrator is responsible for an accurate declaration; field types are not inferred from marker strings.
+
+```json
+{"posts":[123],"mappings":[
+  {"from":"legacy_title","to":"new_title",
+   "acf":{"key":"field_legacy_title","type":"text"}},
+  {"from":"legacy_photo","to":"new_photo",
+   "acf":{"key":"field_legacy_photo","type":"image","id_map":{"42":88}}}
+],"overwrite":false}
+```
+
+- Supported raw types: the schema adapter's 13 basic/choice/Group/Repeater types, plus **Image, File, Gallery, Post Object, Relationship, Taxonomy, User and Link** (21 total). Reference destinations must be defined separately; the schema-only importer still supports 13 types. Source/destination types and multiplicity must match. Standard scalar/singleton-list single references and complete ordered ID lists are supported; formatted objects, unsupported fields (including Password/Clone/Flexible/WYSIWYG/temporal/map types), nested containers and implicit conversions reject.
+- For every media/post/term/user field, supply an explicit **old→existing-destination ID map**, at most 500 entries, **including identity mappings on the same site**. Missing IDs, merged/duplicate list items, unavailable objects, wrong media types and destination permission/filter/cardinality violations reject. No file copying/downloads, user creation, term assignment or automatic cross-site ID reuse.
+- Read standard flattened Group keys (`group_child`) and Repeater count/index keys (`rows`, `rows_0_child`) plus each `_name` reference marker. Every declared value/marker must exist exactly once; there is no missing-value/default inference. Declare every destination child in order (maximum 20), with its local `name`, `key`, `type` and optional reference `id_map`. Undeclared source fields remain untouched/unmigrated. Repeater counts are 0–50, never truncated. Group parents must use standard empty parent values.
+- Example container descriptor: `"acf":{"key":"field_rows","type":"repeater","sub_fields":[{"name":"caption","key":"field_caption","type":"text"}]}`. A supported multi selector adds `"multiple":true`; otherwise scalar mode is explicit/default. No callbacks/code in JSON.
+- Normalization that would strip/change content rejects before applying; choice-definition ordering and canonical integer/string ID representation are handled deliberately. Clean incompatible source values explicitly. No silent flattening, dropped selected IDs, media creation or sanitization loss.
+- The same **100 posts / 20 mappings / 1 MiB / ten records / 30-minute preview**, creator ownership, explicit overwrite, write-ahead backups, global lock, dry-run and guarded rollback rules apply. Source values and reference markers are rechecked before applying, with fresh metadata/group queries rather than stale in-request caches. Source ACF metadata is **never written/deleted**, including during rollback; later ACF edits do not block destination-only rollback. Later destination edits remain protected.
+- Existing v0.31 migration backups remain compatible with their original hash format. New fingerprints include location and registered-rule definitions; state is reread after lock acquisition. Recovery records/options may contain private source/destination data and must be protected and explicitly forgotten.
+
+PHP: `alify_plan_acf_content_migration($post_ids,$mappings,$overwrite=false)` returns a safe summary / `WP_Error`. Use the existing apply/rollback/summary/forget APIs. This is a bounded **raw-metadata adapter**, checked with declared fixtures and native WordPress flows—not certification against every ACF version, an installed ACF plugin, all ACF storage variants or drop-in compatibility. Schema transfer remains configuration-only; content copying is always a separate explicit action. No transactional guarantee or non-post migration is added.
 
 ## Guarded migrations and ACF schema import (0.31.0)
 
@@ -45,7 +98,7 @@ Open **Field Groups → Migrations & ACF Import** as an administrator. These are
 - **Create validated plan** runs the real shared write validation without plugin content writes. Plans expire after 30 minutes, are creator-bound, and capture applicable schema fingerprints and exact source/destination presence/values. Apply rejects schema/value/capability changes and duplicate metadata rows. Password-containing source/target fields and groups containing custom callback types are excluded.
 - Plans/backups use private nonautoload options, not exports: **1 MiB per record, ten records per administrator**. Applied backups persist until **Forget backup**. Summaries show IDs/counts/status, never values. Backups can contain other private field data: restrict database access and explicitly forget records when no longer needed.
 - Apply/rollback use a global `add_option` lock and durable write-ahead backups. Later editorial changes are not overwritten by rollback. Failures attempt guarded restoration and retain recovery state; this is **best effort, not a database transaction or whole-post/content/revision rollback**. External hooks/editor races remain possible. A crash-held `alify_cf_migration_lock` is not automatically stolen: a qualified administrator must verify no migration request is running, preserve the matching private record, remove the stale lock, and use the owning account's rollback/manual database recovery. Never clear a live lock.
-- Existing posts only; no automatic whole-site scans, schema mutation, source deletion, users/terms/options/widget migration or ACF content/reference-ID transfer.
+- Alify-to-Alify mode handles existing posts only, with no automatic whole-site scans, schema mutation, source deletion or users/terms/options/widget migration. ACF values are read only by the separate explicit v0.32 content planner described above.
 
 PHP: `alify_validate_fields($values,$post_id)` returns canonical proposed updates or `WP_Error`; `alify_plan_migration($post_ids,$mappings,$overwrite=false,$transform=null)` returns a safe summary. Apply/rollback with `alify_apply_migration($id)` / `alify_rollback_migration($id)`; inspect/forget with `Alify_CF_Migrations::summary($id)` / `::forget($id)`. PHP-only `mode=custom` requires a trusted callable passed as `$transform`; it runs during planning, and only its validated output is staged. No callable/code is accepted from JSON. Callbacks/third-party validation filters themselves are trusted code, not sandboxed.
 
@@ -751,7 +804,9 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle (0.31.0):** 805 PHP contracts on both runtimes, 84 JavaScript tests, and local SQLite runs with 963 assertions on WordPress 6.2/PHP 7.4 and 966 on WordPress 6.8.3/PHP 8.3. [CI run 40762878282](https://github.com/alifywork/fieldsPlugin/actions/runs/40762878282) passes all four native PHP/WordPress SQLite/MySQL targets, including real Chromium migration plan/apply/rollback and ACF inspection/new-draft import, with clean WordPress debug logs. **63/77 roadmap items complete within their declared scopes; 14 pending.**
+**Current bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Four-target native CI verification pending at this commit. Roadmap: **65/77 complete within declared scopes; 12 pending**, not all development finished.
+
+**Previous bundle (0.31.0):** 805 PHP contracts on both runtimes, 84 JavaScript tests, and local SQLite runs with 963 assertions on WordPress 6.2/PHP 7.4 and 966 on WordPress 6.8.3/PHP 8.3. [CI run 40762878282](https://github.com/alifywork/fieldsPlugin/actions/runs/40762878282) passes all four native PHP/WordPress SQLite/MySQL targets, including real Chromium migration plan/apply/rollback and ACF inspection/new-draft import, with clean WordPress debug logs. At that release: **63/77 scoped items complete; 14 pending.**
 
 **Previous bundle (0.30.0):** 805 PHP contracts on PHP 7.4/8.3, 84 JavaScript tests, and clean-debug-log SQLite runs with 886 assertions on WordPress 6.2/PHP 7.4 and 889 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets pass in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779), including real Chromium chain/User-source frontend flows and custom-block Inspector, refreshed PHP preview, save/reload and public rendering, with clean WordPress debug logs. The declared matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8, not a latest-version certification.
 

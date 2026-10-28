@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.32.0
+
+- Add reusable field-definition registration and PHP Clone macros plus native builder save/insert/delete controls. Materialize independent prefixed snapshots with deterministic key/condition remapping; reject collisions, missing dependencies, recursion and over-budget compositions. Existing stored fields/exports remain concrete schema v1–v10, not a new live Clone type or nested-container promise.
+- Add separate administrator ACF content plans for declared existing-post raw metadata: basic/choice/Group/Repeater values, Link and media/post/term/user references with mandatory explicit ID maps. Validate exact reference markers, complete containers, destination permissions and canonical values; reject missing/duplicate source rows, unsupported types, truncation and sanitization loss. Never mutate ACF source metadata, copy files or automatically transfer site-local IDs.
+- Reuse durable guarded migration apply/rollback/forget. Refresh metadata/group/option caches for optimistic rechecks, reread state under the operation lock, preserve v0.31 hash/backups compatibility and retain later editorial values. This remains best effort, not a database transaction, whole-site importer or ACF API/storage certification.
+- Local checks: 805 PHP contracts on both runtimes, 88 JS tests, 1,016 WordPress 6.2/PHP 7.4 and 1,019 WordPress 6.8.3/PHP 8.3 SQLite assertions. Four-target native CI verification pending at this commit.
+
 ## 0.31.0
 
 - Add shared PHP write dry-run and administrator-only bounded explicit-post migrations: staged name copies, deliberate text/number/list conversions and Flexible layout maps. Canonical source/shape checks prevent implicit truncation or unknown-subfield loss; destination schemas and permissions validate through the existing write API.

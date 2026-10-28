@@ -2,8 +2,8 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
-function builder() {
-    const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
+function builder(reusable = false) {
+    const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button>' + (reusable ? '<select name="alify_location"><option value="page">Page</option></select><select id="alify-library-choice"><option value="shared">Shared</option></select><input id="alify-library-prefix" value="home_"><input id="alify-library-key" value="saved"><input id="alify-library-title" value="Saved fields"><button type="button" id="alify-library-insert"></button><button type="button" id="alify-library-save"></button><button type="button" id="alify-library-delete"></button><p id="alify-library-status"></p>' : '') + '</form>', {runScripts: 'outside-only'});
     const w = dom.window;
     w.AlifyCF = {types: {tab: 'Tab', accordion: 'Accordion', message: 'Message', icon_picker: 'Icon Picker', taxonomy: 'Taxonomy', user: 'User', page_link: 'Page Link', text: 'Text', date_time: 'Date Time', date: 'Date', time: 'Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
@@ -989,4 +989,21 @@ test('dynamic blocks register public native controls and preserve false and zero
     w.wp = {element: {createElement: (type, props, ...children) => ({type, props, children}), Fragment: 'fragment', useState: initial => [initial(), () => {}], useEffect() {}}, blocks: {getBlockType: name => registrations.get(name), registerBlockType: (name, settings) => registrations.set(name, settings)}, components: {TextControl: 'text', ToggleControl: 'toggle', PanelBody: 'panel'}, blockEditor: {useBlockProps: props => props, InspectorControls: 'inspector'}, serverSideRender: {default: 'preview'}};
     w.eval(fs.readFileSync('assets/blocks.js', 'utf8')); const block = registrations.get('alify/card'); assert.equal(block.save(), null); const tree = block.edit({attributes: {count: 0, enabled: false}, setAttributes: attrs => { changed = attrs; }}), controls = tree.children[0].children[0].children;
     assert.equal(controls[1].props.value, 0); assert.equal(controls[2].props.checked, false); controls[1].props.onChange('12'); assert.equal(changed.count, 12); controls[1].props.onChange('1.5'); assert.equal(changed.count, 12); controls[2].props.onChange(true); assert.equal(changed.enabled, true); assert.equal(tree.children[1].children[1].props.httpMethod, 'POST'); w.eval(fs.readFileSync('assets/blocks.js', 'utf8')); assert.equal(registrations.size, 1); w.close();
+});
+
+test('reusable insertion uses capability/nonce endpoint and materializes validated fields', async () => {
+    const w = builder(true), d = w.document; Object.assign(w.AlifyCF, {libraryUrl: '/wp-admin/admin-ajax.php', libraryNonce: 'test-nonce', groupId: 91}); let sent;
+    const copy = {key: 'field_copy', name: 'home_title', label: 'Title', type: 'text', default: '', choices: '', required: false};
+    w.fetch = async (url, options) => { sent = options.body; assert.equal(url, '/wp-admin/admin-ajax.php'); assert.equal(options.credentials, 'same-origin'); return {ok: true, json: async () => ({success: true, data: {fields: [copy]}})}; };
+    d.getElementById('alify-library-insert').click(); await new Promise(setImmediate); assert.equal(sent.get('nonce'), 'test-nonce'); assert.equal(sent.get('prefix'), 'home_'); assert.equal(sent.get('group_id'), '91'); assert.equal(sent.get('location'), 'page'); assert.deepEqual(schema(w), [copy]); assert.match(d.getElementById('alify-library-status').textContent, /independent copies/); w.close();
+});
+test('reusable endpoint errors preserve editor state and restore buttons', async () => {
+    const w = builder(true), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Keep this'); const before = schema(w);
+    w.fetch = async () => ({ok: false, json: async () => ({success: false, data: {message: 'Duplicate field name'}})}); d.getElementById('alify-library-insert').click(); await new Promise(setImmediate); assert.deepEqual(schema(w), before); assert.equal(d.getElementById('alify-library-insert').disabled, false); assert.match(d.getElementById('alify-library-status').textContent, /Duplicate/); w.close();
+});
+test('reusable asynchronous validation cannot overwrite concurrent editor changes', async () => {
+    const w = builder(true), d = w.document; let finish; w.fetch = () => new Promise(resolve => { finish = resolve; }); d.getElementById('alify-library-insert').click(); d.getElementById('alify-add').click(); set(w, 'label', 'New edit'); const before = schema(w); finish({ok: true, json: async () => ({success: true, data: {fields: []}})}); await new Promise(setImmediate); assert.deepEqual(schema(w), before); assert.match(d.getElementById('alify-library-status').textContent, /Editor changed/); w.close();
+});
+test('reusable save and deletion update an escaped catalog without changing fields', async () => {
+    const w = builder(true), d = w.document; const operations = []; w.fetch = async (url, options) => { operations.push(options.body.get('operation')); return {ok: true, json: async () => ({success: true, data: {catalog: {saved: {title: '<img src=x onerror=alert(1)>', managed: true}}}})}; }; d.getElementById('alify-library-save').click(); await new Promise(setImmediate); assert.equal(d.querySelectorAll('img').length, 0); assert.match(d.getElementById('alify-library-choice').textContent, /<img/); d.getElementById('alify-library-delete').click(); await new Promise(setImmediate); assert.deepEqual(operations, ['save', 'delete']); assert.deepEqual(schema(w), []); w.close();
 });

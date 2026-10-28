@@ -138,3 +138,8 @@ function alify_apply_migration($id) { return Alify_CF_Migrations::execute($id); 
 function alify_rollback_migration($id) { return Alify_CF_Migrations::execute($id, true); }
 function alify_inspect_acf_schema($json) { return Alify_CF_ACF_Import::inspect($json); }
 function alify_import_acf_schema($json) { return Alify_CF_ACF_Import::import($json); }
+
+function alify_plan_acf_content_migration($post_ids, $mappings, $overwrite = false) { return Alify_CF_Migrations::plan_acf($post_ids, $mappings, $overwrite); }
+
+function alify_register_field_library($key, $title, $fields) { return Alify_CF_Library::register($key, $title, $fields); }
+function alify_clone_fields($key, $prefix = '') { return Alify_CF_Library::expand(array(array('clone' => $key, 'prefix' => $prefix))); }

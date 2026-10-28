@@ -2,8 +2,10 @@
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-selector.php';
+require_once __DIR__ . '/class-alify-cf-library.php';
 require_once __DIR__ . '/class-alify-cf-api.php';
 require_once __DIR__ . '/class-alify-cf-acf-import.php';
+require_once __DIR__ . '/class-alify-cf-acf-content.php';
 require_once __DIR__ . '/class-alify-cf-migrations.php';
 require_once __DIR__ . '/class-alify-cf-blocks.php';
 require_once __DIR__ . '/class-alify-cf-objects.php';
@@ -42,6 +44,7 @@ final class Alify_CF {
 
     public static function boot() {
         Alify_CF_API::boot();
+        Alify_CF_Library::boot();
         Alify_CF_Migrations::boot();
         Alify_CF_Blocks::boot();
         Alify_CF_Objects::boot();
@@ -85,8 +88,9 @@ final class Alify_CF {
         return get_post_types(array('show_ui' => true), 'objects');
     }
 
-    public static function groups($post_type, $object = 0) {
-        $groups = get_posts(array('post_type' => self::GROUP, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => self::LOCATION, 'meta_value' => $post_type));
+    public static function groups($post_type, $object = 0, $fresh = false) {
+        $groups = get_posts(array('post_type' => self::GROUP, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => self::LOCATION, 'meta_value' => $post_type, 'cache_results' => !$fresh));
+        if ($fresh) { foreach ($groups as $group) { wp_cache_delete($group->ID, 'post_meta'); } }
         foreach (Alify_CF_API::groups($post_type) as $group) { $groups[] = (object) array('ID' => $group['id'], 'post_title' => $group['title']); }
         return $object ? array_values(array_filter($groups, function($group) use ($post_type, $object) { return Alify_CF_Location_Rules::group($group->ID, $post_type, $object); })) : $groups;
     }
@@ -117,7 +121,7 @@ final class Alify_CF {
         }
         if ($screen->post_type === self::GROUP && $screen->base === 'post') {
             wp_enqueue_script('alify-cf-builder', plugins_url('assets/builder.js', ALIFY_CF_FILE), array('jquery', 'jquery-ui-sortable'), ALIFY_CF_VERSION, true);
-            wp_localize_script('alify-cf-builder', 'AlifyCF', array('types' => self::types()));
+            wp_localize_script('alify-cf-builder', 'AlifyCF', array('types' => self::types(), 'libraryUrl' => admin_url('admin-ajax.php'), 'libraryNonce' => wp_create_nonce('alify_cf_library'), 'groupId' => get_the_ID()));
         }
     }
 
@@ -135,6 +139,7 @@ final class Alify_CF {
         wp_nonce_field('alify_schema_' . $post->ID, 'alify_schema_nonce');
         echo '<div class="alify-intro"><span class="alify-badge">ALIFY / FIELDS</span><h2>Good content starts with structure.</h2><p>Add fields, arrange them, and give your editors a clearer way to create.</p></div>';
         echo '<input type="hidden" id="alify-schema" name="alify_schema" value="' . esc_attr(wp_json_encode(self::schema($post->ID))) . '">';
+        Alify_CF_Library::controls();
         echo '<div id="alify-fields"></div><div id="alify-empty" class="alify-empty"><span class="dashicons dashicons-editor-table"></span><h3>A blank canvas for your content</h3><p>Add your first field to bring this group to life.</p></div><div class="alify-footer"><button type="button" class="button button-primary" id="alify-add">+ Add Field</button><span id="alify-count" aria-live="polite"></span></div><noscript><p>The field builder requires JavaScript. Existing fields will be preserved.</p></noscript>';
     }
 

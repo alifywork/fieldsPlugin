@@ -14,6 +14,7 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 $user = get_user_by('login', $fixture['username']); if ($user) { wp_set_current_user($user->ID); foreach ((array) get_user_meta($user->ID, '_alify_cf_migrations', true) as $migration_id) { Alify_CF_Migrations::forget($migration_id); } wp_set_current_user(get_user_by('login', 'alify-test-admin')->ID); wp_delete_user($user->ID); }
 delete_option('alify_cf_options_browser-http');
 delete_option('alify_cf_models');
+delete_option(Alify_CF_Library::OPTION);
 $editor = get_user_by('login', $fixture['editor_username'] ?? 'alify-browser-editor'); if ($editor) { wp_delete_user($editor->ID); }
 $mu = WP_CONTENT_DIR . '/mu-plugins/alify-browser-test.php'; if (is_file($mu)) { unlink($mu); }
 unlink($file);

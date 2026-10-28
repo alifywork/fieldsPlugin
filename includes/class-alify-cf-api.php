@@ -50,7 +50,7 @@ final class Alify_CF_API {
         $key = $definition['key']; $id = -1 - (int) hexdec(substr(hash('sha256', $key), 0, 7));
         foreach (self::$groups as $other_key => $group) { if ($other_key !== $key && $group['id'] === $id) { return new WP_Error('alify_group', 'Registration identifier collision.'); } }
         $location = $definition['location'] ?? 'post'; $errors = array(); $rules = Alify_CF_Location_Rules::clean($definition['rules'] ?? null, $errors);
-        $raw_fields = $definition['fields'] ?? null; self::stable_keys($raw_fields, $key);
+        $raw_fields = $definition['fields'] ?? null; if (Alify_CF_Library::contains($raw_fields)) { $raw_fields = Alify_CF_Library::expand($raw_fields); if (is_wp_error($raw_fields)) { return $raw_fields; } } self::stable_keys($raw_fields, $key);
         $fields = Alify_CF::validate_schema($raw_fields, $location, $id, $errors);
         if ($errors) { return new WP_Error('alify_schema', implode(' ', $errors)); }
         self::$groups[$key] = array('key' => $key, 'id' => $id, 'title' => sanitize_text_field($definition['title']), 'location' => $location, 'fields' => $fields, 'rules' => $rules);

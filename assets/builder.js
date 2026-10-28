@@ -82,6 +82,30 @@
         const field = {key: key(), label: '', name: '', type: 'text', instructions: '', default: '', choices: '', required: false};
         fields.push(field); render(field.key); list.lastElementChild.querySelector('input').focus();
     });
+    const libraryInsert = document.getElementById('alify-library-insert');
+    if (libraryInsert) {
+        const byId = id => document.getElementById('alify-library-' + id);
+        const buttons = ['insert', 'save', 'delete'].map(byId);
+        async function library(operation) {
+            if (operation === 'delete' && !window.confirm('Delete this saved reusable definition? Existing field groups remain unchanged.')) return;
+            const snapshot = input.value;
+            const body = new URLSearchParams({action: 'alify_cf_library', nonce: AlifyCF.libraryNonce, group_id: String(AlifyCF.groupId), operation, key: byId(operation === 'save' ? 'key' : 'choice').value, prefix: byId('prefix').value, title: byId('title').value, schema: snapshot, location: document.querySelector('[name="alify_location"]').value});
+            buttons.forEach(button => { button.disabled = true; }); byId('status').textContent = 'Validating reusable definition…';
+            try {
+                const response = await window.fetch(AlifyCF.libraryUrl, {method: 'POST', credentials: 'same-origin', body}); const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.data?.message || 'Library request failed.');
+                if (operation === 'insert') {
+                    if (input.value !== snapshot) throw new Error('Editor changed during validation; nothing inserted. Try again.');
+                    fields = result.data.fields; render(); byId('status').textContent = 'Reusable fields inserted as independent copies. Save the field group to persist them.';
+                } else {
+                    byId('choice').innerHTML = '<option value="">Choose definition</option>' + Object.entries(result.data.catalog).map(([name, entry]) => `<option value="${escape(name)}">${escape(entry.title)} (${escape(name)})</option>`).join('');
+                    byId('status').textContent = operation === 'save' ? 'Reusable snapshot saved. Existing groups were not changed.' : 'Reusable definition deleted. Existing copies were not changed.';
+                }
+            } catch (error) { byId('status').textContent = error.message || 'Library request failed; editor fields retained.'; }
+            finally { buttons.forEach(button => { button.disabled = false; }); }
+        }
+        buttons.forEach((button, index) => button.addEventListener('click', () => library(['insert', 'save', 'delete'][index])));
+    }
     list.addEventListener('input', event => {
         if (event.target.hasAttribute('data-condition-json')) { try { const field = fields.find(item => item.key === event.target.closest('.alify-card').dataset.key); field.condition = JSON.parse(event.target.value); event.target.setCustomValidity(''); sync(); } catch (_) { event.target.setCustomValidity('Invalid conditions JSON.'); } return; }
         const layoutProp = event.target.dataset.layoutProp;
