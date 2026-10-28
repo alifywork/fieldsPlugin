@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.19.0 — Button Group field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.20.0 — Range field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -31,7 +31,18 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Button Group**. Next: **Range**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Range**. Next: **Password**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+
+## Range field
+
+**Range (`range`)** pairs a named numeric input with an unnamed native slider. Configure `min`, `max` and `step` in the root/subfield builder; omitted settings become `0`, `100` and `1`. Values/getters are canonical decimal strings (`1.500` → `1.5`, `-0.000` → `0`) or `''` for an explicitly cleared optional field.
+
+- Bounds/settings/values support **±1000000**, with **at most three decimal places**. Minimum must be less than maximum; positive step must not exceed the span. Exact scaled-integer arithmetic avoids floating-point step tolerance. Step is anchored at the minimum; an unaligned maximum is not selectable.
+- Strings use plain decimals: no whitespace, leading zeros, leading `+`, exponent notation or `step=any`. Finite numeric JSON values are accepted if their converted decimal meets the same bounds/precision rules. Booleans, arrays and null submissions are rejected. Invalid defaults/settings reject the schema update, preserving its old definition.
+- An empty numeric input means **unset**. Merely rendering the slider never submits its fallback position. Moving it selects a value; numeric edits synchronize it only when valid, without silently clamping invalid input. Optional fields have **Clear value**; required fields reject empty values, but accept `0` when aligned/in bounds.
+- Supported on posts/Options and basic Group/Repeater/Flexible subfields. Invalid submissions retain old scalar/container/Options values under the existing save-safety contracts.
+- Conditional source/target support uses the canonical number (compare `0.5`, not `0.500`). Hidden dependent values stay preserved. Classic and Gutenberg/core REST share server validation.
+- JSON transfers bounds/step/defaults/conditions and subfields. Destination plugins need **0.20.0+**. Get values through `alify_get_field()` / `alify_get_option()`; display formatting, arbitrary precision and unit prefixes/suffixes are outside this increment.
 
 ## Button Group field
 
@@ -460,16 +471,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.19.0:
+Automated checks for 0.20.0:
 
 ```sh
 npm ci
-npm test       # 51 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 54 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 406 assertions with isolated WordPress stubs
+php tests/php-unit.php # 474 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 349 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 374 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -495,7 +506,7 @@ The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all 23 types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all 24 types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.

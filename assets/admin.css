@@ -43,3 +43,8 @@
 @media (forced-colors: active) {
     .alify-button-options input:checked + span { outline: 3px solid Highlight; outline-offset: -4px; }
 }
+
+.alify-range { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.alify-range input[type="number"] { width: 140px; }
+.alify-range input[type="range"] { flex: 1; min-width: 140px; max-width: 480px; }
+.alify-range .description { flex-basis: 100%; }

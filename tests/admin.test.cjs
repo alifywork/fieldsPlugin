@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -720,4 +720,39 @@ test('Button Group cloned rows have independent names, IDs and clearing', () => 
     assert.equal(first.checked, true); assert.equal(second.checked, false);
     rows[1].querySelector('[data-radio-clear]').click();
     assert.equal(rows[1].querySelectorAll('input:checked').length, 0); assert.equal(first.checked, true); w.close();
+});
+
+test('Range builder preserves root and subfield bounds/step', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Amount'); set(w, 'type', 'range');
+    assert.equal(d.querySelector('[data-prop="max"]').value, '100');
+    set(w, 'min', '-1'); set(w, 'max', '2'); set(w, 'step', '0.125'); set(w, 'default', '0');
+    assert.equal(schema(w)[0].step, '0.125'); set(w, 'type', 'repeater'); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'range'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.querySelector('[data-sub-prop="min"]').value, '0');
+    const step = d.querySelector('[data-sub-prop="step"]'); step.value = '0.25'; step.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].step, '0.25'); w.close();
+});
+function rangeMarkup(name = 'amount') {
+    return `<div class="alify-range"><input type="number" data-range-number name="${name}" min="-1" max="2" step="0.125" value=""><input type="range" data-range-slider min="-1" max="2" step="0.125" value="-1"><button type="button" data-range-clear>Clear</button></div>`;
+}
+test('Range slider does not invent a value; sync, precision, step, clear and conditions agree', () => {
+    const w = conditionalEditor('range', 'equals', '0.5', rangeMarkup()), d = w.document;
+    const number = d.querySelector('[data-range-number]'), slider = d.querySelector('[data-range-slider]'), target = d.querySelector('[data-field-key="target"]');
+    assert.equal(number.value, ''); assert.equal(target.hidden, true);
+    slider.value = '0.5'; slider.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(number.value, '0.5'); assert.equal(target.hidden, false);
+    number.value = '0.500'; number.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(target.hidden, false); assert.equal(slider.value, '0.5');
+    for (const bad of ['0.1', '3', '0.0001', '1e0']) {
+        number.value = bad; number.dispatchEvent(new w.Event('input', {bubbles: true}));
+        assert.equal(number.validity.valid, false); assert.equal(target.hidden, true);
+    }
+    d.querySelector('[data-range-clear]').click(); assert.equal(number.value, ''); assert.equal(number.validity.valid, true);
+    assert.equal(slider.getAttribute('aria-valuetext'), 'No value selected'); assert.equal(target.hidden, true); w.close();
+});
+test('Range clearing and events are scoped to the live container', () => {
+    const dom = new JSDOM(rangeMarkup('first') + rangeMarkup('second'), {runScripts: 'outside-only'}), w = dom.window, d = w.document;
+    w.eval(fs.readFileSync('assets/values.js', 'utf8')); const roots = d.querySelectorAll('.alify-range');
+    roots[0].querySelector('[data-range-slider]').value = '1'; roots[0].querySelector('[data-range-slider]').dispatchEvent(new w.Event('change', {bubbles: true}));
+    roots[1].querySelector('[data-range-clear]').click(); assert.equal(roots[0].querySelector('[data-range-number]').value, '1'); w.close();
 });

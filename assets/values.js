@@ -82,6 +82,41 @@
         const first = root.querySelector('input[type="radio"]');
         if (first) first.focus();
     });
+    function rangeUnits(text) {
+        if (!/^-?(?:0|[1-9][0-9]{0,6})(?:\.[0-9]{1,3})?$/.test(text)) return null;
+        const parts = text.replace('-', '').split('.');
+        const units = Number(parts[0]) * 1000 + Number((parts[1] || '').padEnd(3, '0'));
+        return units <= 1000000000 ? (text.startsWith('-') ? -units : units) : null;
+    }
+    function rangeValue(number) {
+        if (!number) return null;
+        const value = rangeUnits(number.value), min = rangeUnits(number.min), max = rangeUnits(number.max), step = rangeUnits(number.step);
+        return value !== null && min !== null && max !== null && step > 0 && value >= min && value <= max && (value - min) % step === 0 ? String(value / 1000) : null;
+    }
+    function syncRange(event) {
+        const root = event.target.closest('.alify-range');
+        if (!root) return;
+        const number = root.querySelector('[data-range-number]'), slider = root.querySelector('[data-range-slider]');
+        if (event.target === slider) {
+            number.value = slider.value;
+            number.dispatchEvent(new Event('input', {bubbles: true}));
+            return;
+        }
+        const value = rangeValue(number);
+        number.setCustomValidity(number.value !== '' && value === null ? 'Use a plain decimal within the bounds, aligned to the step (at most three decimal places).' : '');
+        if (value !== null) { slider.value = value; slider.removeAttribute('aria-valuetext'); }
+        else slider.setAttribute('aria-valuetext', number.value === '' ? 'No value selected' : 'Numeric input invalid');
+    }
+    document.addEventListener('input', syncRange);
+    document.addEventListener('change', syncRange);
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-range-clear]');
+        if (!button || button.disabled) return;
+        const root = button.closest('.alify-range'), number = root.querySelector('[data-range-number]');
+        number.value = ''; root.querySelector('[data-range-slider]').value = number.min;
+        number.dispatchEvent(new Event('input', {bubbles: true})); number.focus();
+    });
+    document.querySelectorAll('[data-range-number]').forEach(number => syncRange({target: number}));
     function syncColor(event) {
         const root = event.target.closest('.alify-color');
         if (!root) return;
@@ -164,6 +199,8 @@
                             } else if (['checkbox', 'true_false', 'radio', 'button_group'].includes(source.dataset.fieldType)) {
                                 values = inputs.filter(input => input.checked).map(input => input.value);
                                 if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
+                            } else if (source.dataset.fieldType === 'range') {
+                                values = [rangeValue(source.querySelector('[data-range-number]')) ?? ''];
                             } else values = inputs.length ? [inputs[0].value] : [''];
                             const empty = !values.length || (values.length === 1 && (values[0] === '' || (source.dataset.fieldType === 'true_false' && values[0] === '0')));
                             const matches = values.includes(rule.value);

@@ -14,9 +14,9 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 ## A. Everyday choice and input fields
 
 1. [x] **Radio Button** — v0.18.0: single configured choice key; defaults, required/optional clearing, post/Options/basic subfields, conditional source/target, REST validation and schema JSON. No “other” choices or custom-choice creation.
-2. [x] **Button Group** — v0.19.0: single-choice segments, native keyboard/focus/required behavior, optional clear, defaults, post/Options/basic subfields, conditions, REST and JSON. Custom/multiple choices and advanced return/layout settings remain under item 7. **Current completed feature.**
-3. [ ] **Range** — numeric slider with min/max/step and server validation. **Next feature.**
-4. [ ] Password — masked editor input; explicitly not encryption or secure-secret storage.
+2. [x] **Button Group** — v0.19.0: single-choice segments, native keyboard/focus/required behavior, optional clear, defaults, post/Options/basic subfields, conditions, REST and JSON. Custom/multiple choices and advanced return/layout settings remain under item 7.
+3. [x] **Range** — v0.20.0: paired slider/numeric input, min/max/step, canonical decimals with exact three-place arithmetic and ±1000000 bounds, defaults, optional clear, required/atomic validation, post/Options/basic containers, conditions, REST and JSON. **Current completed feature.**
+4. [ ] **Password** — masked editor input; explicitly not encryption or secure-secret storage. **Next feature.**
 5. [ ] Combined Date Time — define storage, display and timezone contract.
 6. [ ] Date/Time display and return-format configuration.
 7. [ ] Radio/Select/Checkbox richer settings — layouts, checkbox defaults, multiple/searchable Select and documented return formats.
@@ -127,4 +127,5 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 ## Delivery log
 
 - **v0.18.0 — Radio Button:** first sequential feature. See README/CHANGELOG and the feature tests for the exact supported scope. Verified in [CI run 40693944722](https://github.com/alifywork/fieldsPlugin/actions/runs/40693944722): all four native targets pass (325 backend / 101 browser / 24 HTTP persistence checks), plus 385 isolated PHP assertions and 48 JS tests. The next item at that release was Button Group.
-- **v0.19.0 — Button Group:** native radio-backed single-choice segments with optional clearing and the shared integration/save-safety contract. Local checks: 406 isolated PHP assertions, 51 JS tests, 349 backend assertions on both existing PHP-WASM/SQLite targets. Verified in [CI run 40694812698](https://github.com/alifywork/fieldsPlugin/actions/runs/40694812698): all four native targets pass (349 backend / 112 browser / 24 HTTP persistence checks). Next: **Range**. Subsequent work follows the numbered queue unless a dependency requires reordering, which must be recorded here.
+- **v0.19.0 — Button Group:** native radio-backed single-choice segments with optional clearing and the shared integration/save-safety contract. Local checks: 406 isolated PHP assertions, 51 JS tests, 349 backend assertions on both existing PHP-WASM/SQLite targets. Verified in [CI run 40694812698](https://github.com/alifywork/fieldsPlugin/actions/runs/40694812698): all four native targets pass (349 backend / 112 browser / 24 HTTP persistence checks). The next item at that release was Range.
+- **v0.20.0 — Range:** bounded decimal slider/numeric input with exact step validation and the shared integration/save-safety contract. Local checks: 474 isolated PHP assertions, 54 JS tests, 374 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser verification is recorded after completion. Next: **Password**. Subsequent work follows the numbered queue unless a dependency requires reordering, which must be recorded here.

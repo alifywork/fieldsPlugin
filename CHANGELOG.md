@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0
+
+- Add Range with a named numeric input/unnamed slider, configurable root/subfield min/max/step, canonical decimal-string storage and optional explicit clearing. Empty fields never implicitly save the slider position.
+- Enforce ±1000000 and three-decimal precision using exact thousandth-unit arithmetic; reject out-of-bounds/off-step/malformed values and invalid schemas/defaults. Step is anchored at minimum; invalid input is not silently clamped.
+- Support posts/Options/basic containers, canonical-value conditional sources/targets, core REST save validation and schema-only JSON, retaining existing save-safety behavior.
+- Add builder/value/conditional and backend/browser lifecycle checks. Local results: 474 PHP assertions, 54 JS tests and 374 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser results are recorded after verification.
+- Complete roadmap Range increment; next is Password (masked input, not encryption/secret storage).
+
 ## 0.19.0
 
 - Add single-choice Button Group fields with configured defaults/choices, zero-key preservation and optional clearing. Style real radios as wrapping segments with selected/disabled/focus/forced-colors states; preserve native keyboard/required behavior.

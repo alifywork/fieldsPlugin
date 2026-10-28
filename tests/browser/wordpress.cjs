@@ -52,6 +52,16 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await chooseRelationship();
         check(await value('related').inputValue(), String(fixture.reference), 'Actual AJAX selector writes chosen post/page ID');
         check(await page.locator('.alify-relation-item').count(), 2, 'Relationship AJAX picker prevents duplicate references');
+        const range = page.locator('.alify-range');
+        check(await value('amount').inputValue(), '', 'Optional Range starts unset, not implicit slider value');
+        await range.locator('[data-range-slider]').focus(); await page.keyboard.press('ArrowRight');
+        check(await value('amount').inputValue(), '-0.875', 'Native Range arrow key commits a step from minimum');
+        await value('amount').fill('0.500');
+        check(await range.locator('[data-range-slider]').inputValue(), '0.5', 'Range numeric input synchronizes slider');
+        check(await value('range_details').isVisible(), true, 'Range canonical decimal matches conditional rule');
+        await value('amount').fill('0.1');
+        check(await value('amount').evaluate(node => node.checkValidity()), false, 'Off-step Range input is invalid before save');
+        await value('amount').fill('0.5'); await value('range_details').fill('Range details retained');
         const buttons = page.locator('.alify-button-group');
         check(await buttons.locator('input:checked').inputValue(), '0', 'Button Group renders configured zero default');
         check(await value('button_details').isVisible(), false, 'Button Group conditional target starts hidden');
@@ -127,6 +137,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('[data-relation-action="clear"]').click();
         await page.locator('[data-post-clear]').click();
         check(await buttons.locator('input:checked').inputValue(), 'a', 'Button Group survives Classic save/reload');
+        check(await value('amount').inputValue(), '0.5', 'Range decimal survives Classic save/reload');
+        await range.locator('[data-range-clear]').click();
         await buttons.locator('[data-radio-clear]').click();
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), '0', 'Radio choice survives Classic save/reload');
         await page.locator('.alify-radio:not(.alify-button-group) [data-radio-clear]').click();
@@ -142,6 +154,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-link input[type="url"]').inputValue(), '', 'Explicit Link clear survives actual save/reload');
         check(await value('related').inputValue(), '', 'Explicit post reference clear survives save/reload');
         check(await page.locator('.alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
+        check(await value('amount').inputValue(), '', 'Optional Range clear survives Classic save/reload');
+        check(await value('range_details').inputValue(), 'Range details retained', 'Hidden Range dependent preserves saved value');
         check(await buttons.locator('input:checked').count(), 0, 'Optional Button Group clear survives Classic save/reload');
         check(await value('button_details').inputValue(), 'Button details retained', 'Hidden Button Group dependent retains saved value');
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').count(), 0, 'Optional Radio clear survives Classic save/reload');
@@ -181,6 +195,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
         await value('subtitle').fill('Block subtitle');
+        await value('amount').fill('1.5');
         await buttons.locator('label').filter({has: page.locator('input[value="b"]')}).locator('span').click();
         await page.locator('.alify-radio:not(.alify-button-group) input[value="b"]').check();
         await page.locator('.alify-group [type="text"]').fill('Block profile');
@@ -227,6 +242,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Gutenberg flexible body', 'Flexible content survives Gutenberg REST save/reload');
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), 'b', 'Radio survives same-request Gutenberg REST save/reload');
         check(await buttons.locator('input:checked').inputValue(), 'b', 'Button Group survives Gutenberg REST save/reload');
+        check(await value('amount').inputValue(), '1.5', 'Range survives same-request Gutenberg REST save');
         check(await value('details').inputValue(), 'Block ALL', 'ALL target survives Gutenberg REST save/reload');
         check(await value('alternate').inputValue(), 'Block ANY', 'ANY target survives Gutenberg REST save/reload');
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/block', 'Link components survive same-request Gutenberg REST save/reload');
@@ -247,7 +263,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 2, 'Row-bound schema exports as v2 for safe older-importer rejection');
-        check(exported.group.fields.length, 18, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 20, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
@@ -291,6 +307,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await chooseRelationship();
         await setRich('<p>Options <strong>copy</strong></p>');
         await optionValue('options_title').fill('Saved title');
+        await optionValue('options_amount').fill('1.500');
         await buttons.locator('label').filter({has: page.locator('input[value="a"]')}).locator('span').click();
         await page.locator('.alify-radio:not(.alify-button-group) input[value="a"]').check();
         await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).check();
@@ -299,6 +316,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await saveOptions();
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), 'a', 'Radio survives Options HTTP save/reload');
         check(await buttons.locator('input:checked').inputValue(), 'a', 'Button Group survives Options HTTP save/reload');
+        check(await optionValue('options_amount').inputValue(), '1.5', 'Range canonical decimal survives Options HTTP save');
         check(page.url(), optionsURL, 'Options form redirects to its registered page');
         check(await page.locator('.notice-success').count(), 1, 'Actual options save shows success notice');
         check(await optionValue('options_related').inputValue(), String(fixture.reference), 'Selected post reference survives Options HTTP save/reload');

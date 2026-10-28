@@ -768,4 +768,26 @@ same(array('row' => 0, 'subfield' => 'button_mode'), $location, 'Button Group re
 $dependent = field('details'); $dependent['condition'] = array('field' => $buttons['key'], 'operator' => 'equals', 'value' => '0');
 same(true, Alify_CF::visible($dependent, array($buttons, $dependent), array($buttons['key'] => '0')), 'Button Group is a server condition source');
 same(false, Alify_CF::visible($dependent, array($buttons, $dependent), array($buttons['key'] => '')), 'Empty button_group hides dependent');
+$range = field('amount', 'range'); $range['min'] = '-1'; $range['max'] = '2'; $range['step'] = '0.125';
+same('Range', Alify_CF::types()['range'], 'Range is registered');
+foreach (array('-1' => '-1', '-0.000' => '0', '0.125' => '0.125', '1.500' => '1.5', '2' => '2') as $raw => $expected) { same($expected, Alify_CF::clean_value($range, $raw), 'Range canonicalizes exact step-aligned decimal'); }
+foreach (array('3', '-1.125', '0.1', '1e0', '+1', '01', '0.0001', ' 1', array(), array('1'), true, false, null, INF, NAN) as $bad) {
+    $errors = array(); same(array(), Alify_CF::validate_values(array($range), array('amount' => $bad), array('amount' => '1.5'), $errors), 'Range rejects out-of-bounds/off-step/malformed values');
+    same(true, count($errors) > 0, 'Range invalid submission reports error');
+}
+$errors = array(); same(array('amount' => ''), Alify_CF::validate_values(array($range), array('amount' => ''), array('amount' => '1.5'), $errors), 'Optional Range clears explicitly');
+$range['required'] = true; $errors = array(); same(array(), Alify_CF::validate_values(array($range), array('amount' => ''), array(), $errors), 'Required Range rejects blank');
+$errors = array(); same(array('amount' => '0'), Alify_CF::validate_values(array($range), array('amount' => 0), array(), $errors), 'Required Range accepts zero');
+$errors = array(); same(array('min' => '0', 'max' => '100', 'step' => '1'), Alify_CF_Range::settings(array(), $errors), 'Range supplies explicit default bounds');
+foreach (array(array('min' => '1', 'max' => '1'), array('min' => '2', 'max' => '1'), array('step' => '0'), array('step' => '-1'), array('step' => '101'), array('min' => array()), array('max' => '1000001'), array('step' => '0.0001'), array('step' => 'any')) as $bad) {
+    $errors = array(); same(array(), Alify_CF_Range::settings($bad, $errors), 'Range rejects invalid configuration'); same(true, count($errors) > 0, 'Invalid settings report error');
+}
+$errors = array(); $schema = Alify_CF::validate_schema(array($range), 'post', 9999, $errors); same(array(), $errors, 'Root Range schema accepted'); same('0.125', $schema[0]['step'], 'Root schema preserves Range step');
+$range['default'] = '0.1'; $errors = array(); Alify_CF::validate_schema(array($range), 'post', 9999, $errors); same(true, count($errors) > 0, 'Invalid Range default rejects schema');
+$range['default'] = '1.500'; $errors = array(); $subs = Alify_CF_Repeater::schema(array($range), $errors); same('1.5', $subs[0]['default'], 'Subfield default canonicalizes'); same('-1', $subs[0]['min'], 'Subfield retains bounds');
+$range_rows = field('range_rows', 'repeater'); $range_rows['sub_fields'] = $subs; $issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($range_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'amount' => array()))), null, false, $issue, $location), 'Malformed Range rejects complete container');
+same(array('row' => 0, 'subfield' => 'amount'), $location, 'Range identifies exact invalid subfield');
+$edge = field('edge', 'range'); $edge['min'] = '-1000000'; $edge['max'] = '1000000'; $edge['step'] = '0.001'; same('1000000', Alify_CF::clean_value($edge, '1000000'), 'Bounded integer arithmetic accepts largest edge');
+$offset = field('offset', 'range'); $offset['min'] = '0.1'; $offset['max'] = '1'; $offset['step'] = '0.2'; same('0.3', Alify_CF::clean_value($offset, '0.300'), 'Step anchors at minimum'); same('', Alify_CF::clean_value($offset, '1'), 'Unaligned maximum is not implicitly snapped');
 echo "PASS: $count PHP contract assertions\n";

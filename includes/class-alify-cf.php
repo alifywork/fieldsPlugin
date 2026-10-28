@@ -1,5 +1,6 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
+require_once __DIR__ . '/class-alify-cf-range.php';
 require_once __DIR__ . '/class-alify-cf-link.php';
 require_once __DIR__ . '/class-alify-cf-post-object.php';
 require_once __DIR__ . '/class-alify-cf-relationship.php';
@@ -35,7 +36,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'button_group' => 'Button Group', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'range' => 'Range', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'button_group' => 'Button Group', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
     }
 
     public static function register() {
@@ -170,6 +171,8 @@ final class Alify_CF {
         $container_error = $error_id && in_array($field['type'], array('group', 'repeater', 'flexible'), true);
         if ($container_error) { echo '<div class="alify-container-error" role="group" aria-invalid="true" aria-describedby="' . esc_attr($error_id) . '">'; }
         switch ($field['type']) {
+            case 'range':
+                Alify_CF_Range::render($field, $value, $id, $input, $error_id); break;
             case 'link':
                 Alify_CF_Link::render($field, $value, $id, $input, $error_id); break;
             case 'gallery':
@@ -226,6 +229,7 @@ final class Alify_CF {
     }
 
     public static function clean_value($field, $value) {
+        if ($field['type'] === 'range') { return Alify_CF_Range::clean($field, $value); }
         if ($field['type'] === 'relationship') { return Alify_CF_Relationship::clean($value); }
         if ($field['type'] === 'post_object') { return Alify_CF_Post_Object::clean($value); }
         if ($field['type'] === 'wysiwyg') { return Alify_CF_Rich_Text::clean($value); }
@@ -283,6 +287,7 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
+            if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if ($type === 'repeater') {
                 $limits = Alify_CF_Repeater::limits($field, $errors);
@@ -290,6 +295,7 @@ final class Alify_CF {
             }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
             $clean['default'] = $type === 'post_object' ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
+            if ($type === 'range' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Range default must be within bounds and aligned to its step: ' . $name; }
             $clean['condition'] = Alify_CF_Conditions::clean($field['condition'] ?? null, $errors, $name);
             $fields[] = $clean;
         }
@@ -381,6 +387,7 @@ final class Alify_CF {
             $submitted = $values[$field['name']] ?? '';
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
             $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
+            if ($field['type'] === 'range' && array_key_exists($field['name'], $values) && $values[$field['name']] !== '' && Alify_CF_Range::units($values[$field['name']]) === null) { $invalid = true; }
             if ($field['type'] === 'wysiwyg') { $invalid = !is_string($submitted); }
             if (in_array($field['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
             if (($field['required'] && $empty) || $invalid) {
