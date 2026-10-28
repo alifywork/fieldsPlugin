@@ -22,8 +22,9 @@ final class Alify_CF_Composition {
     }
     private static function cost($field, $value) {
         if ($field['type'] === 'group') { $cost = 3; foreach ($field['sub_fields'] as $sub) { $cost += self::cost($sub, is_array($value) ? ($value[$sub['name']] ?? $sub['default']) : $sub['default']); } return $cost; }
-        if ($field['type'] === 'repeater') { $cost = 3; foreach (is_array($value) ? $value : array() as $row) { $cost += 2; foreach ($field['sub_fields'] as $sub) { $cost += self::cost($sub, $row[$sub['name']] ?? $sub['default']); } } return $cost; }
-        if ($field['type'] === 'flexible') { $cost = 3; foreach (is_array($value) ? $value : array() as $row) { $layout = Alify_CF_Flexible::layout($field, $row['layout'] ?? ''); if ($layout) { $layout['type'] = 'group'; $cost += 3 + self::cost($layout, $row['fields'] ?? array()); } } return $cost; }
+        if ($field['type'] === 'repeater') { $cost = 5; foreach ($field['sub_fields'] as $sub) { $cost += self::cost($sub, $sub['default']); } foreach (is_array($value) ? $value : array() as $row) { $cost += 2; foreach ($field['sub_fields'] as $sub) { $cost += self::cost($sub, $row[$sub['name']] ?? $sub['default']); } } return $cost; }
+        if ($field['type'] === 'flexible') { $cost = 3; foreach ($field['layouts'] as $layout) { $layout['type'] = 'group'; $cost += self::cost($layout, array()); } foreach (is_array($value) ? $value : array() as $row) { $layout = Alify_CF_Flexible::layout($field, $row['layout'] ?? ''); if ($layout) { $layout['type'] = 'group'; $cost += 3 + self::cost($layout, $row['fields'] ?? array()); } } return $cost; }
+        if (in_array($field['type'], array('select', 'checkbox', 'radio', 'button_group'), true)) { return 3 + 2 * (substr_count($field['choices'] ?? '', "\n") + 1); }
         if (is_array($value)) { return 5 + count($value) * 3; } return 3;
     }
     public static function needs_origin($fields) { return self::children($fields) || Alify_CF_Scoped_Conditions::enabled($fields); }

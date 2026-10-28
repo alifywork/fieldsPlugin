@@ -124,6 +124,7 @@ jobs:
           unzip -q /tmp/woocommerce.zip -d "$ALIFY_WP_ROOT/wp-content/plugins"
           git clone --depth 1 --branch 3.9.1 https://github.com/polylang/polylang.git "$ALIFY_WP_ROOT/wp-content/plugins/polylang"
           composer install --working-dir="$ALIFY_WP_ROOT/wp-content/plugins/polylang" --no-dev --no-interaction --no-progress --no-scripts --prefer-dist
+          composer run-script --working-dir="$ALIFY_WP_ROOT/wp-content/plugins/polylang" post-autoload-dump
           npm ci --prefix "$ALIFY_WP_ROOT/wp-content/plugins/polylang" --ignore-scripts --no-audit --no-fund
           npm run build --prefix "$ALIFY_WP_ROOT/wp-content/plugins/polylang"
           mkdir -p "$(dirname "$ALIFY_PROVIDER_VENDOR")"
