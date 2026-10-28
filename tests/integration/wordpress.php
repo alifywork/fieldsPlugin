@@ -593,6 +593,8 @@ try {
     expect_same('<p>Default <strong>text</strong></p>', Alify_CF::schema($diagnostic_group)[0]['default'], 'Rich defaults preserve safe post HTML');
     $rich_raw = '<p onclick="alert(1)">Hello <strong>world</strong> <a href="javascript:alert(1)">link</a></p><script>alert(1)</script>';
     $rich_safe = wp_kses_post($rich_raw);
+    ob_start(); Alify_CF::control($rich_field, $rich_raw, 'rich-legacy', 'legacy-rich'); $legacy_rich_html = ob_get_clean();
+    expect_same(false, strpos($legacy_rich_html, 'onclick') !== false || strpos($legacy_rich_html, '&lt;script') !== false, 'Rich renderer sanitizes legacy stored HTML before it can enter a Visual iframe');
     $rich_data = array('rich_copy' => $rich_raw, 'rich_optional' => '<p>Optional</p>');
     save_values($diagnostic_post, $diagnostic_group, $rich_data);
     expect_same($rich_safe, alify_get_field('rich_copy', $diagnostic_post), 'Classic saves KSES-filtered rich HTML even for administrators');

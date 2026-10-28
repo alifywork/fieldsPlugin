@@ -180,7 +180,7 @@ final class Alify_CF {
             case 'file':
                 self::media_field($field, $value, $id, $input); break;
             case 'wysiwyg':
-                echo '<div class="alify-rich"><button type="button" class="button" data-rich-enable>Enable Visual/Text editor</button><textarea class="alify-rich-text" data-rich-editor' . $attrs . ' aria-required="' . (!empty($field['required']) ? 'true' : 'false') . '" rows="8">' . esc_textarea(is_string($value) ? $value : '') . '</textarea><p class="description">WordPress post HTML only. Required fields need text; empty formatting or media-only content is not sufficient.</p></div>'; break;
+                echo '<div class="alify-rich"><button type="button" class="button" data-rich-enable>Enable Visual/Text editor</button><textarea class="alify-rich-text" data-rich-editor' . $attrs . ' aria-required="' . (!empty($field['required']) ? 'true' : 'false') . '" rows="8">' . esc_textarea(is_string($value) ? wp_kses_post($value) : '') . '</textarea><p class="description">WordPress post HTML only. Required fields need text; empty formatting or media-only content is not sufficient.</p></div>'; break;
             case 'textarea':
                 echo '<textarea' . $attrs . $required . ' rows="4">' . esc_textarea(is_scalar($value) ? $value : '') . '</textarea>'; break;
             case 'select':
