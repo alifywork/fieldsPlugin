@@ -30,7 +30,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
     }
 
     public static function register() {
@@ -184,6 +184,12 @@ final class Alify_CF {
                 echo '<fieldset id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
                 foreach (self::choices($field) as $key => $label) { echo '<label class="alify-choice"><input type="checkbox" name="' . esc_attr($input) . '[]" value="' . esc_attr($key) . '" ' . checked(in_array((string) $key, (array) $value, true), true, false) . '> ' . esc_html($label) . '</label>'; }
                 echo '</fieldset>'; break;
+            case 'color':
+                $text = is_scalar($value) ? (string) $value : '';
+                $swatch = self::clean_value($field, $text) ?: '#000000';
+                echo '<div class="alify-color"><input type="text"' . $attrs . ' value="' . esc_attr($text) . '" placeholder="#rrggbb" pattern="#[0-9a-fA-F]{6}" maxlength="7" autocomplete="off" spellcheck="false"' . $required . '><input type="color" data-color-picker value="' . esc_attr($swatch) . '" aria-label="' . esc_attr($field['label'] . ': choose color') . '"><button type="button" class="button" data-color-clear>Clear color</button></div>'; break;
+            case 'time':
+                echo '<input type="time"' . $attrs . ' value="' . esc_attr(is_scalar($value) ? $value : '') . '" step="60"' . $required . '>'; break;
             case 'true_false':
                 echo '<label class="alify-choice"><input type="checkbox"' . $attrs . ' value="1" ' . checked($value, '1', false) . $required . '> Enabled</label>'; break;
             default:
@@ -215,6 +221,8 @@ final class Alify_CF {
             case 'number': return is_numeric($value) ? $value : '';
             case 'true_false': return $value === '1' ? '1' : '0';
             case 'select': return array_key_exists($value, self::choices($field)) ? $value : '';
+            case 'color': return preg_match('/^#[0-9a-fA-F]{6}$/D', $value) ? strtolower($value) : '';
+            case 'time': return preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $value) ? $value : '';
             case 'date':
                 $date = strpos($value, chr(0)) === false ? DateTime::createFromFormat('!Y-m-d', $value) : false;
                 return $date && $date->format('Y-m-d') === $value ? $value : '';

@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.12.0 — inline container errors and focus**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.13.0 — Color Picker and Time fields**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -28,6 +28,16 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
+
+## Color Picker and Time
+
+Both new basic types work as post fields, Options Page fields, and Group/Repeater/Flexible subfields. They support defaults, required validation, conditional visibility and configuration-only JSON transfer like other basic fields.
+
+- **Color Picker (`color`)**: native color swatch plus editable hex text and **Clear color**. Saves exactly six-digit hex as lowercase (`#2271b1`); rejects shorthand, alpha, named colors and CSS expressions. An empty optional field stays empty—an untouched swatch never implicitly saves black. Required means the submitted hex text cannot be empty.
+- **Time (`time`)**: native browser time input, stored as a strict 24-hour **`HH:MM`** string (`00:00`–`23:59`). No seconds, date, timezone conversion or timestamp semantics. The browser may display a localized clock; the submitted/stored format stays `HH:MM`.
+- Invalid nonempty values are rejected rather than silently cleared. Optional empty values explicitly clear; invalid container subfields retain the entire previous saved container.
+- Builder defaults use the same format rules. Invalid defaults normalize to empty, following existing basic-field behavior. Themes read strings with `alify_get_field()` / `alify_get_option()` and must escape output for its context.
+- JSON preserves these schemas/defaults. Destination plugins need **0.13.0+**; older versions reject the unsupported field types. Existing JSON version-selection rules are unchanged.
 
 ## Theme API
 
@@ -342,7 +352,7 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.12.0:
+Previous verified baseline (0.12.0; new field development checks extend it):
 
 ```sh
 npm ci

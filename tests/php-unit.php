@@ -636,4 +636,18 @@ same(null, $location, 'Incomplete container never targets an unrelated subfield'
 $errors = array(); $field_errors = array(); $locations = array();
 Alify_CF::validate_values(array($diagnostic_rows), array('people' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'name' => '')))), array(), $errors, $field_errors, $locations);
 same(array('people' => array('row' => 0, 'subfield' => 'name')), $locations, 'Validation returns parallel location metadata without changing error strings');
+// Color/time are strict optional scalars, shared by root fields and all basic subfields.
+foreach (array('#AAbB09' => '#aabb09', '#000000' => '#000000', '#ffffff' => '#ffffff', '' => '', '#abc' => '', 'red' => '', '#12345678' => '', "#123456\n" => '', ' #123456' => '') as $raw => $expected) {
+    same($expected, Alify_CF::clean_value(field('accent', 'color'), $raw), 'Strict six-digit color: ' . $raw);
+}
+foreach (array('00:00' => '00:00', '23:59' => '23:59', '09:30' => '09:30', '' => '', '24:00' => '', '9:30' => '', '12:60' => '', '09:30:00' => '', "09:30\n" => '') as $raw => $expected) {
+    same($expected, Alify_CF::clean_value(field('opens', 'time'), $raw), 'Strict HH:MM time: ' . $raw);
+}
+same('', Alify_CF::clean_value(field('accent', 'color'), array('#123456')), 'Color rejects arrays');
+same('', Alify_CF::clean_value(field('opens', 'time'), array('09:30')), 'Time rejects arrays');
+$new_rows = field('palette', 'repeater'); $new_rows['sub_fields'] = array(field('accent', 'color'), field('opens', 'time'));
+same(array(array('accent' => '#aabbcc', 'opens' => '09:30')), Alify_CF_Repeater::clean($new_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'accent' => '#AABBCC', 'opens' => '09:30')))), 'New types clean inside structured rows');
+$old_scalar = array('accent' => '#112233', 'opens' => '08:00'); $errors = array();
+same(array(), Alify_CF::validate_values(array(field('accent', 'color'), field('opens', 'time')), array('accent' => 'bad', 'opens' => '24:00'), $old_scalar, $errors), 'Invalid nonempty optional color/time are rejected, not silently cleared');
+$errors = array(); same(array('accent' => '', 'opens' => ''), Alify_CF::validate_values(array(field('accent', 'color'), field('opens', 'time')), array('accent' => '', 'opens' => ''), $old_scalar, $errors), 'Optional color and time explicitly clear');
 echo "PASS: $count PHP contract assertions\n";

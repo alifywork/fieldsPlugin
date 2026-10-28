@@ -22,6 +22,10 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('#user_login').fill(fixture.username); await page.locator('#user_pass').fill(fixture.password);
         await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
         await page.goto(`${base}/wp-admin/post.php?post=${fixture.classic}&action=edit&alify_classic=1`);
+        check(await value('accent').inputValue(), '', 'Optional color starts empty rather than implicit black');
+        await page.locator('[data-color-picker]').evaluate(node => { node.value = '#2271b1'; node.dispatchEvent(new Event('input', {bubbles: true})); });
+        check(await value('accent').inputValue(), '#2271b1', 'Native color picker updates submitted color text');
+        await value('opens').fill('09:30');
         await value('subtitle').fill('Classic subtitle');
         await page.locator('.alify-group [type="text"]').fill('Classic profile');
         await saveClassic();
@@ -68,6 +72,10 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-row [type="text"]').first().fill('Second member');
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
+        check(await value('accent').inputValue(), '#2271b1', 'Color survives Classic save/reload');
+        check(await value('opens').inputValue(), '09:30', 'Time survives Classic save/reload without conversion');
+        await page.locator('[data-color-clear]').click(); await saveClassic();
+        check(await value('accent').inputValue(), '', 'Cleared color remains empty after actual save/reload');
         check(await page.locator('.alify-flex-row input[name$="[layout]"]').evaluateAll(nodes => nodes.map(node => node.value)), ['text', 'hero'], 'Mixed Flexible layout order survives Classic save/reload');
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Classic flexible body', 'Flexible row values survive Classic save');
         check(await page.locator('.alify-group [type="text"]').inputValue(), 'Classic profile', 'Group text survives Classic save/reload');

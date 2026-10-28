@@ -63,6 +63,25 @@
         return target;
     }
     window.AlifyValidation = {show: showError, focus: focusError, clear: clearError};
+    function syncColor(event) {
+        const root = event.target.closest('.alify-color');
+        if (!root) return;
+        const text = root.querySelector('input[type="text"]');
+        const picker = root.querySelector('[data-color-picker]');
+        if (event.target === picker) {
+            text.value = picker.value;
+            text.dispatchEvent(new Event('input', {bubbles: true}));
+        } else if (event.target === text && /^#[0-9a-f]{6}$/i.test(text.value)) picker.value = text.value.toLowerCase();
+    }
+    document.addEventListener('input', syncColor);
+    document.addEventListener('change', syncColor);
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-color-clear]');
+        if (!button || button.disabled) return;
+        const root = button.closest('.alify-color'), text = root.querySelector('input[type="text"]');
+        text.value = ''; root.querySelector('[data-color-picker]').value = '#000000';
+        text.dispatchEvent(new Event('input', {bubbles: true})); text.focus();
+    });
     function refreshRows(repeater) {
         const rows = Array.from(repeater.querySelector('.alify-rows').children);
         const hidden = !!repeater.closest('.alify-value[hidden]');

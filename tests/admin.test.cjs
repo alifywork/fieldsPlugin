@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -517,4 +517,26 @@ test('REST structured location targets Flexible subfield and ignores a stale res
     assert.equal(field.querySelector('.alify-field-error').hidden, true);
     assert.equal(input.hasAttribute('aria-invalid'), false);
     w.close();
+});
+
+
+test('color picker keeps empty distinct from black, synchronizes text, and explicitly clears', () => {
+    const dom = new JSDOM('<div class="alify-value"><div class="alify-color"><input type="text" name="color" value=""><input type="color" data-color-picker value="#000000"><button type="button" data-color-clear>Clear</button></div></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    const text = d.querySelector('[name="color"]'), picker = d.querySelector('[data-color-picker]');
+    assert.equal(text.value, ''); assert.equal(picker.hasAttribute('name'), false);
+    picker.value = '#2271b1'; picker.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(text.value, '#2271b1');
+    text.value = '#AABBCC'; text.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(picker.value, '#aabbcc');
+    text.value = 'bad'; text.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(text.value, 'bad');
+    d.querySelector('[data-color-clear]').click(); assert.equal(text.value, ''); assert.equal(d.activeElement, text);
+    assert.equal(picker.value, '#000000'); w.close();
+});
+
+test('builder exposes Color and Time types with format-specific defaults guidance', () => {
+    const w = builder(); w.document.getElementById('alify-add').click();
+    set(w, 'label', 'Accent'); set(w, 'type', 'color'); set(w, 'default', '#AABBCC');
+    assert.equal(schema(w)[0].type, 'color'); assert.match(w.document.body.textContent, /Six-digit hex/);
+    set(w, 'type', 'time'); set(w, 'default', '09:30');
+    assert.equal(schema(w)[0].type, 'time'); assert.equal(schema(w)[0].default, '09:30');
+    assert.match(w.document.body.textContent, /24-hour HH:MM/); w.close();
 });

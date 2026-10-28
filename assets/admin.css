@@ -14,3 +14,7 @@
 
 .alify-subfield-error { color: #b32d2e; border-left: 3px solid #b32d2e; padding: 6px 10px; margin: 8px 0; }
 .alify-error-jump { margin-bottom: 10px; }
+
+.alify-color { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.alify-color input[type="text"] { max-width: 180px; }
+.alify-color input[type="color"] { width: 44px; height: 34px; padding: 2px; cursor: pointer; }
