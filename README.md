@@ -342,16 +342,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Last verified baseline (0.11.2; feature checks are being extended for 0.12.0):
+Automated checks for 0.12.0:
 
 ```sh
 npm ci
-npm test       # 31 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 33 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 258 assertions with isolated WordPress stubs
+php tests/php-unit.php # 264 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 211 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 215 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -372,7 +372,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 211 backend assertions, 64 browser assertions and 18 additional HTTP options persistence assertions in [CI run 40679067377](https://github.com/alifywork/fieldsPlugin/actions/runs/40679067377), with clean debug-log checks. Coverage includes actual options-page success/failure redirects, attempted-input recovery, correction, invalid nonce, incomplete forms and editor-role denial. Six independent CLI database inspections distinguish persisted values from recovery-rendered inputs and verify options/post isolation plus autoload-disabled storage. Existing container/media/JSON/conditional flows remain covered. These remote results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 215 backend assertions, 70 browser assertions and 18 additional HTTP options persistence assertions in [CI run 40680765934](https://github.com/alifywork/fieldsPlugin/actions/runs/40680765934), with clean debug-log checks. Coverage includes actual options-page success/failure redirects, attempted-input recovery, correction, invalid nonce, incomplete forms and editor-role denial. Six independent CLI database inspections distinguish persisted values from recovery-rendered inputs and verify options/post isolation plus autoload-disabled storage. Existing container/media/JSON/conditional flows remain covered. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 
