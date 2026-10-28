@@ -751,6 +751,8 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
+**Current bundle (0.31.0):** 805 PHP contracts on both runtimes, 84 JavaScript tests, and local SQLite runs with 963 assertions on WordPress 6.2/PHP 7.4 and 966 on WordPress 6.8.3/PHP 8.3. [CI run 40762878282](https://github.com/alifywork/fieldsPlugin/actions/runs/40762878282) passes all four native PHP/WordPress SQLite/MySQL targets, including real Chromium migration plan/apply/rollback and ACF inspection/new-draft import, with clean WordPress debug logs. **63/77 roadmap items complete within their declared scopes; 14 pending.**
+
 **Previous bundle (0.30.0):** 805 PHP contracts on PHP 7.4/8.3, 84 JavaScript tests, and clean-debug-log SQLite runs with 886 assertions on WordPress 6.2/PHP 7.4 and 889 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets pass in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779), including real Chromium chain/User-source frontend flows and custom-block Inspector, refreshed PHP preview, save/reload and public rendering, with clean WordPress debug logs. The declared matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8, not a latest-version certification.
 
 Historical selector-batch baseline follows for comparison, not the current test count.
