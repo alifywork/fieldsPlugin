@@ -2,6 +2,7 @@
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-link.php';
 require_once __DIR__ . '/class-alify-cf-post-object.php';
+require_once __DIR__ . '/class-alify-cf-relationship.php';
 require_once __DIR__ . '/class-alify-cf-rich-text.php';
 require_once __DIR__ . '/class-alify-cf-repeater.php';
 require_once __DIR__ . '/class-alify-cf-group.php';
@@ -34,7 +35,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
     }
 
     public static function register() {
@@ -72,7 +73,7 @@ final class Alify_CF {
             wp_enqueue_script('alify-cf-flexible', plugins_url('assets/flexible.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
             Alify_CF_Rich_Text::assets();
             Alify_CF_Post_Object::assets();
-            wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery', 'alify-cf-flexible', 'alify-cf-rich-text', 'alify-cf-post-object'), ALIFY_CF_VERSION, true);
+            wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery', 'alify-cf-flexible', 'alify-cf-rich-text', 'alify-cf-post-object', 'alify-cf-relationship'), ALIFY_CF_VERSION, true);
             if (method_exists($screen, 'is_block_editor') && $screen->is_block_editor()) {
                 $type = get_post_type_object($screen->post_type);
                 wp_enqueue_script('alify-cf-editor', plugins_url('assets/editor.js', ALIFY_CF_FILE), array('wp-api-fetch', 'alify-cf-values'), ALIFY_CF_VERSION, true);
@@ -182,6 +183,8 @@ final class Alify_CF {
             case 'image':
             case 'file':
                 self::media_field($field, $value, $id, $input); break;
+            case 'relationship':
+                Alify_CF_Relationship::render($field, $value, $id, $input); break;
             case 'post_object':
                 Alify_CF_Post_Object::render($field, $value, $id, $input); break;
             case 'wysiwyg':
@@ -211,6 +214,7 @@ final class Alify_CF {
     }
 
     public static function clean_value($field, $value) {
+        if ($field['type'] === 'relationship') { return Alify_CF_Relationship::clean($value); }
         if ($field['type'] === 'post_object') { return Alify_CF_Post_Object::clean($value); }
         if ($field['type'] === 'wysiwyg') { return Alify_CF_Rich_Text::clean($value); }
         if ($field['type'] === 'link') { return Alify_CF_Link::clean($value); }
@@ -270,7 +274,7 @@ final class Alify_CF {
                 if (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field)) { $clean = array_merge($clean, $limits); }
             }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
-            $clean['default'] = $type === 'post_object' ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
+            $clean['default'] = $type === 'post_object' ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
             $clean['condition'] = Alify_CF_Conditions::clean($field['condition'] ?? null, $errors, $name);
             $fields[] = $clean;
         }
@@ -281,7 +285,7 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
                 }
-                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg'), true) || $source['key'] === $field['key'] || $source['condition']) {
+                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship'), true) || $source['key'] === $field['key'] || $source['condition']) {
                     $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
                 }
             }
@@ -350,6 +354,8 @@ final class Alify_CF {
                 $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
             } elseif ($field['type'] === 'repeater') {
                 $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
+            } elseif ($field['type'] === 'relationship') {
+                $value = Alify_CF_Relationship::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? array(), true);
             } elseif ($field['type'] === 'post_object') {
                 $value = Alify_CF_Post_Object::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
             } elseif ($field['type'] === 'gallery') {
@@ -359,7 +365,7 @@ final class Alify_CF {
             }
             $submitted = $values[$field['name']] ?? '';
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
-            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
+            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if ($field['type'] === 'wysiwyg') { $invalid = !is_string($submitted); }
             if ($field['type'] === 'post_object' && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
             if (($field['required'] && $empty) || $invalid) {

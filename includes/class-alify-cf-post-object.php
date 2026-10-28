@@ -19,8 +19,14 @@ final class Alify_CF_Post_Object {
         if (self::clean($id) === '' || !current_user_can('read_post', $id)) { return false; }
         return !post_password_required(get_post($id)) || current_user_can('edit_post', $id);
     }
+    public static function resolve($raw) {
+        $id = self::clean($raw); if ($id === '') { return null; }
+        $post = get_post($id);
+        return (is_post_publicly_viewable($post) && !post_password_required($post)) || self::readable($id) ? $post : null;
+    }
     public static function assets() {
         wp_enqueue_script('alify-cf-post-object', plugins_url('assets/post-object.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
+        wp_enqueue_script('alify-cf-relationship', plugins_url('assets/relationship.js', ALIFY_CF_FILE), array('alify-cf-post-object'), ALIFY_CF_VERSION, true);
         wp_localize_script('alify-cf-post-object', 'AlifyPostObject', array('url' => admin_url('admin-ajax.php', 'relative'), 'nonce' => wp_create_nonce('alify_cf_search_posts')));
     }
     public static function search($term, $type, $page, $nonce) {
@@ -46,6 +52,10 @@ final class Alify_CF_Post_Object {
         $selected = self::id($value);
         $label = $selected ? 'Saved selection unavailable. Clear or choose a replacement.' : 'No post selected.';
         if ($selected && self::readable($selected)) { $label = sanitize_text_field(get_the_title($selected)) ?: '(Untitled)'; }
-        echo '<div class="alify-post-object" role="group" aria-label="' . esc_attr($field['label']) . '"><input type="hidden" id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" value="' . esc_attr($selected) . '"><p class="alify-post-selected" role="status">' . esc_html($label) . '</p><button type="button" class="button" data-post-clear>Clear selection</button><div class="alify-post-search"><label for="' . esc_attr($id . '-search') . '">Search posts/pages</label><input type="search" id="' . esc_attr($id . '-search') . '" maxlength="200" data-post-search><label for="' . esc_attr($id . '-type') . '">Type</label><select id="' . esc_attr($id . '-type') . '" data-post-type><option value="">Posts and Pages</option><option value="post">Posts</option><option value="page">Pages</option></select><button type="button" class="button" data-post-find>Search</button><div class="alify-post-results"></div><p class="alify-post-status" role="status" aria-live="polite"></p><button type="button" class="button" data-post-prev disabled>Previous</button> <button type="button" class="button" data-post-next disabled>Next</button></div><p class="description">Single post/page ID. Search pages are permission-filtered and may be empty. No custom post types in this increment.</p></div>';
+        echo '<div class="alify-post-object" role="group" aria-label="' . esc_attr($field['label']) . '"><input type="hidden" id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" value="' . esc_attr($selected) . '"><p class="alify-post-selected" role="status">' . esc_html($label) . '</p><button type="button" class="button" data-post-clear>Clear selection</button>'; self::search_controls($id); echo '<p class="description">Single post/page ID. Search pages are permission-filtered and may be empty. No custom post types in this increment.</p></div>';
     }
+    public static function search_controls($id) {
+        echo '<div class="alify-post-search"><label for="' . esc_attr($id . '-search') . '">Search posts/pages</label><input type="search" id="' . esc_attr($id . '-search') . '" maxlength="200" data-post-search><label for="' . esc_attr($id . '-type') . '">Type</label><select id="' . esc_attr($id . '-type') . '" data-post-type><option value="">Posts and Pages</option><option value="post">Posts</option><option value="page">Pages</option></select><button type="button" class="button" data-post-find>Search</button><div class="alify-post-results"></div><p class="alify-post-status" role="status" aria-live="polite"></p><button type="button" class="button" data-post-prev disabled>Previous</button> <button type="button" class="button" data-post-next disabled>Next</button></div>';
+    }
+
 }

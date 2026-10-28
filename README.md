@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.16.0 — searchable Post Object field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.17.0 — ordered Relationship field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Relationship, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -29,11 +29,30 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
 
+## Relationship field
+
+**Relationship (`relationship`)** selects an ordered list of up to **50 unique posts/pages**. It reuses Post Object's permission-filtered search and adds Move earlier/later, Remove reference and Clear all references. Supported on posts, Options Pages and basic Group/Repeater/Flexible subfields.
+
+- Values are stored as ordered integer-ID arrays. Duplicate IDs keep their first occurrence. The raw submitted list is capped at 50 before deduplication; excess items are rejected, never truncated.
+- The form/REST payload is `{__complete: '1', ids: [42, 51]}`. An explicit clear sends the marker with an empty/omitted `ids` list. Missing markers, malformed/non-list IDs, unavailable targets or new unreadable references reject the entire list; a container subfield failure retains its whole container. Options saves remain page-atomic.
+- Existing saved unreadable references may be retained/reordered or explicitly removed; their titles remain redacted. Deleted targets must be removed/replaced rather than silently discarded.
+- Required means at least one reference. This increment has fixed 0–50 limits (required minimum 1), empty defaults, no custom post types, no bidirectional updates, no configurable cardinality and no cross-site ID migration.
+- Relationship can be conditionally shown, but is not a condition source in this increment. JSON transfers schemas only with empty defaults; destination plugins need **0.17.0+**.
+
+```php
+$posts = alify_get_relationship('related_many', get_the_ID()); // Viewable WP_Post objects, saved order.
+foreach ($posts as $related) {
+    printf('<a href="%s">%s</a>', esc_url(get_permalink($related)), esc_html(get_the_title($related)));
+}
+// Raw IDs (including saved unavailable references): alify_get_field('related_many', $post_id).
+// Options: alify_get_option('related_many', 'site'). Typed getter filtering never changes stored IDs.
+```
+
 ## Post Object field
 
 **Post Object (`post_object`)** is a single post/page reference with a searchable selector, type filter, Previous/Next pages and explicit Clear selection. It works on post/Options fields and as a basic Group/Repeater/Flexible subfield. References store canonical IDs, not copied content or titles. WordPress scalar post-meta reads return a string ID; serialized container/Options values retain integer IDs.
 
-- This increment supports **posts and pages only**, with publish/private/draft/pending/future statuses. Attachments, revisions, trash, auto-drafts and custom post types are excluded. Multi-select Relationship fields are a separate future feature.
+- This increment supports **posts and pages only**, with publish/private/draft/pending/future statuses. Attachments, revisions, trash, auto-drafts and custom post types are excluded. For ordered multi-selection, use the Relationship field.
 - Search requires authentication, a user-scoped nonce and `edit_posts`, `edit_pages` or `manage_options`. Each result also passes object-level read permissions; password-protected targets require password access or edit permission. Only IDs, readable titles and types are returned—no content or unfiltered totals.
 - Queries fetch at most 20 candidates per page, pages 1–100. Permission-filtered pages can be empty; Next does not imply that another readable result exists. Refine the search instead of expecting exhaustive browsing. Search terms are capped at 200 bytes.
 - New references require read access. An unchanged pre-existing reference (or the same saved container's reference moved between rows) can be retained after access loss, without disclosing its title. Deleted/unsupported targets are rejected until explicitly cleared/replaced; saved content is not silently rewritten.
@@ -305,7 +324,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, structured Link fields and WYSIWYG fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
+- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, Relationship, structured Link and WYSIWYG fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
 - Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
@@ -415,7 +434,7 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.16.0:
+Previous verified baseline (0.16.0; Relationship development checks extend it):
 
 ```sh
 npm ci

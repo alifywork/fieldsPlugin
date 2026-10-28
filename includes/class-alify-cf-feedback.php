@@ -46,6 +46,10 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'relationship') {
+            $clean = Alify_CF_Relationship::clean($raw, is_array($previous) ? $previous : array(), true);
+            return is_array($clean) ? $clean : $previous;
+        }
         if ($field['type'] === 'post_object') {
             if ($raw === '') { return ''; }
             $id = Alify_CF_Post_Object::clean($raw);

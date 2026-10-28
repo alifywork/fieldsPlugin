@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -636,4 +636,25 @@ test('Post Object builder omits site-local defaults and offers basic subfields',
     assert.equal(w.document.querySelector('[data-prop="default"]'), null);
     set(w, 'type', 'repeater'); w.document.querySelector('[data-sub-action="add"]').click();
     assert.notEqual(w.document.querySelector('[data-sub-prop="type"] option[value="post_object"]'), null); w.close();
+});
+
+
+test('Relationship selection uses current row token, deduplicates and supports ordering/removal/clear', () => {
+    const dom = new JSDOM('<div class="alify-value"><div class="alify-relationship"><div class="alify-relation-items"></div><input type="hidden" name="alify_values[1][rows][rows][new_token][refs][__complete]" value="1"><button data-relation-action="clear">Clear</button><span class="alify-relation-count"></span><p class="alify-post-status"></p><button data-post-find>Search</button></div></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/relationship.js', 'utf8'));
+    const root = d.querySelector('.alify-relationship');
+    w.AlifyRelationship.add(root, '1', '<img src=x>'); w.AlifyRelationship.add(root, '2', 'Second'); w.AlifyRelationship.add(root, '1', 'Duplicate');
+    assert.equal(d.querySelectorAll('.alify-relation-item').length, 2); assert.equal(d.querySelector('img'), null);
+    assert.equal(d.querySelector('.alify-relation-item input').name, 'alify_values[1][rows][rows][new_token][refs][ids][]');
+    d.querySelectorAll('[data-relation-action="up"]')[1].click(); assert.equal(d.querySelector('.alify-relation-item input').value, '2');
+    d.querySelector('[data-relation-action="remove"]').click(); assert.equal(d.querySelector('.alify-relation-item input').value, '1');
+    d.querySelector('[data-relation-action="clear"]').click(); assert.equal(d.querySelectorAll('.alify-relation-item').length, 0);
+    assert.equal(d.querySelector('[name$="[__complete]"]').value, '1'); w.close();
+});
+
+test('Relationship blocks additions at 50 without truncating selected IDs', () => {
+    const dom = new JSDOM('<div class="alify-relationship"><div class="alify-relation-items"></div><input type="hidden" name="refs[__complete]"><button data-relation-action="clear">Clear</button><span class="alify-relation-count"></span><p class="alify-post-status"></p></div>', {runScripts: 'outside-only'});
+    const w = dom.window, root = w.document.querySelector('.alify-relationship'); w.eval(fs.readFileSync('assets/relationship.js', 'utf8'));
+    for (let i = 1; i <= 51; i++) w.AlifyRelationship.add(root, i, 'Reference');
+    assert.equal(root.querySelectorAll('.alify-relation-item').length, 50); assert.match(root.querySelector('.alify-post-status').textContent, /Maximum 50/); w.close();
 });

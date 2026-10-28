@@ -710,4 +710,22 @@ same(array(array('related' => 802)), Alify_CF_Repeater::clean($ref_rows, array('
 $meta[10]['_alify_cf_related'] = 802; same(null, alify_get_post_object('related', 10), 'Typed getter does not return unreadable private object');
 $meta[10]['_alify_cf_related'] = 801; same($posts[801], alify_get_post_object('related', 10), 'Typed getter returns viewable post object');
 $denied = array();
+$relation = field('related_list', 'relationship');
+$relation_payload = array('__complete' => '1', 'ids' => array('802', '801', '802'));
+same(array(802, 801), Alify_CF::clean_value($relation, $relation_payload), 'Relationship preserves first-seen order and deduplicates');
+foreach (array('', array(), array('ids' => array(801)), array('__complete' => '1', 'ids' => '801'), array('__complete' => '1', 'ids' => array('key' => 801)), array('__complete' => '1', 'ids' => array('0801')), array('__complete' => '1', 'ids' => array(803)), array('__complete' => '1', 'ids' => array_fill(0, 51, 801))) as $bad) {
+    same('', Alify_CF_Relationship::clean($bad), 'Relationship rejects malformed/incomplete/dead/over-limit list atomically');
+}
+same(array(), Alify_CF_Relationship::clean(array('__complete' => '1')), 'Complete empty Relationship clears');
+$denied = array(802);
+same('', Alify_CF_Relationship::clean($relation_payload, array(), true), 'Unreadable new relationship target rejects whole list');
+same(array(802, 801), Alify_CF_Relationship::clean($relation_payload, array(802), true), 'Existing unreadable target may be retained/reordered');
+$errors = array(); $relation['required'] = true;
+same(array(), Alify_CF::validate_values(array($relation), array('related_list' => array('__complete' => '1')), array('related_list' => array(801)), $errors), 'Required Relationship rejects empty selection');
+$relation['required'] = false; $errors = array();
+same(array('related_list' => array()), Alify_CF::validate_values(array($relation), array('related_list' => array('__complete' => '1')), array('related_list' => array(801)), $errors), 'Optional Relationship explicitly clears');
+$meta[10]['_alify_cf_related_list'] = array(802, 801, 801);
+same(array($posts[801]), alify_get_relationship('related_list', 10), 'Relationship getter omits unreadable objects and duplicates without changing storage');
+same(array(802, 801, 801), alify_get_field('related_list', 10), 'Filtered Relationship getter leaves raw IDs unchanged');
+$denied = array();
 echo "PASS: $count PHP contract assertions\n";

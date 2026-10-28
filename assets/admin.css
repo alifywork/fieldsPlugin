@@ -28,3 +28,6 @@
 .alify-post-results { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 10px 0; }
 .alify-post-search { margin-top: 12px; }
 .alify-post-search > label { margin-right: 6px; }
+
+.alify-relation-item { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px; border: 1px solid #dce3ed; margin-bottom: 6px; }
+.alify-relation-title { flex: 1; min-width: 100px; overflow-wrap: anywhere; }

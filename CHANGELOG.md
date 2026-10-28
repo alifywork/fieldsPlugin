@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.0
+
+- Add ordered multi-post/page Relationship fields, sharing permission-filtered search with Post Object, on posts/Options and basic container subfields.
+- Add move/remove/clear controls, duplicate prevention and a fixed 50-reference bound. Build dynamic row input names from each live completion marker, not template tokens.
+- Validate complete payloads and ordered canonical IDs atomically; preserve existing unreadable references without exposing titles and reject invalid/deleted/new unreadable targets.
+- Add `alify_get_relationship()` with viewability filtering that leaves raw saved IDs untouched. Support required/conditional targets and schema-only JSON with empty defaults.
+- CPTs, bidirectional updates, configurable limits and Relationship-as-condition-source remain excluded.
+
 ## 0.16.0
 
 - Feature checks pass on all four existing native-PHP targets: 285 backend, 91 browser and 24 HTTP persistence assertions; 348 isolated PHP assertions and 44 JS tests also pass.

@@ -26,6 +26,10 @@
         const button = event.target.closest('[data-post-clear], [data-post-find], [data-post-prev], [data-post-next], [data-post-id]');
         if (!button || button.disabled) return;
         const root = button.closest('.alify-post-object'), input = root.querySelector('input[type="hidden"]');
+        if (button.hasAttribute('data-post-id') && root.classList.contains('alify-relationship')) {
+            if (window.AlifyRelationship) window.AlifyRelationship.add(root, button.dataset.postId, button.textContent);
+            return;
+        }
         if (button.hasAttribute('data-post-clear') || button.hasAttribute('data-post-id')) {
             input.value = button.dataset.postId || '';
             root.querySelector('.alify-post-selected').textContent = button.dataset.postId ? button.textContent : 'No post selected.';

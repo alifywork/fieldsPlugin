@@ -53,7 +53,7 @@ final class Alify_CF_Options {
         wp_enqueue_script('alify-cf-flexible', plugins_url('assets/flexible.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
         Alify_CF_Rich_Text::assets();
         Alify_CF_Post_Object::assets();
-        wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery', 'alify-cf-flexible', 'alify-cf-rich-text', 'alify-cf-post-object'), ALIFY_CF_VERSION, true);
+        wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery', 'alify-cf-flexible', 'alify-cf-rich-text', 'alify-cf-post-object', 'alify-cf-relationship'), ALIFY_CF_VERSION, true);
     }
 
     /** $request is already unslashed. A failed save leaves the entire page unchanged. */

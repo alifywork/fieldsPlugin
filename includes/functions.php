@@ -63,8 +63,16 @@ function alify_get_link($name, $post_id = 0) {
 
 /** Return a currently viewable referenced post/page, or null; raw ID remains available via alify_get_field. */
 function alify_get_post_object($name, $post_id = 0) {
-    $id = Alify_CF_Post_Object::clean(alify_get_field($name, $post_id));
-    if ($id === '') { return null; }
-    $post = get_post($id);
-    return (is_post_publicly_viewable($post) && !post_password_required($post)) || Alify_CF_Post_Object::readable($id) ? $post : null;
+    return Alify_CF_Post_Object::resolve(alify_get_field($name, $post_id));
+}
+
+/** Resolve readable Relationship targets in saved order, without rewriting stored IDs. */
+function alify_get_relationship($name, $post_id = 0) {
+    $ids = alify_get_field($name, $post_id); $posts = array(); $seen = array();
+    if (!is_array($ids)) { return $posts; }
+    foreach (array_slice($ids, 0, Alify_CF_Relationship::MAX_ITEMS) as $id) {
+        $post = Alify_CF_Post_Object::resolve($id);
+        if ($post && !isset($seen[$post->ID])) { $posts[] = $post; $seen[$post->ID] = true; }
+    }
+    return $posts;
 }

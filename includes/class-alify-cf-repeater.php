@@ -39,7 +39,7 @@ final class Alify_CF_Repeater {
             }
             $names[$name] = true; $keys[$key] = true;
             $clean = array('name' => $name, 'key' => $key, 'type' => $type, 'label' => sanitize_text_field($field['label']), 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'required' => !empty($field['required']));
-            $clean['default'] = $type === 'post_object' ? '' : (in_array($type, array('gallery', 'link'), true) ? array() : Alify_CF::clean_value($clean, $field['default'] ?? ''));
+            $clean['default'] = $type === 'post_object' ? '' : (in_array($type, array('gallery', 'link', 'relationship'), true) ? array() : Alify_CF::clean_value($clean, $field['default'] ?? ''));
             $result[] = $clean;
         }
         return $result;
@@ -57,6 +57,7 @@ final class Alify_CF_Repeater {
         foreach ((array) $old as $row) {
             if (!is_array($row)) { continue; }
             foreach ($field['sub_fields'] as $sub) {
+                if ($sub['type'] === 'relationship') { foreach (is_array($row[$sub['name']] ?? null) ? $row[$sub['name']] : array() as $saved_id) { if (is_int($saved_id) || is_string($saved_id)) { $allowed_posts[] = (string) $saved_id; } } }
                 if ($sub['type'] === 'post_object' && is_scalar($row[$sub['name']] ?? null)) { $allowed_posts[] = (string) $row[$sub['name']]; }
                 if ($sub['type'] === 'gallery') {
                     foreach ((array) ($row[$sub['name']] ?? array()) as $image_id) { if (is_scalar($image_id)) { $allowed_media[] = (string) $image_id; } }
@@ -72,10 +73,10 @@ final class Alify_CF_Repeater {
             $out = array();
             foreach ($field['sub_fields'] as $sub) {
                 $raw = $row[$sub['name']] ?? '';
-                $value = $sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw);
+                $value = $sub['type'] === 'relationship' ? Alify_CF_Relationship::clean($raw, $allowed_posts, $permissions) : ($sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw));
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
                 $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
-                if (($sub['type'] === 'post_object' && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                if (($sub['type'] === 'post_object' && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
                     $location = array('row' => $position - 1, 'subfield' => $sub['name']);
                     $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
                     return '';
