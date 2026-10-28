@@ -31,7 +31,7 @@ foreach (array('One', 'Two') as $name) {
     wp_update_attachment_metadata($id, array('width' => 1, 'height' => 1, 'file' => _wp_relative_upload_path($upload['file']))); $images[] = $id;
 }
 wp_mkdir_p(WP_CONTENT_DIR . '/mu-plugins');
-$mu = '<?php if (!defined("ALIFY_CF_TEST_SITE") || !ALIFY_CF_TEST_SITE) { return; } add_filter("use_block_editor_for_post", function($enabled, $post) { return $post->ID === ' . (int) $classic . ' || isset($_GET["alify_classic"]) ? false : $enabled; }, 10, 2); add_action("admin_init", function() { remove_action("admin_init", "_maybe_update_core"); remove_action("admin_init", "_maybe_update_plugins"); remove_action("admin_init", "_maybe_update_themes"); });';
+$mu = '<?php if (!defined("ALIFY_CF_TEST_SITE") || !ALIFY_CF_TEST_SITE) { return; } add_filter("use_block_editor_for_post", function($enabled, $post) { return $post->ID === ' . (int) $classic . ' || isset($_GET["alify_classic"]) ? false : $enabled; }, 10, 2); add_action("admin_init", function() { remove_action("admin_init", "_maybe_update_core"); remove_action("admin_init", "_maybe_update_plugins"); remove_action("admin_init", "_maybe_update_themes"); }, 0);';
 file_put_contents(WP_CONTENT_DIR . '/mu-plugins/alify-browser-test.php', $mu);
 file_put_contents($file, wp_json_encode(array('username' => 'alify-browser', 'password' => $password, 'classic' => $classic, 'block' => $block, 'rest' => $rest, 'group' => $group, 'images' => $images)));
 chmod($file, 0600);
