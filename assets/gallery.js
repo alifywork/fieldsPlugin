@@ -21,7 +21,7 @@
         const input = document.createElement('input'); input.type = 'hidden'; input.value = attachment.id;
         const marker = gallery.querySelector('.alify-gallery-complete');
         input.name = marker.name.replace(/\[__complete\]$/, '[ids][]'); card.appendChild(input);
-        const url = safeURL(attachment.sizes && attachment.sizes.thumbnail ? attachment.sizes.thumbnail.url : attachment.url);
+        const url = safeURL(attachment.sizes && attachment.sizes[gallery.dataset.previewSize || 'thumbnail'] ? attachment.sizes[gallery.dataset.previewSize || 'thumbnail'].url : attachment.url);
         if (url) { const img = document.createElement('img'); img.alt = ''; img.src = url; card.appendChild(img); }
         const title = document.createElement('span'); title.className = 'alify-gallery-title'; title.textContent = attachment.filename || attachment.title || 'Image ' + attachment.id; card.appendChild(title);
         const actions = document.createElement('div'); actions.className = 'alify-gallery-actions';
@@ -48,12 +48,12 @@
         if (action === 'up' && card.previousElementSibling) { grid.insertBefore(card, card.previousElementSibling); changed(); button.focus(); }
         if (action === 'down' && card.nextElementSibling) { grid.insertBefore(card.nextElementSibling, card); changed(); button.focus(); }
         if (action !== 'add' || !window.wp || !wp.media) return;
-        const frame = wp.media({title: 'Add gallery images', button: {text: 'Add to gallery'}, multiple: true, library: {type: 'image'}});
+        const frame = wp.media({title: 'Add gallery images', button: {text: 'Add to gallery'}, multiple: true, library: {type: gallery.dataset.mimes ? gallery.dataset.mimes.split(',') : 'image'}});
         frame.on('select', () => {
             // The owning repeater row may have been removed while the modal was open.
             if (!gallery.isConnected || gallery.closest('.alify-value[hidden]')) return;
             const selected = frame.state().get('selection').toJSON();
-            if (!Array.isArray(selected) || selected.some(image => image.type !== 'image' || !Number.isSafeInteger(Number(image.id)) || Number(image.id) <= 0)) {
+            if (!Array.isArray(selected) || selected.some(image => image.type !== 'image' || (gallery.dataset.mimes && !gallery.dataset.mimes.split(',').includes(image.mime)) || !Number.isSafeInteger(Number(image.id)) || Number(image.id) <= 0)) {
                 status.textContent = 'Only valid images can be added.'; return;
             }
             const existing = new Set(Array.from(grid.children).map(card => card.dataset.imageId));

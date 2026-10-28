@@ -107,6 +107,15 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('accent').inputValue(), '#000000', 'Explicit Apply commits black even when native swatch has not changed');
         await page.locator('[data-color-picker]').evaluate(node => { node.value = '#2271b1'; node.dispatchEvent(new Event('input', {bubbles: true})); });
         check(await value('accent').inputValue(), '#2271b1', 'Native color picker updates submitted color text');
+        await page.locator('[data-color-value="#2271b180"]').click();
+        check(await value('accent').inputValue(), '#2271b180', 'Palette selects an explicit RGBA hex value');
+        check(await page.locator('[data-color-alpha]').inputValue(), '128', 'Palette synchronizes opacity slider');
+        await page.locator('[data-color-alpha]').evaluate(node => { node.value = '0'; node.dispatchEvent(new Event('input', {bubbles: true})); });
+        check(await value('accent').inputValue(), '#2271b100', 'Opacity slider preserves explicit zero alpha');
+        await page.locator('[data-color-value="#2271b180"]').click();
+        check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/default', 'Configured Link default initializes native URL control');
+        check(await page.locator('.alify-link select').inputValue(), '_blank', 'Configured Link default initializes target');
+        check(await page.locator('.alify-value[data-field-type="gallery"] > .alify-gallery').getAttribute('data-limit'), '4', 'Gallery picker receives configured selection maximum');
         await page.locator('.alify-link input[type="url"]').fill('https://example.com/path?q=1&b=2');
         await page.locator('.alify-link input[type="text"]').fill('Visit example');
         await page.locator('.alify-link select').selectOption('_blank');
@@ -178,7 +187,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await buttons.locator('[data-radio-clear]').click();
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), '0', 'Radio choice survives Classic save/reload');
         await page.locator('.alify-radio:not(.alify-button-group) [data-radio-clear]').click();
-        check(await value('accent').inputValue(), '#2271b1', 'Color survives Classic save/reload');
+        check(await value('accent').inputValue(), '#2271b180', 'Alpha hex survives Classic save/reload');
         check(await value('calendar_day').inputValue(), '2024-02-29', 'Date preview does not change canonical Classic storage');
         check(await value('calendar_day').locator('..').locator('[data-temporal-preview]').textContent(), 'February 29, 2024', 'Date preview survives Classic reload');
         check(await value('opens').inputValue(), '09:30', 'Time survives Classic save/reload without conversion');
@@ -241,6 +250,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await multi.selectOption(['a', 'b']);
         await value('subtitle').fill('Block subtitle');
         await value('meeting_at').fill('2026-10-28T16:45:59');
+        await value('accent').fill('#ABCDEF00');
         await value('masked').fill('Block masked fixture');
         await value('amount').fill('1.5');
         await buttons.locator('label').filter({has: page.locator('input[value="b"]')}).locator('span').click();
@@ -290,6 +300,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), 'b', 'Radio survives same-request Gutenberg REST save/reload');
         check(await buttons.locator('input:checked').inputValue(), 'b', 'Button Group survives Gutenberg REST save/reload');
         check(await value('amount').inputValue(), '1.5', 'Range survives same-request Gutenberg REST save');
+        check(await value('accent').inputValue(), '#abcdef00', 'Transparent alpha color is canonical after Gutenberg REST save/reload');
         check(await selectedMulti(), ['a', 'b'], 'Gutenberg serializes every native multi selection into same-request REST save');
         check(await value('masked').inputValue(), 'Block masked fixture', 'Password survives same-request Gutenberg REST save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Gutenberg reload keeps Password masked');
@@ -314,7 +325,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const download = await downloadReady;
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
-        check(exported.version, 4, 'Rich choice schema exports as v4 for safe older-importer rejection');
+        check(exported.version, 5, 'Color/media/Link schema exports as v5 for safe older-importer rejection');
         check(exported.group.fields.length, 27, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';

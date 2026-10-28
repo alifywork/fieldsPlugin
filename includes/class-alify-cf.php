@@ -1,6 +1,7 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
+require_once __DIR__ . '/class-alify-cf-field-settings.php';
 require_once __DIR__ . '/class-alify-cf-temporal-format.php';
 require_once __DIR__ . '/class-alify-cf-date-time.php';
 require_once __DIR__ . '/class-alify-cf-password.php';
@@ -222,9 +223,13 @@ final class Alify_CF {
                 foreach (self::choices($field) as $key => $label) { echo '<label class="alify-choice"><input type="checkbox" name="' . esc_attr($input) . '[]" value="' . esc_attr($key) . '" ' . checked(in_array((string) $key, (array) $value, true), true, false) . '> ' . esc_html($label) . '</label>'; }
                 echo '</fieldset>'; break;
             case 'color':
-                $text = is_scalar($value) ? (string) $value : '';
-                $swatch = self::clean_value($field, $text) ?: '#000000';
-                echo '<div class="alify-color"><input type="text"' . $attrs . ' value="' . esc_attr($text) . '" placeholder="#rrggbb" pattern="#[0-9a-fA-F]{6}" maxlength="7" autocomplete="off" spellcheck="false"' . $required . '><input type="color" data-color-picker value="' . esc_attr($swatch) . '" aria-label="' . esc_attr($field['label'] . ': choose color') . '"><button type="button" class="button" data-color-apply>Apply swatch</button><button type="button" class="button" data-color-clear>Clear color</button></div>'; break;
+                $text = is_scalar($value) ? (string) $value : ''; $alpha = !empty($field['alpha']);
+                $swatch = substr(Alify_CF_Field_Settings::color($field, $text) ?: '#000000', 0, 7);
+                echo '<div class="alify-color" data-alpha="' . ($alpha ? '1' : '0') . '"><input type="text"' . $attrs . ' value="' . esc_attr($text) . '" placeholder="' . ($alpha ? '#rrggbb or #rrggbbaa' : '#rrggbb') . '" pattern="' . ($alpha ? '#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?' : '#[0-9a-fA-F]{6}') . '" maxlength="' . ($alpha ? '9' : '7') . '" autocomplete="off" spellcheck="false"' . $required . '><input type="color" data-color-picker value="' . esc_attr($swatch) . '" aria-label="' . esc_attr($field['label'] . ': choose color') . '">';
+                if ($alpha) { echo '<label>Opacity (0–255) <input type="range" min="0" max="255" step="1" data-color-alpha value="' . (strlen($text) === 9 ? hexdec(substr($text, 7, 2)) : 255) . '"></label>'; }
+                echo '<button type="button" class="button" data-color-apply>Apply swatch</button><button type="button" class="button" data-color-clear>Clear color</button>';
+                foreach ($field['palette'] ?? array() as $color) { echo '<button type="button" class="button" data-color-value="' . esc_attr($color) . '" aria-label="' . esc_attr('Use color ' . $color) . '">' . esc_html($color) . '</button>'; }
+                echo '</div>'; break;
             case 'date':
             case 'time':
                 Alify_CF_Temporal_Format::render($field, $value, $id, $input, $error_id); break;
@@ -247,7 +252,7 @@ final class Alify_CF {
         if ($field['type'] === 'link') { return Alify_CF_Link::clean($value); }
         if ($field['type'] === 'flexible') { return Alify_CF_Flexible::clean($field, $value); }
         if ($field['type'] === 'group') { return Alify_CF_Group::clean($field, $value); }
-        if ($field['type'] === 'gallery') { return Alify_CF_Gallery::clean($value); }
+        if ($field['type'] === 'gallery') { return Alify_CF_Field_Settings::constrain($field, Alify_CF_Gallery::clean($value)); }
         if ($field['type'] === 'repeater') { return Alify_CF_Repeater::clean($field, $value); }
         if ($field['type'] === 'checkbox') {
             return array_values(array_intersect(array_map('strval', array_keys(self::choices($field))), array_map('sanitize_text_field', is_array($value) ? $value : array())));
@@ -261,7 +266,7 @@ final class Alify_CF {
                 if (!preg_match('/^[1-9][0-9]*$/', $value)) { return ''; }
                 $attachment = get_post((int) $value);
                 if (!$attachment || $attachment->post_type !== 'attachment' || $attachment->post_status === 'trash' || ($field['type'] === 'image' && !wp_attachment_is_image($attachment->ID))) { return ''; }
-                return (int) $value;
+                return Alify_CF_Field_Settings::constrain($field, (int) $value);
             case 'textarea': return sanitize_textarea_field($value);
             case 'email': return is_email($value) ? sanitize_email($value) : '';
             case 'url': return esc_url_raw($value, array('http', 'https'));
@@ -270,7 +275,7 @@ final class Alify_CF {
             case 'button_group':
             case 'radio':
             case 'select': return array_key_exists($value, self::choices($field)) ? $value : '';
-            case 'color': return preg_match('/^#[0-9a-fA-F]{6}$/D', $value) ? strtolower($value) : '';
+            case 'color': return Alify_CF_Field_Settings::color($field, $value);
             case 'time': return preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $value) ? $value : '';
             case 'date':
                 $date = strpos($value, chr(0)) === false ? DateTime::createFromFormat('!Y-m-d', $value) : false;
@@ -298,7 +303,7 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if ($type === 'repeater') {
@@ -307,6 +312,8 @@ final class Alify_CF {
             }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
             $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
+            if ($type === 'link') { $clean['default'] = Alify_CF_Field_Settings::link_default($field['default'] ?? '', $errors); }
+            if ($type === 'color' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Color default must be valid hex.'; }
             if ($type === 'checkbox' || Alify_CF_Choice::multiple($clean)) { $clean['default'] = Alify_CF_Choice::defaults($clean, $field['default'] ?? '', $errors); }
             if ($type === 'date_time' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Date Time default must be a valid wall-clock date/time.'; }
             if ($type === 'password') { $clean['choices'] = ''; if (($field['default'] ?? '') !== '') { $errors[] = 'Password defaults are not supported. Clear the default before saving.'; } }
@@ -400,9 +407,11 @@ final class Alify_CF {
                 $value = self::clean_value($field, $values[$field['name']] ?? '');
             }
             $submitted = $values[$field['name']] ?? '';
+            $value = Alify_CF_Field_Settings::constrain($field, $value);
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
             $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if ($field['type'] === 'range' && array_key_exists($field['name'], $values) && $values[$field['name']] !== '' && Alify_CF_Range::units($values[$field['name']]) === null) { $invalid = true; }
+            if ($field['type'] === 'color' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if (Alify_CF_Choice::multiple($field) && $value === '') { $invalid = true; }
             if ($field['type'] === 'date_time' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if ($field['type'] === 'password' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
@@ -454,8 +463,8 @@ final class Alify_CF {
     private static function media_field($field, $value, $id, $input) {
         $attachment = $value ? get_post((int) $value) : null;
         $valid = $attachment && $attachment->post_type === 'attachment' && $attachment->post_status !== 'trash';
-        $url = $valid && $field['type'] === 'image' ? wp_get_attachment_image_url($attachment->ID, 'thumbnail') : '';
-        echo '<div class="alify-media" data-type="' . esc_attr($field['type']) . '"><input type="hidden" id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" value="' . esc_attr($value) . '">';
+        $url = $valid && $field['type'] === 'image' ? wp_get_attachment_image_url($attachment->ID, $field['preview_size'] ?? 'thumbnail') : '';
+        echo '<div class="alify-media" data-type="' . esc_attr($field['type']) . '"' . Alify_CF_Field_Settings::attributes($field) . '><input type="hidden" id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" value="' . esc_attr($value) . '">';
         echo '<div class="alify-media-preview" aria-live="polite"><img alt="" src="' . esc_url($url ?: '') . '"' . ($url ? '' : ' hidden') . '><span>' . esc_html($valid ? $attachment->post_title : ($value ? 'Attachment unavailable — remove or replace it.' : 'No ' . $field['type'] . ' selected')) . '</span></div>';
         if (current_user_can('upload_files')) { echo '<button type="button" class="button" data-media="choose">Choose ' . esc_html($field['type']) . '</button> '; }
         echo '<button type="button" class="button-link-delete" data-media="remove"' . ($value ? '' : ' hidden') . '>Remove</button></div>';

@@ -191,7 +191,7 @@ if ($link) {
 
 Both new basic types work as post fields, Options Page fields, and Group/Repeater/Flexible subfields. They support defaults, required validation, conditional visibility and configuration-only JSON transfer like other basic fields.
 
-- **Color Picker (`color`)**: native color swatch plus editable hex text, **Apply swatch** and **Clear color**. Apply explicitly commits the displayed swatch, including black when it has not changed. Saves exactly six-digit hex as lowercase (`#2271b1`); rejects shorthand, alpha, named colors and CSS expressions. An empty optional field stays empty—an untouched swatch never implicitly saves black. Required means the submitted hex text cannot be empty.
+- **Color Picker (`color`)**: native color swatch plus editable hex text, **Apply swatch** and **Clear color**. Apply explicitly commits the displayed swatch, including black when it has not changed. By default saves six-digit hex as lowercase (`#2271b1`); optional alpha additionally accepts `#rrggbbaa` (see configuration below). Rejects shorthand, named colors, rgba() and CSS expressions. An empty optional field stays empty—an untouched swatch never implicitly saves black. Required means the submitted hex text cannot be empty.
 - **Time (`time`)**: native browser time input, stored as a strict 24-hour **`HH:MM`** string (`00:00`–`23:59`). No seconds, date, timezone conversion or timestamp semantics. The browser may display a localized clock; the submitted/stored format stays `HH:MM`.
 - Invalid nonempty values are rejected rather than silently cleared. Optional empty values explicitly clear; invalid container subfields retain the entire previous saved container.
 - Builder defaults use the same format rules. Invalid defaults normalize to empty, following existing basic-field behavior. Themes read strings with `alify_get_field()` / `alify_get_option()` and must escape output for its context.
@@ -462,7 +462,7 @@ $settings = alify_get_option('profile', 'site');
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
 
-- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`, `2`, `3` or `4`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; schemas without these features continue to use their existing version.
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`, `2`, `3`, `4` or `5`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; Color/media/Link configuration requires version 5; schemas without these features continue to use their existing version.
 - Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
 - Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
 - Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
@@ -518,25 +518,45 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 - Gutenberg and Classic collect all selected options. Programmatic write-bridge submissions for multiple Select require `{"__complete":"1","values":["a","b"]}`; `{"__complete":"1"}` explicitly clears an optional selection. Incomplete/malformed/unknown-key/over-limit submissions retain the previous field/container (Options retains the whole page); required selections cannot be cleared. This is the existing authenticated editor write bridge, not a general public write API.
 - Rich choice settings/defaults require **schema JSON v4 / plugin 0.24.0+**; imports still accept versions 1–4. No custom-choice creation, asynchronous search or nested containers.
 
+## Color, media and Link configuration (0.25.0)
+
+These settings also work on supported basic Group/Repeater/Flexible subfields and Options. Raw getters/storage remain unchanged; formatted getters recurse through containers. New settings/defaults require **JSON v5 / plugin 0.25.0+**; imports accept v1–v5. Schema changes do not migrate saved data.
+
+### Color
+
+Enable **alpha** to accept six- or eight-digit lowercase hex. `#rrggbbaa` uses an alpha byte from `00` (transparent) to `ff` (opaque); six-digit values stay six-digit. No percentages, rgba(), shorthand or color-space conversion. The RGB picker and 0–255 opacity slider synchronize with text. Up to 20 palette colors are suggested choices, not an allowlist. Palette buttons preserve explicit zero alpha; clearing remains `''`. Invalid palettes/defaults reject the schema update. Native picker appearance remains browser-controlled.
+
+### Image / File / Gallery
+
+- **Return format:** opt-in formatted getters support `id` (legacy raw value), `url`, or `array`. Records contain `id` (integer), `url`, `title`, and `mime`; Gallery returns an ordered list. URLs resolve the original attachment, independently of editor preview size. Missing/trashed attachments format to `null` (single) or are omitted (Gallery). Empty and missing values preserve the existing empty/null contract. These are not ACF-compatible attachment arrays.
+- **Restrictions:** up to 20 exact lowercase MIME types, one per line (`image/png`, `application/pdf`); empty means no additional restriction. No MIME wildcards or extension aliases. Existing image-only checks, upload/edit permissions and 50-image hard cap still apply. These settings do not enable new upload types or grant access.
+- **File size:** integer `min_bytes`/`max_bytes`, 0–1073741824 bytes; maximum 0 means unlimited. Bounds apply per attachment, including every Gallery image. When configured, a readable local attached file is required; remote URLs are never fetched. Checks use WordPress's stored attachment MIME, not a new binary-content security scanner.
+- **Gallery count:** minimum 0–50, maximum 1–50. Minimum applies to nonempty selections; optional fields may explicitly clear. Use Required to disallow empty. Invalid selections retain the whole previous field/container; Options retains the whole page. No silent truncation.
+- **Preview:** choose `thumbnail`, `medium`, `large` or `full` for editor image previews. MIME picker filters and Gallery maximum help selection; the server remains authoritative for MIME, byte and count validation. Custom image dimensions/cropping and custom preview sizes are not implemented.
+
+### Link
+
+Configure an optional default with URL, title, and target (`''` or `_blank`). Only valid HTTP(S) URLs are accepted, with existing credential/control-character restrictions. Defaults initialize missing values; explicit clearing saves an empty array instead of reapplying the default. Opt-in formatted getters support `array` (legacy URL/title/target object) or `url`; raw getters always return the object. Themes must still escape URLs/text for their output context; a new-tab link needs the theme's appropriate `rel` policy.
+
 ## Verification
 
-Automated checks for 0.24.0:
+Automated checks for 0.25.0:
 
 ```sh
 npm ci
-npm test       # 65 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 68 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 689 assertions with isolated WordPress stubs
+php tests/php-unit.php # 726 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 494 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 528 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
 | 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
 | 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
 
-Both integration runs had clean WordPress debug logs. The complete choice batch also passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40707061371](https://github.com/alifywork/fieldsPlugin/actions/runs/40707061371): 494 backend / 161 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
+Both integration runs had clean WordPress debug logs. The previous 0.24.0 choice batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40707061371](https://github.com/alifywork/fieldsPlugin/actions/runs/40707061371): 494 backend / 161 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
 
 ```sh
 # Requires Git/Bash and a native PHP executable with SQLite extensions.

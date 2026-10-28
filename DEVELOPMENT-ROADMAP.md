@@ -19,14 +19,14 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 4. [x] **Password** — v0.21.0: exact bounded UTF-8 strings, masked input/show-hide/clear, no defaults or conditional sources, post/Options/basic containers, conditional targets, REST, JSON and recovery-transient omission. Plaintext, explicitly not encryption or secure-secret storage.
 5. [x] **Combined Date Time** — v0.22.0: native seconds, canonical wall-clock strings, explicit no-conversion/DST contract, strict calendar/default validation, optional clearing, post/Options/basic containers, conditions, REST and JSON.
 6. [x] **Date/Time display and return-format configuration** — v0.23.0: bounded presets, English live display previews beside native inputs, opt-in formatted PHP getters and basic container traversal; raw storage/getters/conditions unchanged; JSON v3 gate. Native picker layout remains browser-controlled; arbitrary custom format strings/localization are excluded.
-7. [x] **Radio/Select/Checkbox richer settings** — v0.24.0 batch: wrapping horizontal/vertical Radio/Checkbox layouts, validated Checkbox defaults, native multiple/local-search Select, optional clearing, opt-in key/label/record formatted returns; post/Options/basic containers/conditions/REST/JSON v4. Raw keys stay unchanged. **Current completed development batch.**
-8. [ ] Color configuration — palettes and optional alpha with explicit storage contract. **Next queue item; group related configuration features into development batches.**
-9. [ ] Image/File/Gallery configuration — return formats, media restrictions and presentation/validation settings.
-10. [ ] Link configuration — supported return formats and optional defaults.
+7. [x] **Radio/Select/Checkbox richer settings** — v0.24.0 batch: wrapping horizontal/vertical Radio/Checkbox layouts, validated Checkbox defaults, native multiple/local-search Select, optional clearing, opt-in key/label/record formatted returns; post/Options/basic containers/conditions/REST/JSON v4. Raw keys stay unchanged.
+8. [x] **Color configuration** — v0.25.0: suggested bounded palettes, six/eight-digit hex alpha, RGB/opacity synchronization, transparent values, defaults/conditions/REST/JSON v5.
+9. [x] **Image/File/Gallery configuration** — v0.25.0: opt-in ID/URL/record returns, exact MIME/local byte restrictions, Gallery cardinality and editor preview size. Existing permission/image validation preserved. Custom dimensions/cropping excluded.
+10. [x] **Link configuration** — v0.25.0: validated portable URL/title/target defaults, explicit clear, opt-in object/URL returns, basic container/Options/REST support. **Current completed development batch.**
 
 ## B. Relational and external fields
 
-11. [ ] Taxonomy selector — permitted taxonomies, single/multiple terms, validation and getters.
+11. [ ] Taxonomy selector — permitted taxonomies, single/multiple terms, validation and getters. **Next queue item; continue related-feature batches.**
 12. [ ] User selector — permissions/privacy, bounded search, single/multiple and getters.
 13. [ ] Page Link — page/post/archive URL selection with defined resolution behavior.
 14. [ ] Post Object/Relationship CPT targets and per-field allowed post types.
@@ -134,3 +134,5 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 - **v0.23.0 — Date/Time formats:** validated live display previews, opt-in return formats/container getters, canonical storage compatibility and JSON v3 gating. Local checks: 650 PHP assertions, 62 JS tests, 460 backend assertions on both existing PHP-WASM/SQLite targets. Verified in [CI run 40705342031](https://github.com/alifywork/fieldsPlugin/actions/runs/40705342031): all four native targets pass (460 backend / 149 browser / 24 HTTP persistence checks). Next: **Richer choice-field settings**. Subsequent work follows the numbered queue unless a dependency requires reordering, which must be recorded here.
 
 - **v0.24.0 — Rich choice settings batch:** six related choice capabilities delivered together, one combined end-of-batch check/CI cycle. Local: 689 PHP assertions on both runtimes, 65 JS tests, 494 backend assertions on both existing SQLite targets. Verified in [CI run 40707061371](https://github.com/alifywork/fieldsPlugin/actions/runs/40707061371): all four native targets green (494 backend / 161 browser / 24 HTTP persistence checks). Next queue item: Color configuration; continue related-feature batches.
+
+- **v0.25.0 — Color/media/Link configuration batch:** items 8–10 developed together, including defaults, server validation, formatted getters and JSON v5. Local: 726 PHP / 68 JS / 528 backend assertions on both existing SQLite targets. Native matrix/browser results pending. Roadmap: 10 complete, 67 pending; this is not a claim that the full backlog is finished.

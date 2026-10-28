@@ -196,19 +196,25 @@
         if (!root) return;
         const text = root.querySelector('input[type="text"]');
         const picker = root.querySelector('[data-color-picker]');
-        if (event.target === picker) {
-            text.value = picker.value;
+        const alpha = root.querySelector('[data-color-alpha]');
+        if (event.target === picker || event.target === alpha) {
+            text.value = picker.value + (alpha && Number(alpha.value) !== 255 ? Number(alpha.value).toString(16).padStart(2, '0') : '');
             text.dispatchEvent(new Event('input', {bubbles: true}));
-        } else if (event.target === text && /^#[0-9a-f]{6}$/i.test(text.value)) picker.value = text.value.toLowerCase();
+        } else if (event.target === text && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(text.value)) {
+            picker.value = text.value.slice(0, 7).toLowerCase(); if (alpha) alpha.value = text.value.length === 9 ? parseInt(text.value.slice(7), 16) : 255;
+        }
+
     }
     document.addEventListener('input', syncColor);
     document.addEventListener('change', syncColor);
     document.addEventListener('click', event => {
-        const button = event.target.closest('[data-color-clear], [data-color-apply]');
+        const button = event.target.closest('[data-color-clear], [data-color-apply], [data-color-value]');
         if (!button || button.disabled) return;
         const root = button.closest('.alify-color'), text = root.querySelector('input[type="text"]');
         const picker = root.querySelector('[data-color-picker]');
-        text.value = button.hasAttribute('data-color-apply') ? picker.value : '';
+        const alpha = root.querySelector('[data-color-alpha]');
+        text.value = button.hasAttribute('data-color-value') ? button.dataset.colorValue : button.hasAttribute('data-color-apply') ? picker.value + (alpha && Number(alpha.value) !== 255 ? Number(alpha.value).toString(16).padStart(2, '0') : '') : '';
+        if (!text.value && alpha) alpha.value = 255;
         if (!text.value) picker.value = '#000000';
         text.dispatchEvent(new Event('input', {bubbles: true})); text.focus();
     });
@@ -275,6 +281,9 @@
                             } else if (['checkbox', 'true_false', 'radio', 'button_group'].includes(source.dataset.fieldType)) {
                                 values = inputs.filter(input => input.checked).map(input => input.value);
                                 if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
+                            } else if (source.dataset.fieldType === 'color') {
+                                const text = source.querySelector('input[type="text"]'); const alpha = source.querySelector('[data-alpha="1"]');
+                                values = [text && (alpha ? /^#[0-9a-f]{6}([0-9a-f]{2})?$/i : /^#[0-9a-f]{6}$/i).test(text.value) ? text.value.toLowerCase() : ''];
                             } else if (source.dataset.fieldType === 'date_time') {
                                 values = [dateTimeValue(inputs[0])];
                             } else if (source.dataset.fieldType === 'range') {
@@ -343,12 +352,13 @@
         }
         if (!window.wp || !wp.media) return;
         const isImage = container.dataset.type === 'image';
-        const frame = wp.media({title: isImage ? 'Choose image' : 'Choose file', button: {text: 'Use this ' + container.dataset.type}, multiple: false, library: isImage ? {type: 'image'} : {}});
+        const frame = wp.media({title: isImage ? 'Choose image' : 'Choose file', button: {text: 'Use this ' + container.dataset.type}, multiple: false, library: container.dataset.mimes ? {type: container.dataset.mimes.split(',')} : isImage ? {type: 'image'} : {}});
         frame.on('select', function () {
             const attachment = frame.state().get('selection').first().toJSON();
             if (isImage && attachment.type !== 'image') return;
+            if (container.dataset.mimes && !container.dataset.mimes.split(',').includes(attachment.mime)) return;
             input.value = attachment.id;
-            const url = isImage && attachment.sizes && attachment.sizes.thumbnail ? attachment.sizes.thumbnail.url : (isImage ? attachment.url : '');
+            const url = isImage && attachment.sizes && attachment.sizes[container.dataset.previewSize || 'thumbnail'] ? attachment.sizes[container.dataset.previewSize || 'thumbnail'].url : (isImage ? attachment.url : '');
             // URLs originate in WordPress media, but reject non-HTTP schemes defensively.
             let safe = '';
             try { const parsed = new URL(url, window.location.href); if (url && ['http:', 'https:'].includes(parsed.protocol)) safe = parsed.href; } catch (_) { /* No preview. */ }

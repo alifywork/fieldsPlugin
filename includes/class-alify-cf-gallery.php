@@ -25,12 +25,12 @@ final class Alify_CF_Gallery {
 
     public static function render($field, $value, $id, $input) {
         $ids = is_array($value) ? $value : array();
-        echo '<div class="alify-gallery" id="' . esc_attr($id) . '" role="group" aria-label="' . esc_attr($field['label']) . '" data-limit="' . esc_attr(self::MAX_IMAGES) . '"><div class="alify-gallery-items">';
+        echo '<div class="alify-gallery" id="' . esc_attr($id) . '" role="group" aria-label="' . esc_attr($field['label']) . '" data-limit="' . esc_attr($field['max_items'] ?? self::MAX_IMAGES) . '"' . Alify_CF_Field_Settings::attributes($field) . '><div class="alify-gallery-items">';
         foreach ($ids as $image_id) {
             if (!is_scalar($image_id) || !preg_match('/^[1-9][0-9]*$/', (string) $image_id)) { continue; }
             $attachment = get_post((int) $image_id);
             $valid = $attachment && $attachment->post_type === 'attachment' && $attachment->post_status !== 'trash' && wp_attachment_is_image((int) $image_id);
-            $url = $valid ? wp_get_attachment_image_url((int) $image_id, 'thumbnail') : false;
+            $url = $valid ? wp_get_attachment_image_url((int) $image_id, $field['preview_size'] ?? 'thumbnail') : false;
             echo '<div class="alify-gallery-item" data-image-id="' . esc_attr($image_id) . '"><input type="hidden" name="' . esc_attr($input . '[ids][]') . '" value="' . esc_attr($image_id) . '">';
             if ($url) { echo '<img alt="" src="' . esc_url($url) . '">'; }
             echo '<span class="alify-gallery-title">' . esc_html($valid ? $attachment->post_title : 'Image unavailable — remove or replace it') . '</span><div class="alify-gallery-actions"><button type="button" class="button" data-gallery="up" aria-label="Move image earlier">←</button><button type="button" class="button" data-gallery="down" aria-label="Move image later">→</button><button type="button" class="button-link-delete" data-gallery="remove">Remove</button></div></div>';

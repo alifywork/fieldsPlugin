@@ -859,3 +859,28 @@ test('Gutenberg serializes all multi Select values and explicit empty lists, not
     await w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, options => { sent = options.data.alify_fields; return Promise.resolve({}); });
     assert.deepEqual(Array.from(sent.groups['7'].choices.values), []); assert.equal(sent.groups['7'].choices.__complete, '1'); w.close();
 });
+
+test('Configuration builder supports color palettes, media bounds and structured Link defaults at root/subfield', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Configured'); set(w, 'type', 'color');
+    const alpha = d.querySelector('[data-prop="alpha"]'); alpha.checked = true; alpha.dispatchEvent(new w.Event('input', {bubbles: true})); set(w, 'palette', '#aabbcc80\n#000000');
+    assert.equal(schema(w)[0].alpha, true); assert.equal(schema(w)[0].palette, '#aabbcc80\n#000000');
+    set(w, 'type', 'gallery'); set(w, 'min_items', '2'); set(w, 'max_items', '4'); set(w, 'allowed_mimes', 'image/png'); set(w, 'max_bytes', '1024'); set(w, 'preview_size', 'medium'); set(w, 'return_format', 'url');
+    assert.equal(schema(w)[0].alpha, undefined); assert.equal(schema(w)[0].max_items, '4'); assert.equal(schema(w)[0].max_bytes, '1024');
+    set(w, 'type', 'link');
+    for (const [part, value] of Object.entries({url: 'https://example.com', title: 'Example', target: '_blank'})) { const node = d.querySelector(`[data-default-part="${part}"]`); node.value = value; node.dispatchEvent(new w.Event('input', {bubbles: true})); }
+    assert.equal(schema(w)[0].default.url, 'https://example.com'); assert.equal(schema(w)[0].default.target, '_blank');
+    set(w, 'type', 'group'); d.querySelector('[data-sub-action="add"]').click(); const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'link'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    const url = d.querySelector('[data-default-part="url"]'); url.value = 'https://example.org'; url.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].sub_fields[0].default.url, 'https://example.org'); w.close();
+});
+test('Alpha editor synchronizes opacity, native RGB, palette and explicit clearing', () => {
+    const dom = new JSDOM('<div class="alify-color" data-alpha="1"><input type="text" value="#aabbcc80"><input type="color" data-color-picker value="#aabbcc"><input type="range" data-color-alpha min="0" max="255" value="128"><button data-color-apply>Apply</button><button data-color-clear>Clear</button><button data-color-value="#11223300">Palette</button></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/values.js', 'utf8')); const text = d.querySelector('[type="text"]'), opacity = d.querySelector('[data-color-alpha]');
+    opacity.value = '0'; opacity.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(text.value, '#aabbcc00');
+    d.querySelector('[data-color-value]').click(); assert.equal(text.value, '#11223300'); assert.equal(d.querySelector('[data-color-picker]').value, '#112233');
+    text.value = '#abcdef80'; text.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(opacity.value, '128');
+    d.querySelector('[data-color-clear]').click(); assert.equal(text.value, ''); assert.equal(opacity.value, '255'); w.close();
+});
+test('Color conditions use the same canonical lowercase alpha keys as server validation', () => {
+    const w = conditionalEditor('color', 'equals', '#aabbcc80', '<div class="alify-color" data-alpha="1"><input type="text" value="#AABBCC80"></div>');
+    assert.equal(w.document.querySelector('[data-field-key="target"]').hidden, false); w.close();
+});
