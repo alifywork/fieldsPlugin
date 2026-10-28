@@ -790,4 +790,34 @@ same('', Alify_CF_Repeater::clean($range_rows, array('__complete' => '1', 'rows'
 same(array('row' => 0, 'subfield' => 'amount'), $location, 'Range identifies exact invalid subfield');
 $edge = field('edge', 'range'); $edge['min'] = '-1000000'; $edge['max'] = '1000000'; $edge['step'] = '0.001'; same('1000000', Alify_CF::clean_value($edge, '1000000'), 'Bounded integer arithmetic accepts largest edge');
 $offset = field('offset', 'range'); $offset['min'] = '0.1'; $offset['max'] = '1'; $offset['step'] = '0.2'; same('0.3', Alify_CF::clean_value($offset, '0.300'), 'Step anchors at minimum'); same('', Alify_CF::clean_value($offset, '1'), 'Unaligned maximum is not implicitly snapped');
+$password = field('masked_value', 'password');
+same('Password', Alify_CF::types()['password'], 'Password is registered');
+$password_value = "  Quotes' \\ <b>&%20 سلام  ";
+same($password_value, Alify_CF::clean_value($password, $password_value), 'Password preserves whitespace, markup, percent sequences, slashes and UTF-8 exactly');
+same(str_repeat('a', 1024), Alify_CF_Password::clean(str_repeat('a', 1024)), 'Password accepts 1024 byte bound');
+foreach (array(array(), array('value'), true, false, 123, null, "line\nbreak", "tab\tvalue", "null\0byte", "bad\x7f", "bad\u{0085}", "\xff", str_repeat('a', 1025), str_repeat('س', 513)) as $bad) {
+    $errors = array(); same(array(), Alify_CF::validate_values(array($password), array('masked_value' => $bad), array('masked_value' => 'saved'), $errors), 'Invalid Password retains saved value');
+    same(true, count($errors) > 0, 'Invalid Password reports error');
+}
+$errors = array(); same(array('masked_value' => ''), Alify_CF::validate_values(array($password), array('masked_value' => ''), array('masked_value' => 'saved'), $errors), 'Optional Password explicitly clears');
+$password['required'] = true; $errors = array(); same(array(), Alify_CF::validate_values(array($password), array('masked_value' => ''), array('masked_value' => 'saved'), $errors), 'Required Password rejects clear');
+$errors = array(); same(array('masked_value' => '0'), Alify_CF::validate_values(array($password), array('masked_value' => '0'), array(), $errors), 'Required Password accepts zero string');
+$password['default'] = 'forbidden-default'; $errors = array(); $schema = Alify_CF::validate_schema(array($password), 'post', 9999, $errors);
+same(true, count($errors) > 0, 'Password schema rejects defaults'); same('', $schema[0]['default'], 'Password schema never retains a default');
+$errors = array(); $subs = Alify_CF_Repeater::schema(array($password), $errors); same(true, count($errors) > 0, 'Password subfield rejects defaults'); same('', $subs[0]['default'], 'Password subfield default is empty');
+$password['default'] = ''; $dependent = field('dependent'); $dependent['condition'] = array('field' => $password['key'], 'operator' => 'equals', 'value' => 'saved');
+$errors = array(); Alify_CF::validate_schema(array($password, $dependent), 'post', 9999, $errors); same(true, count($errors) > 0, 'Password cannot be a condition source');
+same(false, Alify_CF::visible($dependent, array($password, $dependent), array($password['key'] => 'saved')), 'Forged Password source fails closed');
+$password_group = field('password_group', 'group'); $password_group['sub_fields'] = array($password);
+$password_rows = field('password_rows', 'repeater'); $password_rows['sub_fields'] = array($password);
+$password_flex = field('password_flex', 'flexible'); $password_flex['layouts'] = array(array('key' => 'layout_masked', 'name' => 'masked', 'label' => 'Masked', 'sub_fields' => array($password)));
+$feedback_schema = array($password, $password_group, $password_rows, $password_flex, field('note'));
+$previous = array('masked_value' => 'old-sensitive', 'password_group' => array('masked_value' => 'old-sensitive'), 'password_rows' => array(array('masked_value' => 'old-sensitive')), 'password_flex' => array(array('layout' => 'masked', 'fields' => array('masked_value' => 'old-sensitive'))));
+$recovery = Alify_CF_Feedback::group($feedback_schema, array('masked_value' => 'attempt-sensitive', 'password_group' => array(), 'password_rows' => array(), 'password_flex' => array(), 'note' => 'recover me'), $previous, array('note' => 'Invalid'));
+same(array('note' => 'recover me'), $recovery['values'], 'Recovery omits whole Password-containing fields/containers, not their saved or attempted values');
+same(true, $recovery['password_omitted'], 'Password recovery omission is explained');
+same(false, strpos(wp_json_encode($recovery), 'sensitive') !== false, 'Feedback contains no attempted or previous Password value');
+$issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($password_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'masked_value' => array()))), null, false, $issue, $location), 'Malformed Password rejects whole Repeater');
+same(array('row' => 0, 'subfield' => 'masked_value'), $location, 'Password validation reports exact row/subfield');
 echo "PASS: $count PHP contract assertions\n";

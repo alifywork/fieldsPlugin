@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.20.0 — Range field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.21.0 — Password field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -31,7 +31,18 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Range**. Next: **Password**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Password**. Next: **Combined Date Time**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+
+## Password field
+
+**Password (`password`)** is a masked, reversible text field—not authentication, hashing, encryption or a secret vault. **Do not use it for account passwords, API keys or confidential credentials.** Stored values are plaintext in post metadata/Options, backups and authorized editor HTML. PHP getters return the raw value; `alify_the_field()` / `alify_the_option()` can expose it publicly if used in a template. Masking is not an access-control boundary, and `autocomplete="new-password"` is only a browser hint.
+
+- A labeled password input has keyboard-operable **Show value / Hide value** controls. Each page reload starts masked. Optional fields have **Clear value**; blank means explicit clear, not “keep unchanged.” Required means nonempty (`0` and spaces count as supplied strings).
+- Saves exact UTF-8 strings, preserving spaces, quotes, slashes, markup and percent sequences. No trim/HTML stripping/entity decoding. Values are escaped when inserted into editor HTML. Maximum **1024 bytes**; Unicode control characters, invalid UTF-8 and non-string payloads are rejected, retaining the old value. Native maxlength is a character limit, so the server additionally enforces bytes.
+- Posts/Options and basic Group/Repeater/Flexible subfields are supported, including Classic and the authenticated Gutenberg/core REST save bridge. Current core REST responses do not echo custom Password values; the write-only bridge is not a general value-read API.
+- Can be conditionally shown, but **cannot be a conditional source**. Password defaults are not supported: builder type changes clear defaults, schema saves reject nonempty defaults, and JSON imports strip them, including basic subfields.
+- **Recovery privacy:** fields with current Password definitions, and entire containers containing them, are omitted from rejected-input recovery transients—including hidden fields and saved-value fallbacks. On a Classic/Options redirect those controls show saved data instead; re-enter unsaved changes in those fields/containers. Other fields retain normal recovery. Container diagnostics fall back to the parent when the attempted row data is not recoverable. This does not prevent plaintext existing in the current browser DOM, requests, database or third-party logs.
+- Schema-only JSON transfers Password definitions with empty defaults, never stored values. Destination plugins need **0.21.0+**. Password-policy rules, strength meters, account-password updates, encrypted storage and secret-management integration are outside this increment.
 
 ## Range field
 
@@ -361,7 +372,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, Relationship, structured Link and WYSIWYG fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
+- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, Relationship, structured Link, WYSIWYG and Password fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
 - Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
@@ -471,16 +482,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.20.0:
+Automated checks for 0.21.0:
 
 ```sh
 npm ci
-npm test       # 54 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 57 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 474 assertions with isolated WordPress stubs
+php tests/php-unit.php # 519 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 374 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 408 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -506,7 +517,7 @@ The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all 24 types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all 25 types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.

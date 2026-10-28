@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -755,4 +755,32 @@ test('Range clearing and events are scoped to the live container', () => {
     w.eval(fs.readFileSync('assets/values.js', 'utf8')); const roots = d.querySelectorAll('.alify-range');
     roots[0].querySelector('[data-range-slider]').value = '1'; roots[0].querySelector('[data-range-slider]').dispatchEvent(new w.Event('change', {bubbles: true}));
     roots[1].querySelector('[data-range-clear]').click(); assert.equal(roots[0].querySelector('[data-range-number]').value, '1'); w.close();
+});
+
+test('Password builder clears defaults and omits root/subfield default inputs', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Masked'); set(w, 'default', 'not-a-default'); set(w, 'type', 'password');
+    assert.equal(schema(w)[0].default, ''); assert.equal(d.querySelector('[data-prop="default"]'), null);
+    set(w, 'type', 'repeater'); d.querySelector('[data-sub-action="add"]').click();
+    const subDefault = d.querySelector('[data-sub-prop="default"]'); subDefault.value = 'stale'; subDefault.dispatchEvent(new w.Event('input', {bubbles: true}));
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'password'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].default, ''); assert.equal(d.querySelector('[data-sub-prop="default"]'), null); w.close();
+});
+function passwordMarkup(name) {
+    return `<div class="alify-password"><input type="password" data-password-input name="${name}" value="kept"><button type="button" data-password-toggle aria-pressed="false">Show value</button><button type="button" data-password-clear>Clear value</button></div>`;
+}
+test('Password reveal/hide and clearing are scoped and never mutate the value on reveal', () => {
+    const dom = new JSDOM(passwordMarkup('first') + passwordMarkup('second'), {runScripts: 'outside-only'}), w = dom.window, d = w.document;
+    w.eval(fs.readFileSync('assets/values.js', 'utf8')); const roots = d.querySelectorAll('.alify-password');
+    const input = roots[0].querySelector('input'), toggle = roots[0].querySelector('[data-password-toggle]'); toggle.click();
+    assert.equal(input.type, 'text'); assert.equal(input.value, 'kept'); assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+    assert.equal(roots[1].querySelector('input').type, 'password'); toggle.click(); assert.equal(input.type, 'password');
+    toggle.click(); roots[0].querySelector('[data-password-clear]').click();
+    assert.equal(input.type, 'password'); assert.equal(input.value, ''); assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+    assert.equal(roots[1].querySelector('input').value, 'kept'); w.close();
+});
+test('Password is excluded as a conditional source even when revealed', () => {
+    const w = conditionalEditor('password', 'equals', 'kept', passwordMarkup('masked')), d = w.document;
+    assert.equal(d.querySelector('[data-field-key="target"]').hidden, true);
+    d.querySelector('[data-password-toggle]').click(); d.querySelector('[data-password-input]').dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.querySelector('[data-field-key="target"]').hidden, true); w.close();
 });

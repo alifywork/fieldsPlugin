@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.21.0
+
+- Add Password as exact UTF-8 plaintext with editor masking, keyboard-operable show/hide and optional clearing. Reject non-strings, control characters, invalid UTF-8 and values over 1024 bytes. This is not encryption, authentication or secret storage; warn in the editor/docs.
+- Support posts/Options/basic containers, conditional targets and core REST writes. Exclude Password from condition sources; prohibit schema defaults and strip them during JSON imports across supported containers.
+- Omit whole Password-containing fields/containers from rejected-input recovery transients, including saved/hidden fallback paths. Reload them from saved data with an explicit re-entry notice instead of duplicating attempted values into feedback storage.
+- Local feature checks: 519 isolated PHP assertions, 57 JS tests and 408 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser verification is recorded after completion.
+- Complete Password roadmap increment; next is Combined Date Time with an explicit storage/timezone contract.
+
 ## 0.20.0
 
 - Add Range with a named numeric input/unnamed slider, configurable root/subfield min/max/step, canonical decimal-string storage and optional explicit clearing. Empty fields never implicitly save the slider position.

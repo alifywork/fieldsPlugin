@@ -82,6 +82,20 @@
         const first = root.querySelector('input[type="radio"]');
         if (first) first.focus();
     });
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-password-toggle], [data-password-clear]');
+        if (!button || button.disabled) return;
+        const root = button.closest('.alify-password'), input = root.querySelector('[data-password-input]');
+        const toggle = root.querySelector('[data-password-toggle]');
+        if (button.hasAttribute('data-password-clear')) {
+            input.value = ''; input.type = 'password';
+            toggle.setAttribute('aria-pressed', 'false'); toggle.textContent = 'Show value';
+            input.dispatchEvent(new Event('input', {bubbles: true})); input.focus();
+        } else {
+            const show = input.type === 'password'; input.type = show ? 'text' : 'password';
+            toggle.setAttribute('aria-pressed', String(show)); toggle.textContent = show ? 'Hide value' : 'Show value';
+        }
+    });
     function rangeUnits(text) {
         if (!/^-?(?:0|[1-9][0-9]{0,6})(?:\.[0-9]{1,3})?$/.test(text)) return null;
         const parts = text.replace('-', '').split('.');
@@ -191,7 +205,7 @@
                         if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
                         const source = fields.find(item => item.dataset.fieldKey === rule.field);
                         let matched = false;
-                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
+                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
                             const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                             let values;
                             if (source.dataset.fieldType === 'gallery') {
@@ -209,7 +223,7 @@
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
                     visible = !!rules.length && (!rule.rules || ['all', 'any'].includes(rule.relation)) && validSources && (rule.relation === 'any' ? matches.some(Boolean) : matches.every(Boolean));
                 }
                 field.hidden = !visible;

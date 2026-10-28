@@ -48,3 +48,7 @@
 .alify-range input[type="number"] { width: 140px; }
 .alify-range input[type="range"] { flex: 1; min-width: 140px; max-width: 480px; }
 .alify-range .description { flex-basis: 100%; }
+
+.alify-password { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.alify-password input { flex: 1; min-width: 140px; max-width: 480px; }
+.alify-password .description { flex-basis: 100%; }
