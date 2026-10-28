@@ -267,12 +267,20 @@
             else { position = text.indexOf(part, offset); if (position < 0 || (index === 0 && position !== 0)) return false; } offset = position + part.length;
         } return true;
     }
+    function validDependencies(fields, keyOf, conditionOf) {
+        const byKey = new Map(fields.map(field => [keyOf(field), field])), heights = new Map(), visiting = new Set();
+        function leaves(node, depth = 0) { if (!node) return []; if (typeof node !== 'object' || depth > 3) throw new Error('Invalid condition'); if ('rules' in node || 'relation' in node) { if (depth >= 3 || !['all', 'any'].includes(node.relation) || !Array.isArray(node.rules) || !node.rules.length || node.rules.length > 10 || 'field' in node) throw new Error('Invalid group'); return node.rules.flatMap(child => leaves(child, depth + 1)); } if (typeof node.field !== 'string') throw new Error('Invalid source'); return [node]; }
+        function height(key) { if (heights.has(key)) return heights.get(key); if (!byKey.has(key) || visiting.has(key) || visiting.size > 16) return 17; visiting.add(key); let result = 0; const rules = leaves(conditionOf(byKey.get(key))); if (rules.length > 10) result = 17; for (const rule of rules) { result = Math.max(result, 1 + height(rule.field)); if (result > 16) break; } visiting.delete(key); heights.set(key, result); return result; }
+        try { return byKey.size === fields.length && fields.every(field => height(keyOf(field)) <= 16); } catch (_) { return false; }
+    }
     function refreshConditions() {
         document.querySelectorAll('.alify-values').forEach(group => {
             const fields = Array.from(group.querySelectorAll('.alify-value'));
-            fields.forEach(field => {
-                let rule;
-                try { rule = JSON.parse(field.dataset.condition || 'null'); } catch (_) { rule = null; }
+            const trees = new Map(fields.map(field => { let rule; try { rule = JSON.parse(field.dataset.condition || 'null'); } catch (_) { rule = {invalid: true}; } return [field, rule]; }));
+            const graphValid = validDependencies(fields, field => field.dataset.fieldKey, field => trees.get(field)), memo = new Map();
+            function visibility(field) {
+                if (memo.has(field)) return memo.get(field);
+                let rule = trees.get(field);
                 let visible = true;
                 if (rule) {
                     let validTree = true; const rules = [];
@@ -288,10 +296,15 @@
                         if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
                         const source = fields.find(item => item.dataset.fieldKey === rule.field);
                         let matched = false;
-                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
+                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'password', 'google_map'].includes(source.dataset.fieldType) && visibility(source)) {
                             const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                             let values;
-                            if (source.dataset.fieldType === 'select') {
+                            if (['taxonomy', 'user', 'page_link'].includes(source.dataset.fieldType)) {
+                                values = Array.from(source.querySelectorAll('.alify-selector-selected .alify-selector-item input[type="hidden"]')).map(input => input.value).filter(Boolean);
+                            } else if (source.dataset.fieldType === 'relationship' || source.querySelector('.alify-relationship')) {
+                                values = Array.from(source.querySelectorAll('.alify-relation-items .alify-relation-item input[type="hidden"]')).map(input => input.value).filter(Boolean);
+                            } else if (source.dataset.fieldType === 'post_object') { values = [source.querySelector('.alify-post-object > input[type="hidden"]')?.value || ''];
+                            } else if (source.dataset.fieldType === 'select') {
                                 const select = source.querySelector('select'); values = select ? Array.from(select.selectedOptions).map(option => option.value).filter(value => value !== '') : [''];
                             } else if (source.dataset.fieldType === 'gallery') {
                                 values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
@@ -313,10 +326,14 @@
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with', 'glob'].includes(rule.operator) && (rule.operator !== 'glob' || validPattern(rule.value)) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map', 'taxonomy', 'user', 'page_link', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_') && !JSON.parse(item.dataset.condition || 'null')));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with', 'glob'].includes(rule.operator) && (rule.operator !== 'glob' || validPattern(rule.value)) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'password', 'google_map', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_')));
                     function evaluate(node) { if (node.rules) { const children = node.rules.map(evaluate); return node.relation === 'any' ? children.some(Boolean) : children.every(Boolean); } return matches[rules.indexOf(node)]; }
                     visible = validTree && validSources && evaluate(rule);
                 }
+                memo.set(field, visible); return visible;
+            }
+            fields.forEach(field => {
+                const visible = graphValid ? visibility(field) : !trees.get(field);
                 field.hidden = !visible;
                 field.querySelectorAll('input, select, textarea, button').forEach(input => {
                     if (field.dataset.fieldType === 'wysiwyg' && input.closest('.wp-editor-wrap')) {

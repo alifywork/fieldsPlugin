@@ -127,3 +127,6 @@ function alify_get_google_map_html($name, $post_id = 0) { return Alify_CF_Extern
 function alify_get_widget_field($name, $widget_id) { return Alify_CF_Widgets::get($name, $widget_id); }
 
 function alify_get_autosave_field($name, $post_id) { return Alify_CF_Revisions::preview($name, $post_id); }
+
+/** Trusted dynamic blocks with public scalar attributes; register on init. */
+function alify_register_block_type($name, $settings) { return Alify_CF_Blocks::register($name, $settings); }

@@ -3,6 +3,7 @@ if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-selector.php';
 require_once __DIR__ . '/class-alify-cf-api.php';
+require_once __DIR__ . '/class-alify-cf-blocks.php';
 require_once __DIR__ . '/class-alify-cf-objects.php';
 require_once __DIR__ . '/class-alify-cf-widgets.php';
 require_once __DIR__ . '/class-alify-cf-external.php';
@@ -39,6 +40,7 @@ final class Alify_CF {
 
     public static function boot() {
         Alify_CF_API::boot();
+        Alify_CF_Blocks::boot();
         Alify_CF_Objects::boot();
         Alify_CF_Widgets::boot();
         Alify_CF_Local_JSON::boot();
@@ -157,7 +159,7 @@ final class Alify_CF {
         return $choices;
     }
 
-    /** Flat ALL/ANY conditions, referencing unconditional siblings by stable keys. */
+    /** Bounded ALL/ANY conditions and acyclic sibling dependencies by stable keys. */
     public static function visible($field, $schema, $values) {
         return Alify_CF_Conditions::visible($field, $schema, $values);
     }
@@ -369,11 +371,12 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
                 }
-                if (!$source || Alify_CF_Editor_Fields::presentation($source['type']) || Alify_CF_API::custom($source['type']) || Alify_CF_Selector::supported($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map'), true) || Alify_CF_Reference_Settings::multiple($source) || $source['key'] === $field['key'] || $source['condition']) {
-                    $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
+                if (!$source || !Alify_CF_Conditions::source($source) || $source['key'] === $field['key']) {
+                    $errors[] = $field['label'] . ': choose an eligible sibling source, without self-reference.';
                 }
             }
         }
+        Alify_CF_Conditions::graph($fields, $errors);
         // Reserve names across published and draft groups on the same post type.
         $others = get_posts(array('post_type' => self::GROUP, 'post_status' => array('publish', 'draft', 'pending', 'private', 'future'), 'numberposts' => -1, 'exclude' => array($id), 'meta_key' => self::LOCATION, 'meta_value' => $location));
         foreach (Alify_CF_API::groups($location) as $group) { if ($group['id'] !== $id) { $others[] = (object) array('ID' => $group['id'], 'post_title' => $group['title']); } }

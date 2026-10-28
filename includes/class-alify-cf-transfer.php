@@ -29,13 +29,13 @@ final class Alify_CF_Transfer {
     }
     private static function advanced_conditions($condition) { if (!is_array($condition)) { return false; } foreach ($condition['rules'] ?? array($condition) as $node) { if (isset($node['rules']) || in_array($node['operator'] ?? '', array('contains', 'starts_with', 'ends_with'), true)) { return true; } } return false; }
     /** Older importers must reject row-bound schemas rather than silently drop their limits. */
-    public static function minimum_version($fields, $location, $rules = array()) { return isset(Alify_CF_Objects::locations()[$location]) || $location === 'attachment' || $rules ? 9 : self::version(is_array($fields) ? $fields : array()); }
+    public static function minimum_version($fields, $location, $rules = array()) { return max(isset(Alify_CF_Objects::locations()[$location]) || $location === 'attachment' || $rules ? 9 : 1, self::version(is_array($fields) ? $fields : array())); }
     private static function version($fields) {
         $version = 1;
         foreach ($fields as $field) {
             if (!is_array($field) || !is_string($field['type'] ?? null)) { continue; }
-            foreach (Alify_CF_Conditions::rules($field['condition'] ?? null) as $rule) { if (($rule['operator'] ?? '') === 'glob') { $version = 9; } }
-            if (isset($field['page_size']) || in_array($field['type'], array('oembed', 'google_map'), true)) { $version = 9; }
+            foreach (Alify_CF_Conditions::rules($field['condition'] ?? null) as $rule) { foreach ($fields as $source) { if (is_array($source) && is_string($source['key'] ?? null) && is_string($rule['field'] ?? null) && sanitize_key($source['key']) === sanitize_key($rule['field']) && (!empty($source['condition']) || in_array($source['type'] ?? '', array('relationship', 'taxonomy', 'user', 'page_link'), true) || (($source['type'] ?? '') === 'post_object' && !empty($source['multiple'])))) { $version = 10; } } if (($rule['operator'] ?? '') === 'glob') { $version = max($version, 9); } }
+            if (isset($field['page_size']) || in_array($field['type'], array('oembed', 'google_map'), true)) { $version = max($version, 9); }
             if (Alify_CF_API::custom($field['type']) || Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker' || array_intersect(array_keys($field), array('api_read', 'api_write', 'public_output', 'content', 'icons', 'toolbar', 'editor_mode', 'media_buttons', 'row_label', 'collapsed', 'taxonomy_filters')) || self::advanced_conditions($field['condition'] ?? null)) { $version = max($version, 8); }
             if (Alify_CF_Selector::supported($field)) { $version = max($version, 7); }
             if (Alify_CF_Reference_Settings::supported($field) && array_intersect(array_keys($field), array('post_types', 'post_statuses', 'multiple', 'min_items', 'max_items', 'return_format'))) { $version = max($version, 6); }
@@ -44,7 +44,7 @@ final class Alify_CF_Transfer {
             if (Alify_CF_Temporal_Format::formats($field['type']) && (array_key_exists('display_format', $field) || array_key_exists('return_format', $field))) { $version = max($version, 3); }
             if ($field['type'] === 'repeater' && (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field))) { $version = max($version, 2); }
             if (is_array($field['sub_fields'] ?? null)) { foreach ($field['sub_fields'] as $sub) { if (is_array($sub) && ($sub['type'] ?? '') === 'wysiwyg') { $version = max($version, 8); } } $version = max($version, self::version($field['sub_fields'])); }
-            foreach (is_array($field['layouts'] ?? null) ? $field['layouts'] : array() as $layout) { if (!is_array($layout)) { continue; } if (array_intersect(array_keys($layout), array('min_rows', 'max_rows', 'disabled'))) { $version = 9; } $sub_fields = is_array($layout['sub_fields'] ?? null) ? $layout['sub_fields'] : array(); foreach ($sub_fields as $sub) { if (is_array($sub) && ($sub['type'] ?? '') === 'wysiwyg') { $version = max($version, 8); } } $version = max($version, self::version($sub_fields)); }
+            foreach (is_array($field['layouts'] ?? null) ? $field['layouts'] : array() as $layout) { if (!is_array($layout)) { continue; } if (array_intersect(array_keys($layout), array('min_rows', 'max_rows', 'disabled'))) { $version = max($version, 9); } $sub_fields = is_array($layout['sub_fields'] ?? null) ? $layout['sub_fields'] : array(); foreach ($sub_fields as $sub) { if (is_array($sub) && ($sub['type'] ?? '') === 'wysiwyg') { $version = max($version, 8); } } $version = max($version, self::version($sub_fields)); }
         }
         return $version;
     }
@@ -70,7 +70,7 @@ final class Alify_CF_Transfer {
         if (is_wp_error($auth)) { return $auth; }
         if (!is_string($json) || strlen($json) > self::MAX_BYTES || trim($json) === '') { return new WP_Error('alify_transfer_size', 'Provide JSON no larger than 1 MiB.'); }
         $object = json_decode($json, false, 32);
-        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2, 3, 4, 5, 6, 7, 8, 9), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
+        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
             return new WP_Error('alify_transfer_format', 'Invalid Alify JSON or unsupported format version.');
         }
         $group = json_decode($json, true, 32)['group'];
