@@ -6,7 +6,7 @@
 - Add choice `value`/`label`/`array` return settings to opt-in formatted post/Options getters, recursively for supported basic container subfields. Raw getters/storage/conditions keep keys.
 - Collect every Gutenberg selected option, preserve explicit empty selections, validate complete multi-select payloads/defaults/100-key bounds, and retain invalid fields/containers or entire Options pages. Reconstruct stored selections for publication and safe feedback.
 - Round-trip richer choice settings/defaults with JSON v4; continue importing v1–v4. Single/multiple mode changes do not migrate stored values.
-- Local feature checks: 689 isolated PHP assertions on PHP 7.4/8.3, 65 JS tests, and 494 real WordPress backend assertions on both existing PHP-WASM/SQLite targets. Native browser/matrix results pending the batch CI run.
+- Local feature checks: 689 isolated PHP assertions on PHP 7.4/8.3, 65 JS tests, and 494 real WordPress backend assertions on both existing PHP-WASM/SQLite targets. All four native-PHP targets also pass backend and real Chromium/HTTP persistence flows: 494 backend / 161 browser / 24 HTTP assertions. Verified in CI run 40707061371.
 
 ## 0.23.0
 
