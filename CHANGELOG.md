@@ -5,7 +5,7 @@
 - Add Range with a named numeric input/unnamed slider, configurable root/subfield min/max/step, canonical decimal-string storage and optional explicit clearing. Empty fields never implicitly save the slider position.
 - Enforce ±1000000 and three-decimal precision using exact thousandth-unit arithmetic; reject out-of-bounds/off-step/malformed values and invalid schemas/defaults. Step is anchored at minimum; invalid input is not silently clamped.
 - Support posts/Options/basic containers, canonical-value conditional sources/targets, core REST save validation and schema-only JSON, retaining existing save-safety behavior.
-- Add builder/value/conditional and backend/browser lifecycle checks. Local results: 474 PHP assertions, 54 JS tests and 374 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser results are recorded after verification.
+- Add builder/value/conditional and backend/browser lifecycle checks. All four existing native-PHP targets pass: 374 backend, 122 browser and 24 HTTP persistence assertions, plus 474 isolated PHP assertions and 54 JS tests. Both local PHP-WASM/SQLite targets also pass 374 backend assertions. Verified in CI run 40699760663.
 - Complete roadmap Range increment; next is Password (masked input, not encryption/secret storage).
 
 ## 0.19.0
