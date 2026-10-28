@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0
+
+- Batch Post Object/Relationship registered-CPT targets, per-field status filters, multiple Post Object, reference min/max limits and opt-in object returns.
+- Reuse bounded permission-filtered search and ordered reference picker; send filters to search, enforce them during every save, preserve existing raw ID getters and no-migration semantics.
+- Integrate required/optional clearing, basic containers, Options atomicity, REST, publication reconstruction, recovery and recursive formatted getters. Multiple Post Object is excluded from conditional sources.
+- Gate new settings with schema JSON v6; import v1–v6. Existing standalone object resolvers also support registered CPTs without exposing unreadable objects.
+- Local checks: 755 PHP assertions on PHP 7.4/8.3, 70 JS tests, 558 backend assertions on both existing SQLite targets. Combined native/browser matrix pending.
+
 ## 0.25.0
 
 - Batch configurable Color alpha hex, opacity controls and suggested palettes; preserve raw hex and explicit transparent values.

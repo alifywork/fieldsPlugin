@@ -8,14 +8,14 @@
             row.querySelector('[data-relation-action="remove"]').disabled = hidden;
         });
         root.querySelector('[data-relation-action="clear"]').disabled = hidden || !rows.length;
-        root.querySelector('.alify-relation-count').textContent = rows.length + ' / 50 references';
+        root.querySelector('.alify-relation-count').textContent = rows.length + ' / ' + (root.dataset.limit || 50) + ' references';
     }
     function changed(root) { refresh(root); root.dispatchEvent(new Event('change', {bubbles: true})); }
     function add(root, id, title) {
         if (root.closest('.alify-value[hidden]')) return;
         const list = root.querySelector('.alify-relation-items'), status = root.querySelector('.alify-post-status');
         if (Array.from(list.querySelectorAll('input')).some(input => input.value === String(id))) { status.textContent = 'Already selected.'; return; }
-        if (list.children.length >= 50) { status.textContent = 'Maximum 50 references. Remove a selection first.'; return; }
+        if (list.children.length >= Number(root.dataset.limit || 50)) { status.textContent = 'Maximum ' + (root.dataset.limit || 50) + ' references. Remove a selection first.'; return; }
         const row = document.createElement('div'); row.className = 'alify-relation-item';
         const input = document.createElement('input'); input.type = 'hidden'; input.name = root.querySelector('input[name$="[__complete]"]').name.slice(0, -'[__complete]'.length) + '[ids][]'; input.value = String(id); row.appendChild(input);
         const label = document.createElement('span'); label.className = 'alify-relation-title'; label.textContent = title; row.appendChild(label);

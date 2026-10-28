@@ -36,13 +36,19 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await root.locator(`[data-post-id="${fixture.reference}"]`).click();
     }
     async function chooseRelationship() {
-        const root = page.locator('.alify-relationship');
+        const root = page.locator('.alify-relationship[data-reference-kind="relationship"]');
         await root.locator('[data-post-search]').fill('Browser reference target');
         await root.locator('[data-post-type]').selectOption('page'); await root.locator('[data-post-find]').click();
         await root.locator(`[data-post-id="${fixture.reference}"]`).click();
         await root.locator(`[data-post-id="${fixture.reference_second}"]`).click();
         await root.locator(`[data-post-id="${fixture.reference}"]`).click(); // Duplicate does not append.
         await root.locator('.alify-relation-item').nth(1).locator('[data-relation-action="up"]').click();
+    }
+    const extraRefs = page.locator('.alify-relationship[data-reference-kind="post_object"]');
+    const extraIDs = () => extraRefs.locator('.alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value));
+    async function chooseExtraRefs() {
+        await extraRefs.locator('[data-post-type]').selectOption('page'); await extraRefs.locator('[data-post-search]').fill('Browser reference target'); await extraRefs.locator('[data-post-find]').click();
+        await extraRefs.locator(`[data-post-id="${fixture.reference}"]`).click(); await extraRefs.locator(`[data-post-id="${fixture.reference_second}"]`).click();
     }
     async function saveClassic() { await Promise.all([page.waitForNavigation(), page.locator('#publish').click()]); }
     try {
@@ -61,8 +67,14 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('choice_detail').isVisible(), true, 'Multi Select condition reads selected zero key, not search/marker'); await value('choice_detail').fill('Multi condition content');
         await chooseReference();
         await chooseRelationship();
+        await chooseExtraRefs();
+        check(await extraIDs(), [String(fixture.reference), String(fixture.reference_second)], 'Multiple Post Object picker selects ordered references');
+        check(await extraRefs.locator('[data-post-type] option').evaluateAll(options => options.map(option => option.value)), ['', 'page'], 'Reference picker only offers configured post types');
+        check(await extraRefs.locator('.alify-relation-count').textContent(), '2 / 2 references', 'Reference picker displays configured maximum');
+        await extraRefs.evaluate((root, id) => window.AlifyRelationship.add(root, id, 'Over limit'), fixture.classic);
+        check(await extraIDs(), [String(fixture.reference), String(fixture.reference_second)], 'Configured maximum blocks additions without truncation');
         check(await value('related').inputValue(), String(fixture.reference), 'Actual AJAX selector writes chosen post/page ID');
-        check(await page.locator('.alify-relation-item').count(), 2, 'Relationship AJAX picker prevents duplicate references');
+        check(await page.locator('.alify-relationship[data-reference-kind="relationship"] .alify-relation-item').count(), 2, 'Relationship AJAX picker prevents duplicate references');
         await value('calendar_day').fill('2024-02-29');
         check(await value('calendar_day').locator('..').locator('[data-temporal-preview]').textContent(), 'February 29, 2024', 'Date display preset previews without changing native value');
         const dateTime = page.locator('.alify-date-time');
@@ -171,14 +183,16 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
         check(await value('related').inputValue(), String(fixture.reference), 'Selected post reference survives Classic save/reload');
-        check(await page.locator('.alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives Classic save/reload');
-        await page.locator('[data-relation-action="clear"]').click();
+        check(await page.locator('.alify-relationship[data-reference-kind="relationship"] .alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives Classic save/reload');
+        await page.locator('.alify-relationship[data-reference-kind="relationship"] [data-relation-action="clear"]').click();
         await page.locator('[data-post-clear]').click();
         check(await buttons.locator('input:checked').inputValue(), 'a', 'Button Group survives Classic save/reload');
         check(await value('amount').inputValue(), '0.5', 'Range decimal survives Classic save/reload');
         check(await value('masked').inputValue(), classicPassword, 'Password preserves exact value across Classic save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Reload resets Password to masked');
         await password.locator('[data-password-clear]').click();
+        check(await extraIDs(), [String(fixture.reference), String(fixture.reference_second)], 'Multiple Post Object survives Classic save/reload');
+        await extraRefs.locator('[data-relation-action="clear"]').click();
         check(await selectedMulti(), ['0', 'a'], 'Native multi Select survives Classic save/reload');
         await multi.locator('..').locator('[data-select-clear]').click(); check(await value('choice_detail').isVisible(), false, 'Clearing multi Select updates conditions');
         check(await value('meeting_at').inputValue(), '2024-02-29T09:30:45', 'Date Time seconds survive Classic save/reload');
@@ -200,7 +214,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('[data-color-clear]').click(); await saveClassic();
         check(await page.locator('.alify-link input[type="url"]').inputValue(), '', 'Explicit Link clear survives actual save/reload');
         check(await value('related').inputValue(), '', 'Explicit post reference clear survives save/reload');
-        check(await page.locator('.alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
+        check(await page.locator('.alify-relationship[data-reference-kind="relationship"] .alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
+        check(await extraIDs(), [], 'Optional multiple Post Object explicitly clears despite nonempty minimum');
         check(await selectedMulti(), [], 'Explicit multi Select clear survives Classic save/reload without reapplying defaults');
         check(await value('choice_detail').inputValue(), 'Multi condition content', 'Hidden multi-choice dependent retains saved value');
         check(await value('masked').inputValue(), '', 'Optional Password clear survives Classic save/reload');
@@ -247,6 +262,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         if (await welcome.count()) await welcome.getByRole('button', {name: 'Close', exact: true}).click();
         await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
+        await chooseExtraRefs();
         await multi.selectOption(['a', 'b']);
         await value('subtitle').fill('Block subtitle');
         await value('meeting_at').fill('2026-10-28T16:45:59');
@@ -300,6 +316,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), 'b', 'Radio survives same-request Gutenberg REST save/reload');
         check(await buttons.locator('input:checked').inputValue(), 'b', 'Button Group survives Gutenberg REST save/reload');
         check(await value('amount').inputValue(), '1.5', 'Range survives same-request Gutenberg REST save');
+        check(await extraIDs(), [String(fixture.reference), String(fixture.reference_second)], 'Gutenberg serializes complete multiple Post Object payload');
         check(await value('accent').inputValue(), '#abcdef00', 'Transparent alpha color is canonical after Gutenberg REST save/reload');
         check(await selectedMulti(), ['a', 'b'], 'Gutenberg serializes every native multi selection into same-request REST save');
         check(await value('masked').inputValue(), 'Block masked fixture', 'Password survives same-request Gutenberg REST save/reload');
@@ -311,7 +328,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/block', 'Link components survive same-request Gutenberg REST save/reload');
         check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<em>rich</em>'), true, 'Native Visual editor synchronizes HTML into same-request Gutenberg payload');
         check(await value('related').inputValue(), String(fixture.reference), 'Selected post reference survives Gutenberg REST save/reload');
-        check(await page.locator('.alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives same-request Gutenberg REST save');
+        check(await page.locator('.alify-relationship[data-reference-kind="relationship"] .alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives same-request Gutenberg REST save');
         const bypass = await page.evaluate(async ({base, id}) => {
             const response = await fetch(base + '/?rest_route=/wp/v2/posts/' + id, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-WP-Nonce': wpApiSettings.nonce}, body: JSON.stringify({status: 'publish'})});
             return {status: response.status, body: await response.json()};
@@ -325,8 +342,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const download = await downloadReady;
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
-        check(exported.version, 5, 'Color/media/Link schema exports as v5 for safe older-importer rejection');
-        check(exported.group.fields.length, 27, 'Export includes all browser fixture fields');
+        check(exported.version, 6, 'Reference schema exports as v6 for safe older-importer rejection');
+        check(exported.group.fields.length, 28, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
@@ -388,7 +405,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(page.url(), optionsURL, 'Options form redirects to its registered page');
         check(await page.locator('.notice-success').count(), 1, 'Actual options save shows success notice');
         check(await optionValue('options_related').inputValue(), String(fixture.reference), 'Selected post reference survives Options HTTP save/reload');
-        check(await page.locator('.alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives Options HTTP save/reload');
+        check(await page.locator('.alify-relationship[data-reference-kind="relationship"] .alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives Options HTTP save/reload');
         check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<strong>copy</strong>'), true, 'Native Visual editor synchronizes HTML into Options form save');
         verifyOptions('baseline');
         await optionValue('options_masked').fill('Attempted masked fixture');

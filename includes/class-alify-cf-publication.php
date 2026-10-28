@@ -18,7 +18,7 @@ final class Alify_CF_Publication {
     public static function stored_payload($field, $value) {
         if (Alify_CF_Choice::multiple($field)) { return array('__complete' => '1', 'values' => is_array($value) ? $value : array()); }
         if ($field['type'] === 'link') { return array('__complete' => '1', 'url' => is_array($value) ? ($value['url'] ?? '') : '', 'title' => is_array($value) ? ($value['title'] ?? '') : '', 'target' => is_array($value) ? ($value['target'] ?? '') : ''); }
-        if (in_array($field['type'], array('gallery', 'relationship'), true)) { return array('__complete' => '1', 'ids' => is_array($value) ? $value : array()); }
+        if (in_array($field['type'], array('gallery', 'relationship'), true) || Alify_CF_Reference_Settings::multiple($field)) { return array('__complete' => '1', 'ids' => is_array($value) ? $value : array()); }
         if ($field['type'] === 'flexible') {
             $rows = array();
             foreach (is_array($value) ? $value : array() as $row) {

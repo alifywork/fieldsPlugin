@@ -462,7 +462,7 @@ $settings = alify_get_option('profile', 'site');
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
 
-- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`, `2`, `3`, `4` or `5`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; Color/media/Link configuration requires version 5; schemas without these features continue to use their existing version.
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`–`6`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; Color/media/Link configuration requires version 5; new reference configuration requires version 6; schemas without these features continue to use their existing version.
 - Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
 - Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
 - Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
@@ -538,25 +538,37 @@ Enable **alpha** to accept six- or eight-digit lowercase hex. `#rrggbbaa` uses a
 
 Configure an optional default with URL, title, and target (`''` or `_blank`). Only valid HTTP(S) URLs are accepted, with existing credential/control-character restrictions. Defaults initialize missing values; explicit clearing saves an empty array instead of reapplying the default. Opt-in formatted getters support `array` (legacy URL/title/target object) or `url`; raw getters always return the object. Themes must still escape URLs/text for their output context; a new-tab link needs the theme's appropriate `rel` policy.
 
+## Reference configuration (0.26.0)
+
+Post Object and Relationship support the following on post/Options roots and supported basic container subfields:
+
+- **Allowed post types:** 1–20 registered `show_ui` post types, entered as one slug per line. Attachments, revisions and Alify field groups are excluded. Legacy schemas still target only posts/pages. A CPT must be registered on every request and on the destination site before schema import.
+- **Allowed statuses:** a nonempty subset of `publish`, `private`, `draft`, `pending`, `future`. Type/status constraints apply to server validation as well as search. Changing filters does not migrate stored references; invalid saves retain the previous value/container/page rather than silently dropping targets.
+- **Multiple Post Object:** ordered, deduplicated IDs, using the same add/remove/reorder picker as Relationship. The complete write-bridge payload is `{"__complete":"1","ids":[12,34]}`; `{"__complete":"1"}` clears an optional list. Incomplete/malformed payloads retain the previous list. Multiple Post Object is not a conditional source (single Post Object retains its existing source behavior). Defaults are unsupported; changing scalar/list mode does not migrate saved values.
+- **Cardinality:** multiple Post Object and Relationship accept minimum 0–50 and maximum 1–50. Minimum applies when nonempty; Required disallows empty. The picker prevents additions above maximum, while the server enforces both bounds without truncation.
+- **Formatted returns:** `id` (default/raw behavior) or `object` through opt-in formatted getters. Single Post Object returns a viewable `WP_Post` or `null`; lists return ordered viewable objects and omit unavailable targets. Current permissions/password protection still apply; filters do not grant access. Raw getters remain IDs. Existing `alify_get_post_object()` / `alify_get_relationship()` resolvers also recognize registered CPTs; use configured formatted getters when field-specific filters must govern resolution.
+- Search remains nonce/capability checked, paginated (20 queried candidates per page, up to 100 pages), and read-permission filtered. Filter values sent by the picker are search constraints, **not authorization**; no private totals or unreadable titles are returned. Changing permissions can leave a page empty. No taxonomy filtering or bidirectional writes yet.
+- New reference settings require **schema JSON v6 / plugin 0.26.0+**, including subfield-only configuration. Imports continue accepting v1–v6.
+
 ## Verification
 
-Automated checks for 0.25.0:
+Automated checks for 0.26.0:
 
 ```sh
 npm ci
-npm test       # 68 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 70 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 726 assertions with isolated WordPress stubs
+php tests/php-unit.php # 755 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 528 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 558 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
 | 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
 | 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
 
-Both integration runs had clean WordPress debug logs. The 0.25.0 configuration batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40708689961](https://github.com/alifywork/fieldsPlugin/actions/runs/40708689961): 528 backend / 168 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
+Both integration runs had clean WordPress debug logs. The previous 0.25.0 configuration batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40708689961](https://github.com/alifywork/fieldsPlugin/actions/runs/40708689961): 528 backend / 168 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
 
 ```sh
 # Requires Git/Bash and a native PHP executable with SQLite extensions.

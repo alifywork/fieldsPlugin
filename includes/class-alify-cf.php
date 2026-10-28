@@ -1,6 +1,7 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
+require_once __DIR__ . '/class-alify-cf-reference-settings.php';
 require_once __DIR__ . '/class-alify-cf-field-settings.php';
 require_once __DIR__ . '/class-alify-cf-temporal-format.php';
 require_once __DIR__ . '/class-alify-cf-date-time.php';
@@ -199,6 +200,7 @@ final class Alify_CF {
             case 'relationship':
                 Alify_CF_Relationship::render($field, $value, $id, $input); break;
             case 'post_object':
+                if (Alify_CF_Reference_Settings::multiple($field)) { Alify_CF_Relationship::render($field, $value, $id, $input); break; }
                 Alify_CF_Post_Object::render($field, $value, $id, $input); break;
             case 'wysiwyg':
                 echo '<div class="alify-rich"><button type="button" class="button" data-rich-enable>Enable Visual/Text editor</button><textarea class="alify-rich-text" data-rich-editor' . $attrs . ' aria-required="' . (!empty($field['required']) ? 'true' : 'false') . '" rows="8">' . esc_textarea(is_string($value) ? wp_kses_post($value) : '') . '</textarea><p class="description">WordPress post HTML only. Required fields need text; empty formatting or media-only content is not sufficient.</p></div>'; break;
@@ -246,8 +248,8 @@ final class Alify_CF {
         if ($field['type'] === 'date_time') { return Alify_CF_Date_Time::clean($value); }
         if ($field['type'] === 'password') { return Alify_CF_Password::clean($value); }
         if ($field['type'] === 'range') { return Alify_CF_Range::clean($field, $value); }
-        if ($field['type'] === 'relationship') { return Alify_CF_Relationship::clean($value); }
-        if ($field['type'] === 'post_object') { return Alify_CF_Post_Object::clean($value); }
+        if ($field['type'] === 'relationship') { return Alify_CF_Relationship::clean($value, array(), false, $field); }
+        if ($field['type'] === 'post_object') { return Alify_CF_Reference_Settings::multiple($field) ? Alify_CF_Relationship::clean($value, array(), false, $field) : Alify_CF_Post_Object::clean($value, null, false, $field); }
         if ($field['type'] === 'wysiwyg') { return Alify_CF_Rich_Text::clean($value); }
         if ($field['type'] === 'link') { return Alify_CF_Link::clean($value); }
         if ($field['type'] === 'flexible') { return Alify_CF_Flexible::clean($field, $value); }
@@ -303,7 +305,7 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if ($type === 'repeater') {
@@ -328,7 +330,7 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
                 }
-                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'), true) || $source['key'] === $field['key'] || $source['condition']) {
+                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'), true) || Alify_CF_Reference_Settings::multiple($source) || $source['key'] === $field['key'] || $source['condition']) {
                     $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
                 }
             }
@@ -397,10 +399,10 @@ final class Alify_CF {
                 $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
             } elseif ($field['type'] === 'repeater') {
                 $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
-            } elseif ($field['type'] === 'relationship') {
-                $value = Alify_CF_Relationship::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? array(), true);
+            } elseif ($field['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($field)) {
+                $value = Alify_CF_Relationship::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? array(), true, $field);
             } elseif ($field['type'] === 'post_object') {
-                $value = Alify_CF_Post_Object::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
+                $value = Alify_CF_Post_Object::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $field);
             } elseif ($field['type'] === 'gallery') {
                 $value = Alify_CF_Gallery::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? array(), true);
             } else {
@@ -416,7 +418,8 @@ final class Alify_CF {
             if ($field['type'] === 'date_time' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if ($field['type'] === 'password' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if ($field['type'] === 'wysiwyg') { $invalid = !is_string($submitted); }
-            if (in_array($field['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
+            if (Alify_CF_Reference_Settings::multiple($field) && $value === '') { $invalid = true; }
+            if (!Alify_CF_Reference_Settings::multiple($field) && in_array($field['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
             if (($field['required'] && $empty) || $invalid) {
                 if (!$issue && $field['type'] === 'group' && $field['required'] && $empty) { $issue = 'Fill at least one subfield in this Group.'; }
                 if (!$issue && $field['type'] === 'flexible' && $field['required'] && $empty) { $issue = 'Add at least one layout row.'; }

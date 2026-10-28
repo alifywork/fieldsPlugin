@@ -885,3 +885,17 @@ test('Color conditions use the same canonical lowercase alpha keys as server val
     const w = conditionalEditor('color', 'equals', '#aabbcc80', '<div class="alify-color" data-alpha="1"><input type="text" value="#AABBCC80"></div>');
     assert.equal(w.document.querySelector('[data-field-key="target"]').hidden, false); w.close();
 });
+
+test('Reference builder persists filters, multiple mode, bounds and formats at root/subfield', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'References'); set(w, 'type', 'post_object'); set(w, 'post_types', 'page'); set(w, 'post_statuses', 'publish'); set(w, 'return_format', 'object');
+    const multiple = d.querySelector('[data-prop="multiple"]'); multiple.checked = true; multiple.dispatchEvent(new w.Event('input', {bubbles: true})); set(w, 'min_items', '2'); set(w, 'max_items', '4');
+    assert.equal(schema(w)[0].multiple, true); assert.equal(schema(w)[0].post_types, 'page'); assert.equal(schema(w)[0].return_format, 'object'); assert.equal(schema(w)[0].max_items, '4');
+    const toggle = d.querySelector('[data-prop="multiple"]'); toggle.checked = false; toggle.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].min_items, undefined);
+    set(w, 'type', 'group'); d.querySelector('[data-sub-action="add"]').click(); const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'relationship'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    const limit = d.querySelector('[data-sub-prop="max_items"]'); limit.value = '3'; limit.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].sub_fields[0].max_items, '3'); w.close();
+});
+test('Reference list honors configured maximum instead of hardcoded 50', () => {
+    const dom = new JSDOM('<div class="alify-relationship" data-limit="2"><div class="alify-relation-items"></div><input type="hidden" name="refs[__complete]"><button data-relation-action="clear">Clear</button><span class="alify-relation-count"></span><p class="alify-post-status"></p></div>', {runScripts: 'outside-only'});
+    const w = dom.window, root = w.document.querySelector('.alify-relationship'); w.eval(fs.readFileSync('assets/relationship.js', 'utf8'));
+    for (let i = 1; i <= 3; i++) w.AlifyRelationship.add(root, i, 'Reference'); assert.equal(root.querySelectorAll('.alify-relation-item').length, 2); assert.equal(root.querySelector('.alify-relation-count').textContent, '2 / 2 references'); assert.match(root.querySelector('.alify-post-status').textContent, /Maximum 2/); w.close();
+});

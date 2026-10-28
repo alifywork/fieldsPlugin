@@ -22,19 +22,19 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 7. [x] **Radio/Select/Checkbox richer settings** — v0.24.0 batch: wrapping horizontal/vertical Radio/Checkbox layouts, validated Checkbox defaults, native multiple/local-search Select, optional clearing, opt-in key/label/record formatted returns; post/Options/basic containers/conditions/REST/JSON v4. Raw keys stay unchanged.
 8. [x] **Color configuration** — v0.25.0: suggested bounded palettes, six/eight-digit hex alpha, RGB/opacity synchronization, transparent values, defaults/conditions/REST/JSON v5.
 9. [x] **Image/File/Gallery configuration** — v0.25.0: opt-in ID/URL/record returns, exact MIME/local byte restrictions, Gallery cardinality and editor preview size. Existing permission/image validation preserved. Custom dimensions/cropping excluded.
-10. [x] **Link configuration** — v0.25.0: validated portable URL/title/target defaults, explicit clear, opt-in object/URL returns, basic container/Options/REST support. **Current completed development batch.**
+10. [x] **Link configuration** — v0.25.0: validated portable URL/title/target defaults, explicit clear, opt-in object/URL returns, basic container/Options/REST support.
 
 ## B. Relational and external fields
 
 11. [ ] Taxonomy selector — permitted taxonomies, single/multiple terms, validation and getters. **Next queue item; continue related-feature batches.**
 12. [ ] User selector — permissions/privacy, bounded search, single/multiple and getters.
 13. [ ] Page Link — page/post/archive URL selection with defined resolution behavior.
-14. [ ] Post Object/Relationship CPT targets and per-field allowed post types.
-15. [ ] Configurable reference post-status restrictions.
+14. [x] **Post Object/Relationship CPT targets** — v0.26.0: registered show_ui types, per-field filters and permission-filtered search/save validation.
+15. [x] **Reference status restrictions** — v0.26.0: publish/private/draft/pending/future subsets enforced by search and saves.
 16. [ ] Reference taxonomy filters and editor filtering controls.
-17. [ ] Post Object multiple-selection configuration.
-18. [ ] Configurable Relationship min/max cardinality.
-19. [ ] Reference return-format configuration.
+17. [x] **Multiple Post Object** — v0.26.0: ordered complete ID lists, picker/reordering/clearing, containers/Options/REST/publication/recovery; no scalar/list migration or list conditional sources.
+18. [x] **Relationship min/max cardinality** — v0.26.0: shared multiple-reference bounds, maximum 50, optional empty versus Required semantics, no truncation.
+19. [x] **Reference return formats** — v0.26.0: opt-in ID/object returns recursively across containers/Options; unavailable or unreadable objects omitted/null; raw IDs unchanged. **Current completed development batch.**
 20. [ ] Bidirectional relationships — dependency on supported object locations and safe write APIs; avoid recursive writes and partial updates.
 21. [ ] oEmbed — bounded remote provider handling and rendering contract.
 22. [ ] Google Map — provider/key configuration, location storage and external-service constraints.
@@ -136,3 +136,5 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 - **v0.24.0 — Rich choice settings batch:** six related choice capabilities delivered together, one combined end-of-batch check/CI cycle. Local: 689 PHP assertions on both runtimes, 65 JS tests, 494 backend assertions on both existing SQLite targets. Verified in [CI run 40707061371](https://github.com/alifywork/fieldsPlugin/actions/runs/40707061371): all four native targets green (494 backend / 161 browser / 24 HTTP persistence checks). Next queue item: Color configuration; continue related-feature batches.
 
 - **v0.25.0 — Color/media/Link configuration batch:** items 8–10 developed together, including defaults, server validation, formatted getters and JSON v5. Local: 726 PHP / 68 JS / 528 backend assertions on both existing SQLite targets. Verified in [CI run 40708689961](https://github.com/alifywork/fieldsPlugin/actions/runs/40708689961): all four native targets green (528 backend / 168 browser / 24 HTTP persistence checks). Roadmap: 10 complete, 67 pending; this is not a claim that the full backlog is finished.
+
+- **v0.26.0 — Shared reference-engine batch:** complete items 14, 15, 17, 18 and 19 together before new selectors (11–13). Dependency ordering: expand the existing shared reference engine first rather than duplicate target/filter/permission infrastructure in new selectors. Item 16 taxonomy filtering remains pending. Local 755 PHP / 70 JS / 558 backend on both SQLite targets; native/browser verification pending. Roadmap now 15 complete / 62 pending.

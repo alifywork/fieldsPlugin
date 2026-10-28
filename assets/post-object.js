@@ -46,6 +46,8 @@
         root.querySelector('[data-post-prev]').disabled = true; root.querySelector('[data-post-next]').disabled = true;
         try {
             const body = new URLSearchParams({action: 'alify_cf_search_posts', nonce: AlifyPostObject.nonce, search: root.querySelector('[data-post-search]').value, type: root.querySelector('[data-post-type]').value, page: String(page)});
+            const settings = JSON.parse(root.dataset.referenceSettings || '{}');
+            Object.entries(settings).forEach(([key, values]) => { if (Array.isArray(values)) values.forEach(value => body.append('reference_settings[' + key + '][]', value)); });
             const response = await fetch(AlifyPostObject.url, {method: 'POST', body, credentials: 'same-origin', signal: controller.signal});
             const json = await response.json();
             if (requests.get(root) !== controller) return;

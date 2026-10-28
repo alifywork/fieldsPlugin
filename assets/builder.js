@@ -30,6 +30,7 @@
         const attr = sub ? 'data-sub-prop' : 'data-prop';
         const entry = (prop, title, fallback = '', multiline = false) => `<label class="alify-control"><span>${title}</span>${multiline ? `<textarea ${attr}="${prop}">${escape(defaultText(field[prop] ?? fallback))}</textarea>` : `<input ${attr}="${prop}" value="${escape(field[prop] ?? fallback)}">`}</label>`;
         const select = (prop, title, options, fallback) => `<label class="alify-control"><span>${title}</span><select ${attr}="${prop}">${options.map(value => `<option value="${value}" ${value === (field[prop] ?? fallback) ? 'selected' : ''}>${value}</option>`).join('')}</select></label>`;
+        if (['post_object', 'relationship'].includes(field.type)) return `<div class="alify-grid">${entry('post_types', 'Allowed registered post types (one slug per line)', 'post\npage', true)}${entry('post_statuses', 'Allowed statuses (one per line)', 'publish\nprivate\ndraft\npending\nfuture', true)}${select('return_format', 'Formatted getter return format', ['id', 'object'], 'id')}${field.type === 'post_object' ? `<label><input type="checkbox" ${attr}="multiple" ${field.multiple ? 'checked' : ''}> Allow multiple ordered references</label>` : ''}${field.type === 'relationship' || field.multiple ? entry('min_items', 'Minimum references when nonempty', 0) + entry('max_items', 'Maximum references (1–50)', 50) : ''}<p>Filters narrow selection, never grant access. Raw getters keep IDs. Multiple Post Object is not a condition source; defaults are not supported.</p></div>`;
         if (field.type === 'color') return `<div class="alify-grid"><label><input type="checkbox" ${attr}="alpha" ${field.alpha ? 'checked' : ''}> Allow alpha (#rrggbbaa)</label>${entry('palette', 'Suggested palette (up to 20 hex colors, one per line)', '', true)}</div>`;
         if (field.type === 'link') return `<div class="alify-grid">${select('return_format', 'Formatted getter return format', ['array', 'url'], 'array')}${['url', 'title', 'target'].map(part => `<label class="alify-control"><span>Default link ${part}${part === 'target' ? ' (empty or _blank)' : ''}</span><input data-default-part="${part}" value="${escape(field.default?.[part] ?? '')}"></label>`).join('')}</div>`;
         if (!['image', 'file', 'gallery'].includes(field.type)) return '';
@@ -52,7 +53,7 @@
     }
     function conditionUI(field) {
         const condition = field.condition, rules = condition ? (condition.rules || [condition]) : [];
-        const sources = fields.filter(item => item.key !== field.key && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(item.type) && !item.condition);
+        const sources = fields.filter(item => item.key !== field.key && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(item.type) && !(item.type === 'post_object' && item.multiple) && !item.condition);
         return `<div class="alify-condition"><label><input type="checkbox" data-condition-prop="enabled" ${condition ? 'checked' : ''}> Enable conditional logic</label>${condition ? `<p>Show this field when rules match unconditional siblings:</p><label>Match <select data-condition-relation><option value="all" ${condition.relation !== 'any' ? 'selected' : ''}>ALL rules (AND)</option><option value="any" ${condition.relation === 'any' ? 'selected' : ''}>ANY rule (OR)</option></select></label>${rules.map((rule, index) => `<div class="alify-condition-rule" data-rule-index="${index}"><div class="alify-grid"><label class="alify-control"><span>Source field</span><select data-condition-prop="field"><option value="">Choose field</option>${sources.map(item => `<option value="${escape(item.key)}" ${item.key === rule.field ? 'selected' : ''}>${escape(item.label || item.name || 'Untitled field')}</option>`).join('')}</select></label><label class="alify-control"><span>Comparison</span><select data-condition-prop="operator">${Object.entries({equals: 'Is equal to', not_equals: 'Is not equal to', empty: 'Is empty', not_empty: 'Is not empty'}).map(([key, label]) => `<option value="${key}" ${key === rule.operator ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label class="alify-control"><span>Comparison value</span><input data-condition-prop="value" value="${escape(rule.value)}" ${['empty', 'not_empty'].includes(rule.operator) ? 'disabled' : ''}><small>Choice key, attachment ID or 1/0 for a toggle. Checkbox/Gallery rules match a selected key/ID.</small></label></div><button type="button" class="button-link-delete" data-condition-action="remove" ${rules.length <= 1 ? 'disabled' : ''}>Remove rule</button></div>`).join('')}<button type="button" class="button" data-condition-action="add" ${rules.length >= 10 ? 'disabled' : ''}>+ Add Rule</button>` : ''}</div>`;
     }
     function render(openKey) {
@@ -90,7 +91,8 @@
             if (subProp === 'label' && (!sub.name || sub.name === slug(previous))) {
                 sub.name = slug(sub.label); event.target.closest('.alify-sub-card').querySelector('[data-sub-prop="name"]').value = sub.name;
             }
-            if (subProp === 'type') { delete sub.display_format; delete sub.return_format; delete sub.layout; delete sub.multiple; delete sub.searchable; ['alpha', 'palette', 'allowed_mimes', 'preview_size', 'min_bytes', 'max_bytes', 'min_items', 'max_items'].forEach(key => delete sub[key]); if (sub.default && typeof sub.default === 'object') sub.default = '';  }
+            if (subProp === 'multiple' && sub.type === 'post_object' && !sub.multiple) { delete sub.min_items; delete sub.max_items; }
+            if (subProp === 'type') { delete sub.display_format; delete sub.return_format; delete sub.layout; delete sub.multiple; delete sub.searchable; ['alpha', 'palette', 'allowed_mimes', 'preview_size', 'min_bytes', 'max_bytes', 'min_items', 'max_items', 'post_types', 'post_statuses'].forEach(key => delete sub[key]); if (sub.default && typeof sub.default === 'object') sub.default = '';  }
             if (subProp === 'type' && sub.type === 'password') { sub.default = ''; sub.choices = ''; }
             if (subProp === 'type' || subProp === 'multiple') { render(event.target.closest('.alify-card').dataset.key); return; }
             sync(); return;
@@ -118,7 +120,8 @@
         if (prop === 'label' && (!field.name || field.name === slug(previous))) {
             field.name = slug(field.label); card.querySelector('[data-prop="name"]').value = field.name;
         }
-        if (prop === 'type') { delete field.display_format; delete field.return_format; delete field.layout; delete field.multiple; delete field.searchable; ['alpha', 'palette', 'allowed_mimes', 'preview_size', 'min_bytes', 'max_bytes', 'min_items', 'max_items'].forEach(key => delete field[key]); if (field.default && typeof field.default === 'object') field.default = '';  }
+        if (prop === 'multiple' && field.type === 'post_object' && !field.multiple) { delete field.min_items; delete field.max_items; }
+        if (prop === 'type') { delete field.display_format; delete field.return_format; delete field.layout; delete field.multiple; delete field.searchable; ['alpha', 'palette', 'allowed_mimes', 'preview_size', 'min_bytes', 'max_bytes', 'min_items', 'max_items', 'post_types', 'post_statuses'].forEach(key => delete field[key]); if (field.default && typeof field.default === 'object') field.default = '';  }
         if (prop === 'type' && field.type === 'password') { field.default = ''; field.choices = ''; }
         if (prop === 'type' || prop === 'multiple') { render(field.key); return; }
         card.querySelector('.alify-card-title').textContent = field.label || 'Untitled field';
@@ -183,7 +186,7 @@
                 const rules = field.condition.rules || [field.condition];
                 if (!rules.length || rules.length > 10 || rules.some(rule => {
                     const source = fields.find(item => item.key === rule.field);
-                    return !source || ['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(source.type) || source.key === field.key || source.condition;
+                    return !source || (source.type === 'post_object' && source.multiple) || ['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(source.type) || source.key === field.key || source.condition;
                 })) {
                     event.preventDefault(); render(field.key); window.alert('Use 1–10 rules referencing unconditional siblings. Fix removed sources, self-references or chains.'); return;
                 }

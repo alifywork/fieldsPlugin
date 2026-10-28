@@ -50,14 +50,14 @@ final class Alify_CF_Feedback {
     private static function display($field, $raw, $previous, $allowed_media = array()) {
         if (Alify_CF_Choice::multiple($field)) { $clean = Alify_CF_Choice::clean($field, $raw); return is_array($clean) ? $clean : $previous; }
         if ($field['type'] === 'date_time') { $clean = Alify_CF_Date_Time::clean($raw); return $raw === '' ? '' : ($clean !== '' ? $clean : $previous); }
-        if ($field['type'] === 'relationship') {
-            $clean = Alify_CF_Relationship::clean($raw, is_array($previous) ? $previous : array(), true);
+        if ($field['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($field)) {
+            $clean = Alify_CF_Relationship::clean($raw, is_array($previous) ? $previous : array(), true, $field);
             return is_array($clean) ? $clean : $previous;
         }
         if ($field['type'] === 'post_object') {
             if ($raw === '') { return ''; }
-            $id = Alify_CF_Post_Object::clean($raw);
-            return $id !== '' && ((is_scalar($previous) && (string) $id === (string) $previous) || Alify_CF_Post_Object::readable($id)) ? $id : $previous;
+            $id = Alify_CF_Post_Object::clean($raw, null, false, $field);
+            return $id !== '' && ((is_scalar($previous) && (string) $id === (string) $previous) || Alify_CF_Post_Object::readable($id, $field)) ? $id : $previous;
         }
         if ($field['type'] === 'wysiwyg') { return is_string($raw) ? wp_kses_post(substr($raw, 0, 100000)) : ''; }
         if ($field['type'] === 'link') {

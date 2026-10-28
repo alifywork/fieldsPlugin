@@ -39,7 +39,7 @@ final class Alify_CF_Repeater {
             }
             $names[$name] = true; $keys[$key] = true;
             $clean = array('name' => $name, 'key' => $key, 'type' => $type, 'label' => sanitize_text_field($field['label']), 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'required' => !empty($field['required']));
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('gallery', 'link', 'relationship'), true) ? array() : Alify_CF::clean_value($clean, $field['default'] ?? ''));
             if ($type === 'link') { $clean['default'] = Alify_CF_Field_Settings::link_default($field['default'] ?? '', $errors); }
@@ -65,7 +65,7 @@ final class Alify_CF_Repeater {
         foreach ((array) $old as $row) {
             if (!is_array($row)) { continue; }
             foreach ($field['sub_fields'] as $sub) {
-                if ($sub['type'] === 'relationship') { foreach (is_array($row[$sub['name']] ?? null) ? $row[$sub['name']] : array() as $saved_id) { if (is_int($saved_id) || is_string($saved_id)) { $allowed_posts[] = (string) $saved_id; } } }
+                if ($sub['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($sub)) { foreach (is_array($row[$sub['name']] ?? null) ? $row[$sub['name']] : array() as $saved_id) { if (is_int($saved_id) || is_string($saved_id)) { $allowed_posts[] = (string) $saved_id; } } }
                 if ($sub['type'] === 'post_object' && is_scalar($row[$sub['name']] ?? null)) { $allowed_posts[] = (string) $row[$sub['name']]; }
                 if ($sub['type'] === 'gallery') {
                     foreach ((array) ($row[$sub['name']] ?? array()) as $image_id) { if (is_scalar($image_id)) { $allowed_media[] = (string) $image_id; } }
@@ -81,17 +81,17 @@ final class Alify_CF_Repeater {
             $out = array();
             foreach ($field['sub_fields'] as $sub) {
                 $raw = $row[$sub['name']] ?? '';
-                $value = $sub['type'] === 'relationship' ? Alify_CF_Relationship::clean($raw, $allowed_posts, $permissions) : ($sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw));
+                $value = ($sub['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($sub)) ? Alify_CF_Relationship::clean($raw, $allowed_posts, $permissions, $sub) : ($sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw));
                 $value = Alify_CF_Field_Settings::constrain($sub, $value);
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
                 $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
-                if (($sub['type'] === 'color' && array_key_exists($sub['name'], $row) && !is_string($raw)) || (Alify_CF_Choice::multiple($sub) && $value === '') || ($sub['type'] === 'date_time' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'password' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'range' && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== '' && Alify_CF_Range::units($row[$sub['name']]) === null) || (in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                if (($sub['type'] === 'color' && array_key_exists($sub['name'], $row) && !is_string($raw)) || (Alify_CF_Choice::multiple($sub) && $value === '') || ($sub['type'] === 'date_time' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'password' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'range' && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== '' && Alify_CF_Range::units($row[$sub['name']]) === null) || (Alify_CF_Reference_Settings::multiple($sub) && $value === '') || (!Alify_CF_Reference_Settings::multiple($sub) && in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
                     $location = array('row' => $position - 1, 'subfield' => $sub['name']);
                     $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
                     return '';
                 }
                 if ($permissions && in_array($sub['type'], array('image', 'file'), true) && $value !== '' && !in_array((string) $value, $allowed_media, true) && !current_user_can('edit_post', $value)) { $location = array('row' => $position - 1, 'subfield' => $sub['name']); $issue = $path . 'You cannot select this attachment.'; return ''; }
-                if ($permissions && $sub['type'] === 'post_object' && $value !== '' && !in_array((string) $value, $allowed_posts, true) && !Alify_CF_Post_Object::readable($value)) { $location = array('row' => $position - 1, 'subfield' => $sub['name']); $issue = $path . 'You cannot select this post.'; return ''; }
+                if ($permissions && $sub['type'] === 'post_object' && !Alify_CF_Reference_Settings::multiple($sub) && $value !== '' && !in_array((string) $value, $allowed_posts, true) && !Alify_CF_Post_Object::readable($value, $sub)) { $location = array('row' => $position - 1, 'subfield' => $sub['name']); $issue = $path . 'You cannot select this post.'; return ''; }
                 $out[$sub['name']] = $value;
             }
             $clean[] = $out;
