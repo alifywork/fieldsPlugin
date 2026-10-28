@@ -151,7 +151,7 @@ final class Alify_CF {
             if ($field['instructions']) { echo '<p id="' . esc_attr($id . '-help') . '" class="description">' . esc_html($field['instructions']) . '</p>'; }
             $field_error = $feedback['errors'][$name] ?? '';
             self::control($field, $value, $id, $input, $field_error ? $id . '-error' : '');
-            if ($field_error) { echo '<p class="alify-field-error" id="' . esc_attr($id . '-error') . '" role="alert">' . esc_html($field_error) . '</p>'; }
+            if ($field_error) { echo '<p class="alify-field-error" id="' . esc_attr($id . '-error') . '" role="alert" data-error-location="' . esc_attr(wp_json_encode(empty($feedback['omitted']) ? ($feedback['display_locations'][$name] ?? null) : null)) . '">' . esc_html($field_error) . '</p>'; }
             echo '</div>';
         }
         echo '<input type="hidden" name="alify_values[' . esc_attr($group->ID) . '][__group_complete]" value="1"></div>';
@@ -301,8 +301,8 @@ final class Alify_CF {
             $previous = array();
             foreach ($schema as $field) { $previous[$field['name']] = alify_get_field($field['name'], $id); }
             $field_errors = array();
-            $updates = self::validate_values($schema, $values, $previous, $errors, $field_errors);
-            if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors); }
+            $updates = self::validate_values($schema, $values, $previous, $errors, $field_errors, $locations);
+            if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors, $locations); }
             else { unset($feedback[$group->ID]); }
             foreach ($updates as $name => $value) { update_post_meta($id, '_alify_cf_' . $name, wp_slash($value)); }
         }
@@ -310,8 +310,8 @@ final class Alify_CF {
         if ($errors) { self::error($id, $errors); }
     }
 
-    public static function validate_values($schema, $values, $previous, &$errors, &$field_errors = null) {
-        $field_errors = array();
+    public static function validate_values($schema, $values, $previous, &$errors, &$field_errors = null, &$locations = null) {
+        $field_errors = array(); $locations = array();
         $updates = array();
         $submitted_values = array();
         foreach ($schema as $field) {
@@ -320,13 +320,13 @@ final class Alify_CF {
         foreach ($schema as $field) {
             // Hidden values are preserved, even if a forged request supplies them.
             if (!self::visible($field, $schema, $submitted_values)) { continue; }
-            $issue = '';
+            $issue = ''; $location = null;
             if ($field['type'] === 'flexible') {
-                $value = Alify_CF_Flexible::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue);
+                $value = Alify_CF_Flexible::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
             } elseif ($field['type'] === 'group') {
-                $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue);
+                $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
             } elseif ($field['type'] === 'repeater') {
-                $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue);
+                $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue, $location);
             } elseif ($field['type'] === 'gallery') {
                 $value = Alify_CF_Gallery::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? array(), true);
             } else {
@@ -340,12 +340,14 @@ final class Alify_CF {
                 if (!$issue && $field['type'] === 'flexible' && $field['required'] && $empty) { $issue = 'Add at least one layout row.'; }
                 $message = ($issue ?: ($field['required'] && $empty ? 'A valid value is required.' : 'Invalid value.')) . ' Previous saved value retained.';
                 $field_errors[$field['name']] = $message;
+                if ($location) { $locations[$field['name']] = $location; }
                 $errors[] = $field['label'] . ': ' . $message;
                 continue;
             }
             if (in_array($field['type'], array('image', 'file'), true) && $value !== '' && (string) ($previous[$field['name']] ?? null) !== (string) $value && !current_user_can('edit_post', $value)) {
                 $message = 'You cannot select this attachment. Previous saved value retained.';
                 $field_errors[$field['name']] = $message;
+                if ($location) { $locations[$field['name']] = $location; }
                 $errors[] = $field['label'] . ': ' . $message;
                 continue;
             }

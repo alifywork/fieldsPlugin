@@ -11,3 +11,6 @@
 .alify-group > .alify-sub-value + .alify-sub-value { margin-top: 18px; }
 
 .alify-flex-row, .alify-layout-card { border: 1px solid #dcdcde; margin: 12px 0; padding: 12px; background: #fff; }
+
+.alify-subfield-error { color: #b32d2e; border-left: 3px solid #b32d2e; padding: 6px 10px; margin: 8px 0; }
+.alify-error-jump { margin-bottom: 10px; }

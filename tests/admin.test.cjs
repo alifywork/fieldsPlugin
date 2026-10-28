@@ -476,3 +476,41 @@ test('REST feedback has accessible error references, clears on edit and relinks 
     assert.equal(message.hidden, false); assert.equal(input.getAttribute('aria-describedby'), 'existing-help ' + message.id);
     w.close();
 });
+
+test('structured inline targeting uses row order and schema names, expands panel and clears without losing help', () => {
+    const dom = new JSDOM(`<div class="postbox closed"><div class="inside"><div class="alify-value" data-field-type="repeater"><div class="alify-rows"><div class="alify-row"><div class="alify-sub-value" data-subfield="email"><input id="valid" value="ok"></div></div><div class="alify-row"><div class="alify-sub-value" data-subfield="email"><input id="invalid" aria-describedby="help"></div></div></div><p class="alify-field-error" id="problem" data-error-location='{"row":1,"subfield":"email"}'>Invalid email.</p></div></div></div>`, {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document;
+    w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    const invalid = d.getElementById('invalid');
+    assert.equal(d.activeElement, invalid);
+    assert.equal(d.querySelector('.postbox').classList.contains('closed'), false);
+    assert.equal(d.getElementById('valid').hasAttribute('aria-invalid'), false);
+    assert.equal(invalid.getAttribute('aria-describedby'), 'help problem-inline');
+    assert.equal(invalid.closest('.alify-sub-value').querySelector('.alify-subfield-error').textContent, 'Invalid email.');
+    d.getElementById('valid').focus(); d.querySelector('.alify-error-jump').click(); assert.equal(d.activeElement, invalid);
+    invalid.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(invalid.getAttribute('aria-describedby'), 'help');
+    assert.equal(d.querySelector('.alify-subfield-error').hidden, true);
+    assert.equal(d.querySelector('.alify-error-jump'), null);
+    w.close();
+});
+
+test('REST structured location targets Flexible subfield and ignores a stale response after editing', async () => {
+    const w = editorBridge(), d = w.document;
+    const field = d.querySelector('.alify-value');
+    field.dataset.fieldType = 'flexible';
+    field.innerHTML = '<div class="alify-flex-rows"><div class="alify-flex-row"><div class="alify-sub-value" data-subfield="body"><input name="alify_values[7][blocks][rows][token][fields][body]" id="body"></div></div></div>';
+    w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    const error = {data: {alify_errors: {'7': {blocks: 'Body: Required.'}}, alify_error_locations: {'7': {blocks: {row: 0, subfield: 'body'}}}}};
+    await assert.rejects(w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, () => Promise.reject(error)));
+    assert.equal(d.activeElement.id, 'body');
+    assert.equal(field.querySelector('.alify-subfield-error').textContent, 'Body: Required.');
+    const input = d.getElementById('body'); input.value = 'Changed'; input.dispatchEvent(new w.Event('input', {bubbles: true}));
+    let reject;
+    const pending = w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, () => new Promise((resolve, fail) => { reject = fail; }));
+    input.value = 'Edited while saving'; input.dispatchEvent(new w.Event('input', {bubbles: true})); reject(error);
+    await assert.rejects(pending);
+    assert.equal(field.querySelector('.alify-field-error').hidden, true);
+    assert.equal(input.hasAttribute('aria-invalid'), false);
+    w.close();
+});

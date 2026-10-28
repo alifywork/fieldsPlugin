@@ -63,8 +63,8 @@ final class Alify_CF_Publication {
                 $values = $submitted[$group->ID];
             }
             $field_errors = array();
-            $group_updates = Alify_CF::validate_values($schema, $values, $previous, $errors, $field_errors);
-            if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors); }
+            $group_updates = Alify_CF::validate_values($schema, $values, $previous, $errors, $field_errors, $locations);
+            if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors, $locations); }
             foreach ($group_updates as $name => $value) { $updates[$name] = $value; }
         }
         return array('errors' => $errors, 'feedback' => $feedback, 'updates' => $updates);
@@ -121,9 +121,9 @@ final class Alify_CF_Publication {
         $result = self::assess($type, $id, $payload === null ? null : $payload['groups']);
         if ($result['errors']) {
             if ($id) { Alify_CF_Feedback::put('post_' . $id, $result['feedback']); }
-            $inline = array();
-            foreach ($result['feedback'] as $group_id => $feedback) { $inline[$group_id] = $feedback['errors']; }
-            return new WP_Error('alify_invalid_fields', 'Alify fields need correction: ' . implode(' ', $result['errors']), array('status' => 400, 'alify_errors' => $inline));
+            $inline = array(); $paths = array();
+            foreach ($result['feedback'] as $group_id => $feedback) { $inline[$group_id] = $feedback['errors']; $paths[$group_id] = $feedback['locations'] ?? array(); }
+            return new WP_Error('alify_invalid_fields', 'Alify fields need correction: ' . implode(' ', $result['errors']), array('status' => 400, 'alify_errors' => $inline, 'alify_error_locations' => $paths));
         }
         self::$active[spl_object_hash($request)] = true;
         self::$updates[spl_object_hash($request)] = $result['updates'];

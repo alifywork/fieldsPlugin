@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0
+
+- Place the first failing Group/Repeater/Flexible subfield diagnostic beside its exact input; preserve the parent summary and atomic saved-container behavior.
+- Carry structured schema names and zero-based visual row ordinals through Classic/Options recovery and additive REST `alify_error_locations`, preserving existing string errors. Never parse labels or expose submitted row tokens.
+- Focus the first invalid control, open closed metabox/details ancestors, and add a jump action. Existing row bodies remain expanded.
+- Mark only the target subfield invalid, preserve help references, and clear inline/jump feedback on edit. Ignore stale REST field errors after the submitted field has changed.
+- Keep structural/count errors at the parent boundary and avoid mislabeling saved rows when attempted input cannot be recovered. All-error enumeration remains out of scope.
+
 ## 0.11.2
 
 - Add dedicated disposable Options Page/group and editor-role browser fixtures without touching Site Settings.

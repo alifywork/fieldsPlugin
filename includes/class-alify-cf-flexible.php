@@ -19,8 +19,8 @@ final class Alify_CF_Flexible {
         foreach ($field['layouts'] ?? array() as $layout) { if ($layout['name'] === $name) { return $layout; } }
         return null;
     }
-    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null) {
-        $issue = '';
+    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null, &$location = null) {
+        $issue = ''; $location = null;
         if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1' || !is_array($payload['rows'] ?? array()) || count($payload['rows'] ?? array()) > self::MAX_ROWS) { $issue = 'Use a complete layout list with no more than 50 rows. Reload if the submission was incomplete.'; return ''; }
         $out = array();
         $position = 0;
@@ -31,8 +31,9 @@ final class Alify_CF_Flexible {
             $previous = array();
             foreach (is_array($old) ? $old : array() as $saved) { if (is_array($saved) && ($saved['layout'] ?? null) === $layout['name'] && is_array($saved['fields'] ?? null)) { $previous[] = $saved['fields']; } }
             $values = $row['fields']; $values['__row_complete'] = '1';
-            $clean = Alify_CF_Repeater::clean($layout, array('__complete' => '1', 'rows' => array($values)), $previous, $permissions, $issue);
+            $clean = Alify_CF_Repeater::clean($layout, array('__complete' => '1', 'rows' => array($values)), $previous, $permissions, $issue, $location);
             if (!is_array($clean)) {
+                if ($location) { $location['row'] = $position - 1; }
                 if (strpos($issue, 'Row 1 → ') === 0) { $issue = substr($issue, strlen('Row 1 → ')); }
                 $issue = 'Row ' . $position . ' (' . $layout['label'] . ') → ' . $issue;
                 return '';

@@ -46,8 +46,8 @@ final class Alify_CF_Repeater {
     }
 
     /** Invalid/truncated payloads return '', causing the caller to retain all old rows. */
-    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null) {
-        $issue = '';
+    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null, &$location = null) {
+        $issue = ''; $location = null;
         if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1') { $issue = 'Incomplete submission. Reload the editor.'; return ''; }
         $rows = $payload['rows'] ?? array();
         list($minimum, $maximum) = self::bounds($field);
@@ -75,10 +75,11 @@ final class Alify_CF_Repeater {
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
                 $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
                 if (($sub['type'] === 'gallery' && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                    $location = array('row' => $position - 1, 'subfield' => $sub['name']);
                     $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
                     return '';
                 }
-                if ($permissions && in_array($sub['type'], array('image', 'file'), true) && $value !== '' && !in_array((string) $value, $allowed_media, true) && !current_user_can('edit_post', $value)) { $issue = $path . 'You cannot select this attachment.'; return ''; }
+                if ($permissions && in_array($sub['type'], array('image', 'file'), true) && $value !== '' && !in_array((string) $value, $allowed_media, true) && !current_user_can('edit_post', $value)) { $location = array('row' => $position - 1, 'subfield' => $sub['name']); $issue = $path . 'You cannot select this attachment.'; return ''; }
                 $out[$sub['name']] = $value;
             }
             $clean[] = $out;
@@ -102,7 +103,7 @@ final class Alify_CF_Repeater {
             $sub_id = $id . '-' . $index . '-' . $sub['key'];
             $name = $input . '[rows][' . $index . '][' . $sub['name'] . ']';
             $value = $row === null ? $sub['default'] : ($row[$sub['name']] ?? '');
-            echo '<div class="alify-sub-value"><label class="alify-label" for="' . esc_attr($sub_id) . '">' . esc_html($sub['label']) . (!empty($sub['required']) ? ' <span class="alify-required">*</span>' : '') . '</label><p class="description" id="' . esc_attr($sub_id . '-help') . '">' . esc_html($sub['instructions']) . '</p>';
+            echo '<div class="alify-sub-value" data-subfield="' . esc_attr($sub['name']) . '"><label class="alify-label" for="' . esc_attr($sub_id) . '">' . esc_html($sub['label']) . (!empty($sub['required']) ? ' <span class="alify-required">*</span>' : '') . '</label><p class="description" id="' . esc_attr($sub_id . '-help') . '">' . esc_html($sub['instructions']) . '</p>';
             Alify_CF::control($sub, $value, $sub_id, $name);
             echo '</div>';
         }

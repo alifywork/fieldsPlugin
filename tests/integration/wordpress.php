@@ -496,7 +496,14 @@ try {
     $response = rest_do_request($request);
     expect_same(400, $response->get_status(), 'REST detailed errors reject before post write');
     expect_same($diagnostic_feedback, $response->get_data()['data']['alify_errors'][$diagnostic_group], 'REST carries the same detailed strings as Classic');
+    $expected_locations = array('diagnostic_profile' => array('subfield' => 'name'), 'diagnostic_people' => array('row' => 1, 'subfield' => 'email'), 'diagnostic_blocks' => array('row' => 0, 'subfield' => 'body'));
+    expect_same($expected_locations, $response->get_data()['data']['alify_error_locations'][$diagnostic_group], 'REST has structured schema names and visual locations alongside unchanged strings');
+    expect_same($expected_locations, Alify_CF_Feedback::get('post_' . $diagnostic_post)[$diagnostic_group]['display_locations'], 'Recovery targets only corresponding displayed invalid inputs');
+    expect_same(true, strpos($diagnostic_html, 'data-error-location="{&quot;row&quot;:1,&quot;subfield&quot;:&quot;email&quot;}"') !== false, 'Classic render encodes exact machine location safely');
     expect_same(false, strpos($response->get_data()['message'], 'private-invalid') !== false, 'REST error messages do not leak rejected values');
+    $fallback_raw = array('diagnostic_people' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'email' => ''), array('email' => 'incomplete'))));
+    $fallback = Alify_CF_Feedback::group(array($diagnostic_people), $fallback_raw, array('diagnostic_people' => $diagnostic_old[1]), array('diagnostic_people' => 'Row 1 → Email: A valid value is required. Previous saved value retained.'), array('diagnostic_people' => array('row' => 0, 'subfield' => 'email')));
+    expect_same(array(), $fallback['display_locations'], 'Recovery fallback to saved rows never mislabels them with submitted-row errors');
     $diagnostic_valid['__group_complete'] = '1'; $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $diagnostic_valid)));
     expect_same(200, rest_do_request($request)->get_status(), 'Correction clears diagnostic rejection and publishes');
     expect_same(array(), Alify_CF_Feedback::get('post_' . $diagnostic_post), 'Correction clears diagnostic feedback');

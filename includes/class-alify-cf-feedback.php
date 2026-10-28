@@ -18,15 +18,25 @@ final class Alify_CF_Feedback {
         else { delete_transient(self::key($context)); }
     }
 
-    public static function group($schema, $values, $previous, $errors) {
-        $display = array(); $submitted = array();
+    public static function group($schema, $values, $previous, $errors, $locations = array()) {
+        $display = array(); $display_locations = array(); $submitted = array();
         foreach ($schema as $field) { $submitted[$field['key']] = Alify_CF::clean_value($field, $values[$field['name']] ?? ''); }
         foreach ($schema as $field) {
             $name = $field['name'];
             $old = $previous[$name] ?? $field['default'];
             $display[$name] = Alify_CF::visible($field, $schema, $submitted) ? self::display($field, $values[$name] ?? '', $old) : $old;
         }
-        return array('values' => $display, 'errors' => $errors, 'schema' => hash('sha256', wp_json_encode($schema)));
+        // Recovery may fall back to saved rows. Never point a submitted-row error at unrelated saved data.
+        foreach ($schema as $field) {
+            $name = $field['name'];
+            if (!in_array($field['type'], array('group', 'repeater', 'flexible'), true) || empty($locations[$name]) || empty($errors[$name])) { continue; }
+            $candidate = Alify_CF_Publication::stored_payload($field, $display[$name]);
+            $issue = ''; $location = null;
+            $cleaner = 'Alify_CF_' . ucfirst($field['type']);
+            $cleaner::clean($field, $candidate, $previous[$name] ?? null, true, $issue, $location);
+            if ($location === $locations[$name] && $issue && strpos($errors[$name], $issue) === 0) { $display_locations[$name] = $location; }
+        }
+        return array('locations' => $locations, 'display_locations' => $display_locations, 'values' => $display, 'errors' => $errors, 'schema' => hash('sha256', wp_json_encode($schema)));
     }
 
     private static function text($raw, $multiline = false) {

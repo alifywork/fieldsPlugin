@@ -73,8 +73,8 @@ final class Alify_CF_Options {
                 $names[$field['name']] = true;
             }
             $field_errors = array();
-            $updates = Alify_CF::validate_values($schema, $values, $previous, $errors, $field_errors);
-            $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors);
+            $updates = Alify_CF::validate_values($schema, $values, $previous, $errors, $field_errors, $locations);
+            $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors, $locations);
             foreach ($updates as $name => $value) { $next[$name] = $value; }
         }
         if ($errors) { Alify_CF_Feedback::put('options_' . $slug, $feedback); return false; }

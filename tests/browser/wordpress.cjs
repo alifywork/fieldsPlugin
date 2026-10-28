@@ -62,6 +62,9 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'draft', 'Invalid row subfield blocks actual Classic publication');
         check((await page.locator('.alify-value[data-field-type="repeater"] .alify-field-error').textContent()).includes('Row 1 → Name:'), true, 'Classic summary identifies offending row and subfield');
+        check(await page.locator('.alify-row').first().locator('.alify-subfield-error').isVisible(), true, 'Classic error is beside exact row subfield');
+        check(await page.locator('.alify-row [type="text"]').first().evaluate(node => node === document.activeElement), true, 'Classic reload focuses first invalid subfield');
+        check(await page.locator('.alify-row [type="text"]').nth(1).getAttribute('aria-invalid'), null, 'Valid sibling row is not marked invalid');
         await page.locator('.alify-row [type="text"]').first().fill('Second member');
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
@@ -117,7 +120,11 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-field-error').count() > 0, true, 'Gutenberg renders server field errors');
         const flexibleError = page.locator('.alify-value[data-field-type="flexible"] .alify-field-error');
         check((await flexibleError.textContent()).includes('Row 1 (Text) → Body:'), true, 'Gutenberg error names layout, row and subfield');
-        const errorId = await flexibleError.getAttribute('id');
+        const flexibleInline = page.locator('.alify-flex-row .alify-subfield-error');
+        check(await flexibleInline.isVisible(), true, 'Gutenberg error is beside exact layout subfield');
+        await page.locator('.alify-value[data-field-type="flexible"] .alify-error-jump').click();
+        check(await page.locator('.alify-flex-row textarea').evaluate(node => node === document.activeElement), true, 'Jump action focuses invalid Flexible control');
+        const errorId = await flexibleInline.getAttribute('id');
         check((await page.locator('.alify-flex-row textarea').getAttribute('aria-describedby')).split(/\s+/).includes(errorId), true, 'REST error is linked to affected container controls');
         await page.locator('.alify-flex-row textarea').fill('Gutenberg flexible body');
         check(await page.locator('.alify-flex-row textarea').getAttribute('aria-invalid'), null, 'Editing clears stale container invalid state');
@@ -205,6 +212,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.notice-error').count(), 1, 'Invalid options HTTP save redirects with failure notice');
         check(await optionValue('options_title').inputValue(), 'Attempted title', 'Options restores attempted input separately from saved data');
         check((await page.locator('.alify-value[data-field-type="repeater"] .alify-field-error').textContent()).includes('Row 1 → Name:'), true, 'Options HTTP flow displays detailed row error');
+        check(await page.locator('.alify-row .alify-subfield-error').isVisible(), true, 'Options recovery places row error beside subfield');
         verifyOptions('baseline');
         await optionValue('options_title').fill('Corrected title'); await page.locator('.alify-group [type="text"]').fill('Corrected profile');
         await page.locator('.alify-row [type="text"]').fill('Corrected member');

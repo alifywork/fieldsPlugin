@@ -1,6 +1,66 @@
 /* global wp */
 (function () {
     'use strict';
+    // Structured schema names + visual row ordinals; never parse translated labels or submitted tokens.
+    function clearError(field) {
+        const messages = Array.from(field.querySelectorAll('.alify-field-error, .alify-subfield-error'));
+        const ids = messages.map(message => message.id).filter(Boolean);
+        messages.forEach(message => { message.hidden = true; });
+        field.querySelectorAll('.alify-error-jump').forEach(button => button.remove());
+        field.querySelectorAll('[aria-describedby]').forEach(control => {
+            const keep = control.getAttribute('aria-describedby').split(/\s+/).filter(id => id && !ids.includes(id));
+            if (keep.length) control.setAttribute('aria-describedby', keep.join(' ')); else control.removeAttribute('aria-describedby');
+        });
+        field.querySelectorAll('[aria-invalid]').forEach(control => control.removeAttribute('aria-invalid'));
+    }
+    function focusError(target) {
+        if (!target || target.closest('.alify-value[hidden]')) return;
+        for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+            if (parent.tagName === 'DETAILS') parent.open = true;
+            if (parent.classList.contains('postbox')) {
+                parent.classList.remove('closed');
+                const inside = parent.querySelector('.inside');
+                if (inside) { inside.hidden = false; inside.style.display = ''; }
+            }
+        }
+        target.focus();
+        if (target.scrollIntoView) target.scrollIntoView({block: 'center', behavior: 'auto'});
+    }
+    function showError(field, message, location) {
+        const text = message.textContent;
+        clearError(field); message.hidden = false;
+        let scope = field;
+        if (location && typeof location.subfield === 'string') {
+            let container = field;
+            if (Object.prototype.hasOwnProperty.call(location, 'row')) {
+                const list = field.querySelector('.alify-rows, .alify-flex-rows');
+                container = list && Number.isInteger(location.row) && location.row >= 0 ? list.children[location.row] : null;
+            }
+            const sub = container && Array.from(container.querySelectorAll('.alify-sub-value')).find(item => item.dataset.subfield === location.subfield);
+            if (sub) scope = sub;
+        }
+        let description = message;
+        if (scope !== field) {
+            description = scope.querySelector('.alify-subfield-error');
+            if (!description) { description = document.createElement('p'); description.className = 'alify-subfield-error'; scope.appendChild(description); }
+            description.id = message.id + '-inline'; description.textContent = text; description.hidden = false;
+        }
+        const controls = Array.from(scope.querySelectorAll('input:not([type="hidden"]), select, textarea, button')).filter(control => !control.disabled && !control.closest('[hidden]'));
+        controls.forEach(control => {
+            control.setAttribute('aria-invalid', 'true');
+            const ids = (control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+            if (!ids.includes(description.id)) ids.push(description.id);
+            control.setAttribute('aria-describedby', ids.join(' '));
+        });
+        const target = controls[0] || message;
+        if (target === message) message.tabIndex = -1;
+        if (scope !== field) {
+            const jump = document.createElement('button'); jump.type = 'button'; jump.className = 'button-link alify-error-jump'; jump.textContent = 'Go to invalid field';
+            jump.addEventListener('click', () => focusError(target)); message.insertAdjacentElement('afterend', jump);
+        }
+        return target;
+    }
+    window.AlifyValidation = {show: showError, focus: focusError, clear: clearError};
     function refreshRows(repeater) {
         const rows = Array.from(repeater.querySelector('.alify-rows').children);
         const hidden = !!repeater.closest('.alify-value[hidden]');
@@ -83,20 +143,21 @@
     function edited(event) {
         const field = event.target.closest('.alify-value');
         if (field) {
-            const errors = Array.from(field.querySelectorAll('.alify-field-error'));
-            const errorIds = errors.map(error => error.id).filter(Boolean);
-            errors.forEach(error => { error.hidden = true; });
-            field.querySelectorAll('[aria-describedby]').forEach(control => {
-                const ids = control.getAttribute('aria-describedby').split(/\s+/).filter(id => id && !errorIds.includes(id));
-                if (ids.length) control.setAttribute('aria-describedby', ids.join(' ')); else control.removeAttribute('aria-describedby');
-            });
-            field.querySelectorAll('[aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
+            clearError(field);
         }
         refreshConditions();
     }
     document.addEventListener('input', edited);
     document.addEventListener('change', edited);
     refreshConditions();
+    let firstError = null;
+    document.querySelectorAll('.alify-value > .alify-field-error').forEach(message => {
+        let location = null;
+        try { location = JSON.parse(message.dataset.errorLocation || 'null'); } catch (_) { /* Legacy feedback has no target. */ }
+        const target = showError(message.closest('.alify-value'), message, location);
+        if (!firstError && !message.closest('.alify-value[hidden]')) firstError = target;
+    });
+    if (firstError) focusError(firstError);
     document.addEventListener('click', function (event) {
         const button = event.target.closest('[data-media]');
         if (!button) return;

@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.11.2 — options HTTP-flow hardening**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.12.0 — inline container errors and focus**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -269,7 +269,7 @@ Each persisted row is `['layout' => 'hero', 'fields' => ['title' => '...']]`. Te
 
 All rows validate atomically. Invalid subfields, unknown layouts, unauthorized new media or missing completion markers retain the previous complete list. A required Flexible field needs at least one valid row. A complete empty optional list clears it. Existing restricted media is retained only within its original layout's media pool, including reordering.
 
-Layout names/keys and definitions transfer through JSON; content does not. Destination sites need Flexible support (0.9.0+). Image/file defaults reset. Removing/renaming a layout does not migrate data: saved unknown rows show a warning and block replacement until their schema is restored or the editor explicitly removes them. Removing/renaming subfields similarly requires review; no data migration or revision restoration is provided. Errors/recovery are field-level; diagnostic text names the first failing row/layout/subfield, but separate per-row inline placement is not yet provided.
+Layout names/keys and definitions transfer through JSON; content does not. Destination sites need Flexible support (0.9.0+). Image/file defaults reset. Removing/renaming a layout does not migrate data: saved unknown rows show a warning and block replacement until their schema is restored or the editor explicitly removes them. Removing/renaming subfields similarly requires review; no data migration or revision restoration is provided. Errors/recovery are field-level; diagnostic text names the first failing row/layout/subfield, with an inline message beside the offending subfield and a jump action.
 
 ## Group fields
 
@@ -336,13 +336,13 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 Group errors identify the subfield; Repeater errors identify the visual row number and subfield; Flexible errors also identify the schema's layout label. For example: **Row 2 (Contact) → Email: A valid value is required.** Row counts and incomplete structures have explicit correction/reload messages.
 
-This increment reports the **first failing location per container** in the existing field-level alert, across Classic, Gutenberg/core REST and options feedback. It does not yet render separate inline errors beside every subfield, focus/jump to rows, or enumerate all failures at once. Fix the reported issue and save again to reveal another failure. The complete previous container stays saved until validation succeeds.
+The **first failing location per container** appears in the parent alert and beside the exact offending subfield, across Classic, Gutenberg/core REST and options feedback. The first invalid control receives focus; a “Go to invalid field” action returns to it, opening closed WordPress metaboxes/details ancestors. Rows themselves currently stay expanded. Structural/count errors remain at the parent boundary. When recovery falls back to saved values, it does not falsely mark unrelated saved rows. All-failure enumeration is not yet provided. Fix the reported issue and save again to reveal another failure. The complete previous container stays saved until validation succeeds.
 
 Messages never include rejected scalar values, submitted row tokens, unknown layout names or attachment identities. Container alerts have accessible description references; REST-created errors link to controls, and editing clears stale invalid/error references without removing existing help descriptions. This is targeted accessibility hardening, not a completed accessibility audit.
 
 ## Verification
 
-Automated checks for 0.11.2:
+Last verified baseline (0.11.2; feature checks are being extended for 0.12.0):
 
 ```sh
 npm ci
