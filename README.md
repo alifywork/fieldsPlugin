@@ -804,7 +804,7 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Four-target native CI verification pending at this commit. Roadmap: **65/77 complete within declared scopes; 12 pending**, not all development finished.
+**Current bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Verified in [CI run 40767256561](https://github.com/alifywork/fieldsPlugin/actions/runs/40767256561): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium ACF content planning/apply/media remapping/rollback and reusable-definition save/insert/group persistence/delete/nonce flows, with clean WordPress debug logs. Roadmap: **65/77 complete within declared scopes; 12 pending**, not all development finished.
 
 **Previous bundle (0.31.0):** 805 PHP contracts on both runtimes, 84 JavaScript tests, and local SQLite runs with 963 assertions on WordPress 6.2/PHP 7.4 and 966 on WordPress 6.8.3/PHP 8.3. [CI run 40762878282](https://github.com/alifywork/fieldsPlugin/actions/runs/40762878282) passes all four native PHP/WordPress SQLite/MySQL targets, including real Chromium migration plan/apply/rollback and ACF inspection/new-draft import, with clean WordPress debug logs. At that release: **63/77 scoped items complete; 14 pending.**
 
