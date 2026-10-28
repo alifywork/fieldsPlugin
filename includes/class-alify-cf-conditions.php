@@ -9,7 +9,7 @@ final class Alify_CF_Conditions {
         if (!isset($condition['rules'])) { return array($condition); }
         $out = array(); foreach (is_array($condition['rules']) ? $condition['rules'] : array() as $node) { $out = array_merge($out, self::rules($node, $depth + 1)); if (count($out) > 10) { break; } } return $out;
     }
-    public static function operators() { return array('equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with'); }
+    public static function operators() { return array('equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with', 'glob'); }
     public static function clean($raw, &$errors, $name) {
         if (!$raw) { return null; } $count = 0; $clean = self::node($raw, $errors, $name, 0, $count);
         if ($count > self::MAX_RULES) { $errors[] = 'Conditions support at most 10 leaf rules: ' . $name; }
@@ -23,7 +23,15 @@ final class Alify_CF_Conditions {
         }
         $count++;
         if (!is_string($raw['field'] ?? null) || !is_string($raw['operator'] ?? null) || !is_string($raw['value'] ?? null) || strlen($raw['value']) > 1000 || !in_array($raw['operator'], self::operators(), true)) { $errors[] = 'Invalid conditional leaf: ' . $name; return null; }
+        if ($raw['operator'] === 'glob' && !self::pattern($raw['value'])) { $errors[] = 'Patterns need 1–256 printable ASCII characters and at most four * wildcards.'; return null; }
         return array('field' => sanitize_key($raw['field']), 'operator' => $raw['operator'], 'value' => sanitize_text_field($raw['value']));
+    }
+    public static function pattern($pattern) { return is_string($pattern) && preg_match('/^[\x20-\x7e]{1,256}$/D', $pattern) && substr_count($pattern, '*') <= 4; }
+    public static function glob($text, $pattern) {
+        if (!is_string($text) || !self::pattern($pattern) || !preg_match('/^[\x09\x0a\x0d\x20-\x7e]{0,4096}$/D', $text)) { return false; }
+        if (strpos($pattern, '*') === false) { return $text === $pattern; }
+        $parts = explode('*', $pattern); $offset = 0; $last = count($parts) - 1;
+        foreach ($parts as $index => $part) { if ($part === '') { continue; } if ($index === $last) { $position = strlen($text) - strlen($part); if ($position < $offset || substr($text, $position) !== $part) { return false; } } else { $position = strpos($text, $part, $offset); if ($position === false || ($index === 0 && $position !== 0)) { return false; } } $offset = $position + strlen($part); } return true;
     }
     public static function visible($field, $schema, $values) {
         $condition = $field['condition'] ?? null; if (!$condition) { return true; }
@@ -37,7 +45,8 @@ final class Alify_CF_Conditions {
             if (in_array($operator, array('contains', 'starts_with', 'ends_with'), true)) {
                 $matches = false; if ($rule['value'] !== '') { foreach ($items as $item) { $needle = $rule['value']; if (($operator === 'contains' && strpos($item, $needle) !== false) || ($operator === 'starts_with' && strpos($item, $needle) === 0) || ($operator === 'ends_with' && substr($item, -strlen($needle)) === $needle)) { $matches = true; break; } } }
             }
-            $results[] = in_array($operator, array('equals', 'contains', 'starts_with', 'ends_with'), true) ? $matches : ($operator === 'not_equals' ? !$matches : ($operator === 'empty' ? $empty : !$empty));
+            if ($operator === 'glob') { $matches = false; foreach ($items as $item) { if (self::glob($item, $rule['value'])) { $matches = true; break; } } }
+            $results[] = in_array($operator, array('equals', 'contains', 'starts_with', 'ends_with', 'glob'), true) ? $matches : ($operator === 'not_equals' ? !$matches : ($operator === 'empty' ? $empty : !$empty));
         }
         $index = 0; return self::evaluate($condition, $results, $index);
     }

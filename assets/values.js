@@ -257,6 +257,16 @@
         refreshRows(repeater);
         repeater.dispatchEvent(new Event('change', {bubbles: true}));
     });
+    function validPattern(pattern) { return typeof pattern === 'string' && /^[\x20-\x7e]{1,256}$/.test(pattern) && (pattern.match(/\*/g) || []).length <= 4; }
+    function glob(text, pattern) {
+        if (!validPattern(pattern) || !/^[\x09\x0a\x0d\x20-\x7e]{0,4096}$/.test(text)) return false;
+        if (!pattern.includes('*')) return text === pattern;
+        const parts = pattern.split('*'); let offset = 0;
+        for (let index = 0; index < parts.length; index++) { const part = parts[index]; if (!part) continue; let position;
+            if (index === parts.length - 1) { position = text.length - part.length; if (position < offset || text.slice(position) !== part) return false; }
+            else { position = text.indexOf(part, offset); if (position < 0 || (index === 0 && position !== 0)) return false; } offset = position + part.length;
+        } return true;
+    }
     function refreshConditions() {
         document.querySelectorAll('.alify-values').forEach(group => {
             const fields = Array.from(group.querySelectorAll('.alify-value'));
@@ -298,12 +308,12 @@
                             } else values = inputs.length ? [inputs[0].value] : [''];
                             const empty = !values.length || (values.length === 1 && (values[0] === '' || (source.dataset.fieldType === 'true_false' && values[0] === '0')));
                             const matches = values.includes(rule.value);
-                            matched = ({equals: matches, not_equals: !matches, empty, not_empty: !empty, contains: rule.value !== '' && values.some(value => value.includes(rule.value)), starts_with: rule.value !== '' && values.some(value => value.startsWith(rule.value)), ends_with: rule.value !== '' && values.some(value => value.endsWith(rule.value))})[rule.operator] === true;
+                            matched = ({equals: matches, not_equals: !matches, empty, not_empty: !empty, contains: rule.value !== '' && values.some(value => value.includes(rule.value)), starts_with: rule.value !== '' && values.some(value => value.startsWith(rule.value)), ends_with: rule.value !== '' && values.some(value => value.endsWith(rule.value)), glob: values.some(value => glob(value, rule.value))})[rule.operator] === true;
                         }
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map', 'taxonomy', 'user', 'page_link', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_') && !JSON.parse(item.dataset.condition || 'null')));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with', 'glob'].includes(rule.operator) && (rule.operator !== 'glob' || validPattern(rule.value)) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map', 'taxonomy', 'user', 'page_link', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_') && !JSON.parse(item.dataset.condition || 'null')));
                     function evaluate(node) { if (node.rules) { const children = node.rules.map(evaluate); return node.relation === 'any' ? children.some(Boolean) : children.every(Boolean); } return matches[rules.indexOf(node)]; }
                     visible = validTree && validSources && evaluate(rule);
                 }

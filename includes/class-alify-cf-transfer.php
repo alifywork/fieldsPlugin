@@ -32,6 +32,7 @@ final class Alify_CF_Transfer {
     private static function version($fields) {
         $version = 1;
         foreach ($fields as $field) {
+            foreach (Alify_CF_Conditions::rules($field['condition'] ?? null) as $rule) { if (($rule['operator'] ?? '') === 'glob') { $version = 9; } }
             if (isset($field['page_size']) || in_array($field['type'], array('oembed', 'google_map'), true)) { $version = 9; }
             if (Alify_CF_API::custom($field['type']) || Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker' || array_intersect(array_keys($field), array('api_read', 'api_write', 'public_output', 'content', 'icons', 'toolbar', 'editor_mode', 'media_buttons', 'row_label', 'collapsed', 'taxonomy_filters')) || self::advanced_conditions($field['condition'] ?? null)) { $version = max($version, 8); }
             if (Alify_CF_Selector::supported($field)) { $version = max($version, 7); }

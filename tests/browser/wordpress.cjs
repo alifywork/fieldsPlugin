@@ -520,7 +520,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await profileInput.fill('Native profile note'); await Promise.all([page.waitForNavigation(), page.locator('#submit').click()]); check(await profileInput.inputValue(), 'Native profile note', 'Native user profile fields persist');
         await page.goto(base + '/wp-admin/term.php?taxonomy=category&tag_ID=' + fixture.selector_terms[0] + '&post_type=post');
         const termInput = page.locator(`[name="alify_object_values[term:${fixture.selector_terms[0]}][${fixture.term_group}][term_note]"]`);
-        await termInput.fill('Native term note'); await Promise.all([page.waitForNavigation(), page.locator('#submit').click()]);
+        await termInput.fill('Native term note'); await Promise.all([page.waitForNavigation(), page.locator('#edittag input[type="submit"]').click()]);
         await page.goto(base + '/wp-admin/term.php?taxonomy=category&tag_ID=' + fixture.selector_terms[0] + '&post_type=post'); check(await termInput.inputValue(), 'Native term note', 'Native taxonomy-term edit fields persist');
         await page.goto(base + '/wp-admin/post.php?post=' + fixture.images[0] + '&action=edit');
         const attachmentInput = page.locator(`[name="alify_values[${fixture.attachment_group}][media_note]"]`); await attachmentInput.fill('Native attachment note');
