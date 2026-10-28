@@ -2,6 +2,8 @@
 
 ## 0.15.0
 
+- Feature checks pass on all four existing native-PHP targets: 262 backend, 85 browser and 24 HTTP persistence assertions; 325 isolated PHP assertions and 41 JS tests also pass.
+
 - Add top-level WYSIWYG fields on posts/Options Pages with escaped textarea fallback and on-demand native WordPress Visual/Text editor.
 - Synchronize Visual content before form/REST serialization, preserve Text-tab edits, and save/remove/reinitialize native editor instances around Classic metabox sorting.
 - Apply WordPress post-HTML KSES filtering regardless of administrator unfiltered-HTML capability. Normalize empty formatting/invisible spacing; required fields need textual content.
