@@ -42,11 +42,11 @@
             const zoom = map.addListener('zoom_changed', () => { if (writable()) { input.zoom.value = String(Math.max(1, Math.min(20, Math.round(map.getZoom() || 15)))); input.zoom.dispatchEvent(new Event('change', {bubbles: true})); } });
             const chosen = async event => {
                 const version = ++revision, before = JSON.stringify(Object.values(input).map(control => control.value));
-                try { const place = event.placePrediction.toPlace(); await place.fetchFields({fields: ['location', 'formattedAddress']}); if (version !== revision || JSON.stringify(Object.values(input).map(control => control.value)) !== before || !writable()) return; set(place.location, place.formattedAddress); }
+                try { const place = event.placePrediction.toPlace(); await place.fetchFields({fields: ['location', 'formattedAddress']}); if (version !== revision || JSON.stringify(Object.values(input).map(control => control.value)) !== before || !writable()) return; map.setZoom(Math.max(15, Math.min(20, map.getZoom() || 15))); set(place.location, place.formattedAddress); }
                 catch (_) { if (root.isConnected && version === revision) status.textContent = 'Place lookup failed; manual coordinates are unchanged.'; }
             };
             search.addEventListener('gmp-select', chosen);
-            const manual = event => { if (event.isTrusted) { revision++; const center = input.lat.value !== '' && input.lng.value !== '' ? coordinate(input.lat.value, input.lng.value) : null; point.setVisible(!!center); if (center) { point.setCenter(center); map.panTo(center); } } };
+            const manual = event => { if (event.isTrusted) { revision++; if (event.target === input.zoom && /^(?:[1-9]|1[0-9]|20)$/.test(input.zoom.value)) map.setZoom(Number(input.zoom.value)); const center = input.lat.value !== '' && input.lng.value !== '' ? coordinate(input.lat.value, input.lng.value) : null; point.setVisible(!!center); if (center) { point.setCenter(center); map.panTo(center); } } };
             root.addEventListener('input', manual);
             active.set(root, () => { revision++; [click, drag, zoom].forEach(listener => listener?.remove()); search.removeEventListener('gmp-select', chosen); root.removeEventListener('input', manual); point.setMap(null); root.querySelector('[data-map-search]').replaceChildren(); canvas.replaceChildren(); });
             button.hidden = true; status.textContent = 'Search for a place, click the map or drag the blue point. Nothing is stored until you save.';
