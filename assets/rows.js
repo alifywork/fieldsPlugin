@@ -85,7 +85,7 @@
             if (!template) return; list.insertBefore(copy(row, template, flexible ? '__FLEX_ROW__' : '__ROW__'), row.nextSibling); prepare(); container.dispatchEvent(new Event('change', {bubbles: true})); document.dispatchEvent(new Event('alify:visibility'));
         }
     });
-    document.addEventListener('invalid', event => { event.target.closest('.alify-row-collapsed')?.classList.remove('alify-row-collapsed'); }, true);
+    document.addEventListener('invalid', event => { let row = event.target.closest?.('.alify-row-collapsed'); while (row) { row.classList.remove('alify-row-collapsed'); const button = row.querySelector('[data-row-tool="collapse"]'); if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Collapse row'; } row = row.parentElement?.closest('.alify-row-collapsed'); } }, true);
     document.addEventListener('input', () => prepare()); document.addEventListener('alify:visibility', () => prepare());
     const observer = new MutationObserver(records => { if (records.some(record => Array.from(record.addedNodes).some(node => node.nodeType === 1 && (node.matches?.(rowSelector) || node.querySelector?.(rowSelector))))) prepare(); });
     observer.observe(document.body, {childList: true, subtree: true}); prepare();
