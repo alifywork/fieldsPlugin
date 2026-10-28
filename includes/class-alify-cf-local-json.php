@@ -31,7 +31,7 @@ final class Alify_CF_Local_JSON {
     }
     public static function state($post) { return $post ? hash('sha256', wp_json_encode(array($post->post_title, $post->post_status, get_post_meta($post->ID, Alify_CF::LOCATION, true), get_post_meta($post->ID, '_alify_cf_location_rules', true), Alify_CF::schema($post->ID)))) : 'new'; }
     public static function load() {
-        foreach (self::files() as $key => $file) { if (self::database($key) !== null || $file['data']['status'] !== 'publish') { continue; } $definition = $file['data']['group']; $definition['key'] = 'local_' . substr(hash('sha256', $key), 0, 40); alify_register_field_group($definition); }
+        foreach (self::files() as $key => $file) { if (self::database($key) !== null || $file['data']['status'] !== 'publish') { continue; } $definition = $file['data']['group']; if ($file['data']['schema_version'] < Alify_CF_Transfer::minimum_version($definition['fields'] ?? array(), is_string($definition['location'] ?? null) ? $definition['location'] : '', $definition['rules'] ?? array())) { continue; } $definition['key'] = 'local_' . substr(hash('sha256', $key), 0, 40); alify_register_field_group($definition); }
     }
     public static function save($id, $post) {
         $directory = self::directory();
@@ -50,14 +50,15 @@ final class Alify_CF_Local_JSON {
         if (!current_user_can('manage_options')) { return new WP_Error('alify_forbidden', 'Administrator permission required.'); }
         $files = self::files(); if (!is_string($key) || !isset($files[$key]) || !is_string($file_hash) || !hash_equals($files[$key]['hash'], $file_hash)) { return new WP_Error('alify_conflict', 'File changed or unavailable; reload before syncing.'); }
         $post = self::database($key); if (is_wp_error($post)) { return $post; } if (!is_string($database_hash) || !hash_equals(self::state($post), $database_hash)) { return new WP_Error('alify_conflict', 'Database changed; reload before syncing.'); }
-        $definition = $files[$key]['data']['group']; if (!is_string($definition['title'] ?? null) || trim($definition['title']) === '' || !is_string($definition['location'] ?? null)) { return new WP_Error('alify_schema', 'Local group title/location invalid.'); }
+        $definition = $files[$key]['data']['group']; if (!is_string($definition['title'] ?? null) || trim(sanitize_text_field($definition['title'])) === '' || !is_string($definition['location'] ?? null)) { return new WP_Error('alify_schema', 'Local group title/location invalid.'); }
+        if ($files[$key]['data']['schema_version'] < Alify_CF_Transfer::minimum_version($definition['fields'] ?? array(), $definition['location'], $definition['rules'] ?? array())) { return new WP_Error('alify_version', 'Local JSON features require a newer declared schema version.'); }
         $virtual_key = 'local_' . substr(hash('sha256', $key), 0, 40); $virtual = null; foreach (Alify_CF_API::groups() as $registered) { if ($registered['key'] === $virtual_key) { $virtual = $registered; break; } }
         Alify_CF_API::unregister_group($virtual_key);
         $errors = array(); $rules = Alify_CF_Location_Rules::clean($definition['rules'] ?? null, $errors); $fields = Alify_CF::validate_schema($definition['fields'] ?? null, $definition['location'], $post ? $post->ID : 0, $errors); if ($errors) { if ($virtual) { Alify_CF_API::register_group($virtual); } return new WP_Error('alify_schema', implode(' ', $errors)); }
         $snapshots = array(); if ($post) { foreach (array(Alify_CF::SCHEMA, Alify_CF::LOCATION, '_alify_cf_local_key', '_alify_cf_location_rules') as $meta_key) { $snapshots[$meta_key] = array(metadata_exists('post', $post->ID, $meta_key), get_post_meta($post->ID, $meta_key, true)); } }
         self::$syncing = true;
         try {
-            $id = wp_insert_post(wp_slash(array('ID' => $post ? $post->ID : 0, 'post_type' => Alify_CF::GROUP, 'post_title' => sanitize_text_field($definition['title']), 'post_status' => $post ? $post->post_status : 'draft')), true); if (is_wp_error($id)) { return $id; }
+            $id = wp_insert_post(wp_slash(array('ID' => $post ? $post->ID : 0, 'post_type' => Alify_CF::GROUP, 'post_title' => sanitize_text_field($definition['title']), 'post_status' => $post ? $post->post_status : 'draft')), true); if (is_wp_error($id)) { if ($virtual) { Alify_CF_API::register_group($virtual); } return $id; }
             update_post_meta($id, Alify_CF::SCHEMA, wp_slash($fields)); update_post_meta($id, Alify_CF::LOCATION, $definition['location']); update_post_meta($id, '_alify_cf_local_key', $key); update_post_meta($id, '_alify_cf_location_rules', wp_slash($rules));
             if (Alify_CF::schema($id) !== $fields || get_post_meta($id, Alify_CF::LOCATION, true) !== $definition['location'] || get_post_meta($id, '_alify_cf_local_key', true) !== $key || get_post_meta($id, '_alify_cf_location_rules', true) !== $rules) { if ($post) { foreach ($snapshots as $meta_key => $snapshot) { if ($snapshot[0]) { update_post_meta($id, $meta_key, wp_slash($snapshot[1])); } else { delete_post_meta($id, $meta_key); } } wp_update_post(wp_slash(array('ID' => $id, 'post_title' => $post->post_title))); } else { wp_delete_post($id, true); } if ($virtual) { Alify_CF_API::register_group($virtual); } return new WP_Error('alify_storage', 'Schema storage failed; restoration attempted.'); }
             return $id;
