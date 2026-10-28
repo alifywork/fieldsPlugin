@@ -5,7 +5,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Requirements and installation
 
 - WordPress 6.2+; PHP 7.4+ (a currently supported PHP version is recommended).
-- Copy this repository folder to `wp-content/plugins/alify-custom-field/`, or ZIP its contents inside an `alify-custom-field` folder and upload through **Plugins → Add New → Upload Plugin**.
+- Install the packaged `alify-custom-field.zip` using **Plugins → Add New → Upload Plugin**, or copy the runtime plugin files to `wp-content/plugins/alify-custom-field/`. For a clean archive from this checkout, use `python3 tools/package-release.py --output /tmp/alify-release-0.34.0`; do not ZIP Git metadata, dependencies or local test settings.
 - Activate **Alify Custom Field**.
 - Open **Alify Custom Field → Add Field Group**, enter a title, add fields, choose a post type, and **Publish**.
 - Edit a post of that type, fill in its fields, and save the post.
@@ -164,7 +164,7 @@ A hidden source is **unavailable**, not an empty value: none of its leaves match
 
 **Relationship, multiple Post Object, Taxonomy, User and Page Link** can now be condition sources. Single sources compare their canonical ID/token; lists use ANY-selected-token matching. `equals` means exact key/ID/token membership, `not_equals` means no item matches, and `empty`/`not_empty` inspect the selection. Existing literal/pattern operators compare individual canonical token strings, not display labels, URLs or formatted object returns. Search text, complete markers and picker buttons never count as selections. Selection permissions and reference validation remain unchanged; conditions do not grant object access.
 
-Password, WYSIWYG, custom scalar callbacks, Group/Repeater/Flexible, Link and Google Map remain ineligible sources. Cross-group references remain unsupported; v0.33.0 adds independent sibling subfield scopes as described above. Chains/new reference-source semantics require **schema JSON v10**; downgrade attempts reject before import, and Local JSON supports versions 1–11 with their feature gates.
+Password, WYSIWYG, custom scalar callbacks, Group/Repeater/Flexible, Link and Google Map remain ineligible sources. Cross-group references remain unsupported; v0.33.0 adds independent sibling subfield scopes as described above. Chains/new reference-source semantics require **schema JSON v10**; downgrade attempts reject before import, and Local JSON supports versions 1–12 with their feature gates.
 
 ### Native dynamic-block API
 
@@ -591,7 +591,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 ### Repeater limits and save behavior
 
-- **Single level only**, maximum **20 subfields** and **50 rows** per repeater. DOM pagination, duplication and drag/keyboard ordering are available; v0.33.0 adds local sibling conditions. v0.34.0 adds bounded nested repeaters.
+- Maximum **20 subfields** and **50 rows** per repeater, with up to four mixed container levels under the shared budgets. DOM pagination, duplication and drag/keyboard ordering are available; v0.33.0 adds local sibling conditions. v0.34.0 adds bounded nested repeaters.
 - A whole repeater can be a conditional target. It cannot be a condition source. Hidden repeaters preserve all saved rows and skip validation.
 - Each row is sanitized against its schema, including required and media checks. A newly selected media ID requires attachment edit permission; existing repeater attachment IDs may survive reordering without that permission.
 - If any row is invalid, **all previous rows for that repeater are retained** and the existing save-error notice identifies the repeater. Other valid fields may still save. Errors are displayed at repeater level, not against individual subfields. Best-effort rejected-input recovery is available as described below.
@@ -663,7 +663,7 @@ $settings = alify_get_option('profile', 'site');
 
 - Posts and options support Group text/choice/media/gallery subfields. Subfield media IDs are integers inside the serialized object; gallery IDs remain ordered integer arrays.
 - The whole Group is validated atomically. An invalid required subfield, unauthorized new attachment or incomplete payload retains the previous complete object. Post publication and core REST validation include Groups.
-- A required Group needs at least one nonempty subfield (an unchecked toggle does not count); individually required subfields must always validate when the Group is visible.
+- A required Group needs at least one nonempty subfield (an unchecked toggle does not count); individually required visible subfields must validate when the Group is visible.
 - Optional checkbox/toggle-only Groups can be cleared. Missing completion markers never clear saved data.
 - Whole-Group conditional visibility is supported; Groups cannot be condition sources. v0.33.0 adds sibling subfield conditions; v0.34.0 adds bounded mixed nested containers (see the current contract).
 - Group schemas and subfield keys participate in JSON transfer (the destination needs Group support, version 0.8.0+). Image/file defaults reset during transfer as with other fields. Errors/recovery are shown at the Group boundary, not individually per subfield.
@@ -771,7 +771,7 @@ All three work on post/Options roots and supported basic container subfields. Us
 
 Single values clear with `''`; multiple editor-bridge payloads use `{"__complete":"1","ids":[...]}` and explicit empty `{"__complete":"1"}`. Malformed, truncated, unknown or disallowed values retain the previous field/container; Options retains the whole page. Required values cannot clear. Raw IDs/tokens remain available even where formatted records are privacy-filtered: **raw metadata is not an authorization API**, so themes must enforce their own access policy and context-escape output.
 
-Defaults, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets and, since 0.30.0, canonical token sources. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v11 within their feature gates, and exports contain configuration, not selected site-local IDs or user records.
+Defaults, automatic taxonomy/user modification and cross-site ID migration are unsupported. Bounded nested containers are supported since v0.34.0. Selectors may be conditional targets and, since 0.30.0, canonical token sources. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v12 within their feature gates, and exports contain configuration, not selected site-local IDs or user records.
 
 ## Bundled editor and developer features (0.28.0)
 
@@ -830,10 +830,10 @@ All exposure flags default off. Root-field builder checkboxes control `api_read`
 
 - Post Object/Relationship `taxonomy_filters` accept up to 10 ANDed clauses: `[{"taxonomy":"category","terms":[12,34],"operator":"IN"}]` (`IN` / `NOT IN`; maximum 50 existing IDs per clause). Terms in an IN clause are alternatives, and descendants are not implicitly included. The builder accepts JSON; the editor dropdown can narrow a configured IN selection. Filters apply to search and save and never grant object access. Nonpublic taxonomy names are shown only to users with assignment capability. IDs are site-local configuration; remap them explicitly on deployment.
 - Conditions support mixed nested `all`/`any` groups with at most **three group levels and ten total leaves**. Flat controls remain; **Edit nested ALL/ANY JSON** opens the advanced representation. Leaf shapes remain `{field: "field_key", operator: "equals", value: "text"}`.
-- New literal, case-sensitive operators `contains`, `starts_with`, `ends_with` compare each scalar/selected item; an empty comparison never matches. Comparison strings are limited to 1,000 bytes. Arbitrary regex is not implemented; bounded ASCII glob patterns are available in 0.29.0+. Version 0.30.0 adds acyclic sibling chains and reference-token sources; scoped subfield/cross-group conditions remain pending. Cycles are rejected.
+- New literal, case-sensitive operators `contains`, `starts_with`, `ends_with` compare each scalar/selected item; an empty comparison never matches. Comparison strings are limited to 1,000 bytes. Arbitrary regex is not implemented; bounded ASCII glob patterns are available in 0.29.0+. Version 0.30.0 adds acyclic sibling chains and reference-token sources; v0.33+ supports local sibling subfield conditions; cross-group conditions remain unsupported. Cycles are rejected.
 - **Schema JSON v8 / plugin 0.28.0+** gates new editor/exposure/filter settings, nested/extended conditions, custom types and dynamic rich subfields. The original v0.28 importer accepted v1–v8; the current importer also accepts v9/v10 within their gates. Older destinations must reject v8 rather than silently discard these settings. Schema transfer is not selected-ID/content migration.
 
-The entire 77-item roadmap is **not** complete. Versions 0.29/0.30 add scoped object editors, revisions/forms, conditional dependencies and scalar blocks. Deeper containers, bidirectional relationships, native post-field sidebar/datastore and dedicated integrations/distribution remain tracked in `DEVELOPMENT-ROADMAP.md`.
+The v0.34.0 combined bundle completes the **77-item development roadmap within the explicitly declared scopes**, including bounded deeper containers, post-only bidirectional coordination, native scalar sidebar/datastore and named ecosystem/distribution adapters. This is not full ACF parity or a claim about every integration; see `DEVELOPMENT-CONTRACTS.md`.
 
 ## Verification
 
@@ -846,7 +846,9 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Previous bundle (0.33.0):** 805 PHP contracts on PHP 7.4/8.3, 93 JavaScript tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions locally. Verified in [CI run 40770133129](https://github.com/alifywork/fieldsPlugin/actions/runs/40770133129): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium local-condition reorder/duplicate/new-row persistence and consent-triggered mocked Maps/Places selection/save/reload, with clean WordPress debug logs. Google provider responses remain controlled fixtures, not live-service certification. Roadmap: **67/77 complete within declared scopes; 10 pending**.
+**Current bundle (0.34.0):** 805 PHP contracts on PHP 7.4/8.3; 98 JavaScript tests; 1,106 minimum / 1,109 modern / 1,111 WordPress 6.9 backend assertions; 37 real-provider assertions; 2 offline packaging tests. [CI run 40778208867](https://github.com/alifywork/fieldsPlugin/actions/runs/40778208867) is **green across all five jobs**: four native WordPress/PHP SQLite/MySQL targets with real Chromium flows, plus WordPress 6.9/MySQL with real WooCommerce 10.9.0 (authoritative HPOS), Polylang 3.9.1 and Timber 2.3.3. WordPress debug logs remain clean. Roadmap: **77/77 complete within declared scopes; 0 pending development rows**. Managed release integrity uses controlled fixtures; release publishing, independent security/performance certification and live Google billing/provider certification are not claimed.
+
+**Previous bundle (0.33.0):** 805 PHP contracts on PHP 7.4/8.3, 93 JavaScript tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions locally. Verified in [CI run 40770133129](https://github.com/alifywork/fieldsPlugin/actions/runs/40770133129): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium local-condition reorder/duplicate/new-row persistence and consent-triggered mocked Maps/Places selection/save/reload, with clean WordPress debug logs. Google provider responses remain controlled fixtures, not live-service certification. At that release: **67/77 complete within declared scopes; 10 pending**.
 
 **Previous bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Verified in [CI run 40767256561](https://github.com/alifywork/fieldsPlugin/actions/runs/40767256561): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium ACF content planning/apply/media remapping/rollback and reusable-definition save/insert/group persistence/delete/nonce flows, with clean WordPress debug logs. At that release: **65/77 complete within declared scopes; 12 pending**.
 

@@ -11,6 +11,10 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 - No automatic ACF schema/content compatibility, performance superiority or security certification is implied.
 - `[ ]` = pending; `[x]` = implemented and verified within its documented scope.
 
+## Current development status — v0.34.0
+
+**77/77 implemented and verified within the declared scopes; no open development rows in this backlog.** The final combined bundle completes items 20, 42–43, 50, 71 and 73–77. See [DEVELOPMENT-CONTRACTS.md](DEVELOPMENT-CONTRACTS.md) for exact opt-ins, limits, vendor contracts and recovery behavior. This is not full ACF parity, unlimited composition, all-vendor compatibility, a hosted support service or live Google certification.
+
 ## A. Everyday choice and input fields
 
 1. [x] **Radio Button** — v0.18.0: single configured choice key; defaults, required/optional clearing, post/Options/basic subfields, conditional source/target, REST validation and schema JSON. No “other” choices or custom-choice creation.
@@ -35,7 +39,7 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 17. [x] **Multiple Post Object** — v0.26.0: ordered complete ID lists, picker/reordering/clearing, containers/Options/REST/publication/recovery; no scalar/list migration or list conditional sources.
 18. [x] **Relationship min/max cardinality** — v0.26.0: shared multiple-reference bounds, maximum 50, optional empty versus Required semantics, no truncation.
 19. [x] **Reference return formats** — v0.26.0: opt-in ID/object returns recursively across containers/Options; unavailable or unreadable objects omitted/null; raw IDs unchanged.
-20. [ ] Bidirectional relationships — dependency on supported object locations and safe write APIs; avoid recursive writes and partial updates.
+20. [x] **Bidirectional post references — v0.34.0:** explicitly registered paired Relationship/multiple Post Object endpoints, all-object preflight/capabilities, reentrancy guards, optimistic commit/restore and private creator recovery backups. At most 20 pairs / 101 participating posts; not SQL transactions, user/term pairs or deletion cleanup.
 21. [x] oEmbed — **v0.29.0:** canonical HTTPS YouTube/Vimeo, fixed provider requests with timeout/size/call limits, success cache and reconstructed validated iframe output. Explicit output API only; no arbitrary-host discovery. HTTP mocks cover provider responses, not live-service certification.
 22. [x] Google Map — **v0.29.0/v0.33.0:** manual canonical storage/explicit keyed Embed output plus optional consent-triggered Maps JavaScript/modern Places search, click/drag point, stale-result guards and manual fallback. Browser-restricted key/APIs/billing required; no geolocation/background geocoding or live Google certification.
 23. [x] Icon Picker — supported libraries and safe identifier output. — **v0.28.0: 40 bundled Dashicons, optional allowlist, safe stored identifiers and preview; no arbitrary SVG.**
@@ -66,22 +70,22 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 
 ## E. Structured content
 
-42. [ ] Nested Group support with bounded recursive schema/value handling.
-43. [ ] Nested Repeater and Flexible Content composition; preserve atomic validation and error paths.
+42. [x] **Nested Group — v0.34.0:** up to four mixed container levels through advanced JSON builder/PHP/schema v12, recursive validation, safe fixed-slot retention and public/revision/custom-type gates. Not a recursive graphical schema designer.
+43. [x] **Nested Repeater/Flexible composition — v0.34.0:** recursive canonical transport, row/path-specific origin identities, new-row/clone/reorder safety, sibling-local conditions and atomic deep validation with full textual error paths. Index helpers bind known outer identities; deeper mutations never guess old rows.
 44. [x] Repeater/Flexible drag sorting, with keyboard alternatives. — **v0.28.0: native jQuery UI handles plus existing keyboard move buttons; rich editor teardown/recreation.**
 45. [x] Content-row duplication with fresh names/IDs and safe editor state. — **v0.28.0: pristine-template clones with fresh IDs/names, synchronized HTML and ordered selected IDs.**
 46. [x] Container presentation settings and collapsible row labels. — **v0.28.0: initially collapsed rows and safe direct-scalar labels; no layout/display-mode redesign.**
 47. [x] Repeater pagination/large-content workflow; do not silently discard unloaded rows. — **v0.29.0:** page_size 0 or 1–50, all DOM rows remain submitted, invalid controls reveal all rows. Presentation only, not lazy loading or increased bounds.
 48. [x] Flexible layout-specific limits, configuration and richer layout-management controls. — **v0.29.0:** per-layout min/max (0–50), disabled count-growth policy and corresponding picker/Add/Clone/Remove controls; existing disabled rows stay editable. No layout rename/content migration.
-49. [x] Clone/reusable field definitions — **v0.32.0:** trusted PHP named definitions/Clone composition and native builder managed save/insert/delete; materialized prefixed independent copies, stable keys/condition remapping, collision/missing-dependency/cycle/budget rejection. No live inheritance, automatic content migration or new nested-container support.
-50. [ ] Review fixed field/subfield/layout/row bounds after scalable editing support; no unbounded payload promise.
+49. [x] Clone/reusable field definitions — **v0.32.0:** trusted PHP named definitions/Clone composition and native builder managed save/insert/delete; materialized prefixed independent copies, stable keys/condition remapping, collision/missing-dependency/cycle/budget rejection. No live inheritance or automatic content migration; bounded nested composition is separately implemented in v0.34.0.
+50. [x] **Scalability bound review — v0.34.0:** retain 200 roots / 20 children / 10 layouts / 50 rows; add shared byte/node/depth budgets and conservative form/choice/inert-template estimates, retention notices, and ancestor-aware pagination/validation reveal. No unbounded payload or paged-storage promise.
 
 ## F. Conditional logic
 
 51. [x] Nested/mixed AND/OR rule groups. — **v0.28.0: mixed ALL/ANY advanced JSON, at most three group levels and ten total leaves; no conditional sources/chains.**
 52. [x] Contains/pattern and other appropriate type-specific operators with bounded evaluation. — **v0.29.0:** literal contains/prefix/suffix plus anchored case-sensitive ASCII `glob` (only * special, at most four stars, 256-character pattern/4,096-character source); bounded literal searches in PHP/JS, no regex evaluation. Unicode still works for the existing literal operators; glob rejects non-ASCII/over-budget values. Arbitrary regex/PCRE is deliberately excluded.
-53. [x] Subfield/container-scoped conditions — **v0.33.0:** independent basic siblings inside a Group or individual Repeater/Flexible row/layout; shared chains/operators, cycle/local-reference guards, dynamic visibility, visible-only required checks, origin-MAC hidden retention across reorder/clone, atomic explicit API rejection and recursive JSON v11 gates. No ancestors/other-row/cross-layout/nested-container scopes.
-54. [x] Conditional chains with cycle detection and deterministic server/client parity. — **v0.30.0:** same-group root siblings, whole-graph cycles/missing/self references rejected, at most 16 links, order-independent PHP/JS evaluation; hidden sources never match any operator. No cross-group or row-scoped conditions.
+53. [x] Subfield/container-scoped conditions — **v0.33.0:** independent basic siblings inside a Group or individual Repeater/Flexible row/layout; shared chains/operators, cycle/local-reference guards, dynamic visibility, visible-only required checks, origin-MAC hidden retention across reorder/clone, atomic explicit API rejection and recursive JSON v11 gates. No ancestor/other-row/cross-layout references; v0.34.0 applies the same independent scope at each nested level.
+54. [x] Conditional chains with cycle detection and deterministic server/client parity. — **v0.30.0:** same-group root siblings, whole-graph cycles/missing/self references rejected, at most 16 links, order-independent PHP/JS evaluation; hidden sources never match any operator. No cross-group references; v0.33+ separately adds local row-scoped conditions.
 55. [x] Richer eligible condition sources. — **v0.30.0:** Relationship, multiple Post Object, Taxonomy, User and Page Link selected canonical token lists/scalars; equality is membership, never labels/search/complete markers. Composite Link/Map/container/custom callback sources remain excluded.
 
 ## G. Developer APIs, portability and migrations
@@ -104,16 +108,16 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 68. [x] Frontend forms API with CSRF protection, object authorization, uploads and safe validation. — **v0.29.0:** authenticated existing-post forms, complete-group/post nonce/capability enforcement, shared validation and safe redirects; native media assets reuse WordPress upload capabilities/handling, no custom upload endpoint. No anonymous/new-post flow or client draft-recovery UI.
 69. [x] Optional safe shortcode/output integration with explicit exposure/escaping policy. — **v0.28.0: explicitly exposed public scalar shortcode, escaped output; no protected/private/rich/secret values.**
 70. [x] Custom blocks framework — **v0.30.0:** trusted PHP registration, native API-v2 public scalar attribute schemas, Inspector controls, native authenticated server-side preview, dynamic post-safe rendering and core content persistence. Text/textarea/integer/toggle/select only; no private field reuse, container controls, inline canvas editor or ACF block compatibility.
-71. [ ] Native Gutenberg sidebar/datastore integration and appropriate inline editing.
+71. [x] **Gutenberg sidebar/datastore — v0.34.0:** opt-in native PluginSidebar and `alify/fields` store mirror exposed editable root scalars through the normal publication bridge. Structured fields retain their dedicated editors; no ACF datastore or inline canvas claim.
 72. [x] Core Block Bindings integration. — **v0.28.0: version-gated alify/field native source with public scalar policy; no Attributes picker/datastore/live-preview claim.**
-73. [ ] Optional WordPress Abilities/MCP integration with explicit opt-in and permissions.
+73. [x] **Abilities/MCP — v0.34.0:** opt-in WordPress 6.9 read/write abilities with native registry/schema, edit-object permissions and explicit API field gates. External MCP transport/server/client remains separately configured and authenticated.
 
 ## I. Dedicated integration development
 
-74. [ ] Builder/theme dynamic-data adapters: choose and declare supported integrations individually; ACF APIs are not interchangeable with `alify_*` APIs.
-75. [ ] WooCommerce-specific storage/editor integration, including an explicit HPOS contract where applicable.
-76. [ ] Multilingual field-definition/value translation integration.
-77. [ ] Optional managed update/distribution and support workflow; pricing and vendor support are product decisions, not missing field types.
+74. [x] **Declared theme adapter — v0.34.0:** opt-in Timber 2.x/Twig 3 escaped public-scalar filter with existing public-output privacy gates. No Elementor/Divi/Beaver or interchangeable ACF API claim.
+75. [x] **WooCommerce — v0.34.0:** opt-in CRUD-only `woo_order` storage/editor/helpers, native authoritative HPOS metadata, capability/nonce/atomic validation, generic REST prefix and metadata-ID protection, conditional HPOS declaration for legacy post groups. No automatic `shop_order` migration or extension/refund/product-wide support claim.
+76. [x] **Multilingual — v0.34.0:** opt-in Polylang presentation strings/choice labels, independent linked-post metadata and explicit safe root-scalar copy policies. Never replace canonical keys/choice tokens; no WPML/all-field translation bridge.
+77. [x] **Distribution/support — v0.34.0:** opt-in trusted-repository stable GitHub update offers, verified ZIP/SHA-256 downloads, reproducible installable packaging and administrator-only local support diagnostics. Pricing, hosted support/licensing and release publication remain explicit maintainer decisions, not invented services.
 
 ## Not missing features: evidence and deployment checks
 
@@ -147,12 +151,14 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 
 - **v0.30.0 — Conditional/editor framework bundle:** items 54, 55 and 70 implemented within the scopes above. Local: 805 PHP contracts on both runtimes, 84 JS tests, 886 backend assertions on WordPress 6.2/PHP 7.4 and 889 on WordPress 6.8.3/PHP 8.3 using SQLite. Verified in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779): all four native PHP/SQLite/MySQL targets pass, including Chromium conditional-chain/token-source frontend forms and dynamic-block preview/save/reload/public rendering with clean WordPress debug logs. Roadmap: **61 complete within declared scopes / 16 pending**, not all remaining development finished.
 
-### Remaining development, not hidden completion claims
+### Historical remaining scope after v0.30.0 (superseded by later bundles)
 
-The 16 open items are **20, 22, 42–43, 49–50, 53, 62–64, 71 and 73–77**: bidirectional relationships, interactive maps, recursive containers, Clone/reuse, a post-scalability bound review, row-scoped conditions, explicit migrations/ACF import, native sidebar/datastore, and declared ecosystem/distribution integrations. Manual coordinates are not an interactive picker; classic widgets are not block widgets; public scalar custom blocks are not private field-group/container blocks. Provider credentials, integration environments and product decisions need explicit contracts, but do not make all remaining work externally blocked. Continue combined development batches without per-item approval requests.
+At that point, the 16 open items were **20, 22, 42–43, 49–50, 53, 62–64, 71 and 73–77**: bidirectional relationships, interactive maps, recursive containers, Clone/reuse, a post-scalability bound review, row-scoped conditions, explicit migrations/ACF import, native sidebar/datastore, and declared ecosystem/distribution integrations. Manual coordinates are not an interactive picker; classic widgets are not block widgets; public scalar custom blocks are not private field-group/container blocks. Provider credentials, integration environments and product decisions need explicit contracts, but do not make all remaining work externally blocked. Continue combined development batches without per-item approval requests.
 
 - **v0.31.0 — Migration/import bundle:** items 62 and 63 implemented within the explicit scopes above. Local checks: 805 PHP contracts on PHP 7.4/8.3, 84 JS tests, 963 backend assertions on WordPress 6.2/PHP 7.4 and 966 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets pass in [CI run 40762878282](https://github.com/alifywork/fieldsPlugin/actions/runs/40762878282), including native Chromium migration/ACF admin flows and clean debug logs. Roadmap: **63 complete within declared scopes / 14 pending**. ACF content migration (64) and the remaining broader capabilities stay pending.
 
 - **v0.32.0 — Reusable/migration development bundle:** items 49 and 64 implemented within the explicit scopes above. Local: 805 PHP contracts on both runtimes, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Verified in [CI run 40767256561](https://github.com/alifywork/fieldsPlugin/actions/runs/40767256561): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium ACF content planning/apply/media remapping/rollback and reusable-definition save/insert/group persistence/delete/nonce flows, with clean WordPress debug logs. **65 complete within declared scopes / 12 pending.**
 
 - **v0.33.0 — Scoped editor development bundle:** items 22 and 53 implemented within the declared scopes. Local: 805 PHP contracts on both runtimes, 93 JS tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions. Verified in [CI run 40770133129](https://github.com/alifywork/fieldsPlugin/actions/runs/40770133129): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium local-condition reorder/duplicate/new-row persistence and consent-triggered mocked Maps/Places selection/save/reload, with clean WordPress debug logs. Google provider responses remain controlled fixtures, not live-service certification. **67 scoped complete / 10 pending.**
+
+- **v0.34.0 — Final combined development bundle:** implements the remaining ten engineering scopes above. 805 PHP contracts on PHP 7.4/8.3; 98 JavaScript tests; 1,106 minimum / 1,109 modern / 1,111 WordPress 6.9 backend assertions; 37 real-provider assertions; 2 offline packaging tests. Verified in [CI run 40778208867](https://github.com/alifywork/fieldsPlugin/actions/runs/40778208867): **all five jobs green**, including the four native PHP/WordPress SQLite/MySQL Chromium targets and WordPress 6.9/MySQL with real WooCommerce 10.9.0 HPOS, Polylang 3.9.1 and Timber 2.3.3, with clean WordPress debug logs. Nested identities survive coordinated API/editor writes; generic Woo REST cannot expose or rename protected metadata; nested invalid controls reveal ancestor pages/collapsed rows. Installable ZIP/checksum tooling is verified; no release was automatically published. **77 scoped complete / 0 pending development items.** Wider evidence/deployment questions above remain explicitly outside this feature backlog.
