@@ -248,7 +248,7 @@ try {
     expect_same('', Alify_CF::schema($media_import)[5]['default'], 'Root media default reset on import');
     expect_same('', Alify_CF::schema($media_import)[3]['sub_fields'][2]['default'], 'Repeater media default reset on import');
     $before_import_count = (int) wp_count_posts(Alify_CF::GROUP)->draft;
-    foreach (array('', '{', '[]', 'null', str_repeat('x', Alify_CF_Transfer::MAX_BYTES + 1), '{"format":"alify-custom-field","version":2,"group":{}}') as $invalid) {
+    foreach (array('', '{', '[]', 'null', str_repeat('x', Alify_CF_Transfer::MAX_BYTES + 1), '{"format":"alify-custom-field","version":3,"group":{}}') as $invalid) {
         expect_same(true, is_wp_error(Alify_CF_Transfer::import_json($invalid, $import_nonce)), 'Malformed, oversized or unknown-version input rejected');
     }
     $valid_document = $document; $valid_document['group']['location'] = 'options:transfer-tests';

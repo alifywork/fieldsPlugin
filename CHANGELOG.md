@@ -8,7 +8,7 @@
 - Enforce bounds atomically across Classic/core REST publication, options and JSON schema transfer; retain complete previous row lists on invalid submissions.
 - Export configured row bounds using transfer format v2 to prevent older importers silently discarding limits; continue accepting legacy v1 documents.
 - Render existing out-of-bounds rows for explicit correction instead of silently truncating them. Hidden repeaters retain data without enforcing inactive bounds.
-- Expand isolated PHP, JS, real WordPress and browser coverage. Nested repeaters and data migration remain out of scope.
+- Verify four native-PHP SQLite/MySQL targets: 197 backend and 45 real-browser assertions per target, plus 244 isolated PHP assertions and 30 JS tests. Nested repeaters and data migration remain out of scope.
 
 ## 0.10.0
 
