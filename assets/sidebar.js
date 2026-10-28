@@ -1,11 +1,11 @@
 /* global wp, AlifySidebar */
 (function () {
     'use strict';
-    const h = wp.element.createElement, store = 'alify/fields';
+    const h = wp.element.createElement, store = 'alify/fields', emptyDraft = {};
     if (!wp.data.select(store)) wp.data.registerStore(store, {
         reducer(state = {}, action) { return action.type === 'SET' ? {...state, [action.post]: {...state[action.post], [action.name]: action.value}} : state; },
         actions: {set(post, name, value) { return {type: 'SET', post, name, value}; }},
-        selectors: {getDraft(state, post) { return state[post] || {}; }}
+        selectors: {getDraft(state, post) { return state[post] || emptyDraft; }}
     });
     const supported = ['text', 'textarea', 'email', 'url', 'number', 'date', 'time', 'color', 'true_false', 'select'];
     const rootFor = field => document.querySelector('.alify-value[data-field-key="' + field.key + '"]');

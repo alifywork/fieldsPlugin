@@ -127,6 +127,7 @@ jobs:
         env:
           ALIFY_NATIVE_PROVIDERS: '1'
         run: |
+          trap 'status=$?; if [[ -s "$ALIFY_TEST_DIR/debug.log" ]]; then while IFS= read -r line; do printf "::error title=Native adapter debug::%s\n" "$line"; done < "$ALIFY_TEST_DIR/debug.log"; fi; exit "$status"' ERR
           php tests/integration/provider-install.php
           php tests/integration/providers.php
           test ! -s "$ALIFY_TEST_DIR/debug.log" || { cat "$ALIFY_TEST_DIR/debug.log"; exit 1; }
