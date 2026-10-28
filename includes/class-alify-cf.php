@@ -441,7 +441,7 @@ final class Alify_CF {
             $updates = self::validate_values($schema, $values, $previous, $errors, $field_errors, $locations);
             if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors, $locations); }
             else { unset($feedback[$group->ID]); }
-            if ($updates && Alify_CF_Bidirectional::touches($updates, $id)) { $paired = Alify_CF_Bidirectional::editor($updates, $id); if (is_wp_error($paired)) { $errors[] = $paired->get_error_message(); } }
+            if ($updates && Alify_CF_Bidirectional::touches($updates, $id)) { $paired = Alify_CF_Bidirectional::editor($updates, $id, $values); if (is_wp_error($paired)) { $errors[] = $paired->get_error_message(); } }
             else { foreach ($updates as $name => $value) { update_post_meta($id, '_alify_cf_' . $name, wp_slash($value)); } }
         }
         Alify_CF_Feedback::put('post_' . $id, $feedback);

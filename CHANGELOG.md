@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.34.0
+
+- Develop four-level mixed Group/Repeater/Flexible composition with recursive validation, hidden-write auditing, identity-safe nested origins, distinct inert template tokens, cloning/new rows, advanced JSON builder children/layouts and portable schema/Local JSON v12 gates.
+- Review scalability without enlarging fixed widths/cardinalities: shared 1 MiB schema/value ceilings, structural-node limits and conservative form/choice/template estimates with complete-marker retention on oversized editors.
+- Add explicitly registered, coordinated bidirectional post-reference lists to normal editor/PHP/REST/form/revision paths. Preflight every object, reject recursive commits, verify/restore optimistic snapshots and retain private recovery backups rather than overwrite unknown edits. Separate migration journals refuse paired destinations.
+- Add opt-in native Gutenberg scalar PluginSidebar/datastore saving through the normal bridge; WordPress 6.9 Abilities discovery/permission callbacks; Timber escaped public-scalar filter; WooCommerce `woo_order` CRUD/HPOS metabox/helpers and generic REST protection; Polylang presentation strings, independent translated values and explicit safe scalar-copy policy.
+- Add opt-in fixed-repository managed GitHub releases requiring a stable packaged ZIP/checksum and verified downloads, plus explicit admin-only local support diagnostics. No publishing, license/account server, telemetry, hosted support or pricing claims.
+- Document exact supported scopes, required provider configuration, deployment and failure/recovery behavior in DEVELOPMENT-CONTRACTS.md. Native end-of-bundle verification is in progress; no live Google certification or full ACF interchangeability is claimed.
+
 ## 0.33.0
 
 - Add independent sibling conditions to Group, Repeater and Flexible layout children: shared PHP/JS chains/operators, local graph/cycle checks, visible-only required checks, dynamic-row visibility and builder advanced JSON controls. No ancestor, other-row or nested-container scope.

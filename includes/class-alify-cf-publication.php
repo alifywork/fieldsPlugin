@@ -34,12 +34,13 @@ final class Alify_CF_Publication {
         if ($field['type'] === 'group') {
             $out = array();
             foreach ($field['sub_fields'] as $sub) { $out[$sub['name']] = self::stored_payload($sub, is_array($value) && array_key_exists($sub['name'], $value) ? $value[$sub['name']] : $sub['default']); }
+            if (is_array($value) && array_key_exists('__row_origin', $value)) { $out['__row_origin'] = $value['__row_origin']; }
             return array('__complete' => '1', 'fields' => $out);
         }
         if ($field['type'] === 'repeater') {
             $rows = array();
             foreach (is_array($value) ? $value : array() as $row) {
-                $out = array('__row_complete' => '1');
+                $out = array('__row_complete' => '1'); if (is_array($row) && array_key_exists('__row_origin', $row)) { $out['__row_origin'] = $row['__row_origin']; }
                 foreach ($field['sub_fields'] as $sub) { $out[$sub['name']] = self::stored_payload($sub, $row[$sub['name']] ?? $sub['default']); }
                 $rows[] = $out;
             }
@@ -138,7 +139,7 @@ final class Alify_CF_Publication {
         if (!current_user_can('edit_post', $post->ID)) { return new WP_Error('alify_forbidden', 'You cannot edit these fields.', array('status' => 403)); }
         $key = spl_object_hash($request);
         if (!isset(self::$updates[$key])) { return new WP_Error('alify_unvalidated_fields', 'Alify fields were not validated.', array('status' => 400)); }
-        if (self::$updates[$key] && Alify_CF_Bidirectional::touches(self::$updates[$key], $post->ID)) { $paired = Alify_CF_Bidirectional::editor(self::$updates[$key], $post->ID); if (is_wp_error($paired)) { return $paired; } }
+        if (self::$updates[$key] && Alify_CF_Bidirectional::touches(self::$updates[$key], $post->ID)) { $original = array(); $groups = $request->get_param('alify_fields')['groups'] ?? array(); foreach (Alify_CF::groups($post->post_type, $post->ID) as $group) { foreach (Alify_CF::schema($group->ID) as $definition) { if (array_key_exists($definition['name'], $groups[$group->ID] ?? array())) { $original[$definition['name']] = $groups[$group->ID][$definition['name']]; } } } $paired = Alify_CF_Bidirectional::editor(self::$updates[$key], $post->ID, $original); if (is_wp_error($paired)) { return $paired; } }
         else foreach (self::$updates[$key] as $name => $value) { update_post_meta($post->ID, '_alify_cf_' . $name, wp_slash($value)); }
         Alify_CF_Feedback::put('post_' . $post->ID, array());
         return true;

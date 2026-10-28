@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.33.0 — row-scoped conditions and opt-in interactive maps**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.34.0 — bounded composition and explicit ecosystem adapters**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -33,11 +33,25 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.32.0 adds reusable schema snapshots and a separate explicit ACF content migration planner; 0.31.0 added guarded post-field migrations and a declared-subset ACF schema importer; 0.30.0 added conditional dependencies and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
 
+## Bounded composition and ecosystem development (0.34.0)
+
+The combined implementation for the final roadmap scopes is described in **[DEVELOPMENT-CONTRACTS.md](DEVELOPMENT-CONTRACTS.md)**. Read that contract before enabling adapters or migrating legacy configurations.
+
+- **Nested containers:** Group, Repeater and Flexible Content compose up to four container levels, with advanced JSON builder configuration, recursive hidden-value protection, path-specific template identities, normal raw getters and portable **schema v12** / Local JSON gates.
+- **Scalability bounds reviewed:** retain 200 root fields / 20 children / 10 layouts / 50 rows per list; add shared schema/value byte/node budgets and fail-closed form/template input estimates. No unbounded storage or DOM pagination claim.
+- **Bidirectional post-reference lists:** explicit paired Relationship/multiple Post Object endpoints; capabilities on every changed destination, coordinated preflight/commit, optimistic verification and recovery backups that never overwrite unknown changes. Not SQL transactions, user/term pairs or automatic deletion cleanup.
+- **Native Gutenberg PluginSidebar + `alify/fields` datastore:** exposed root scalars mirror the established metabox controls and save with normal Update/Publish. Structured fields retain their dedicated editors; no ACF datastore impersonation.
+- **Optional Abilities:** WordPress 6.9+ `alify/read-fields` and `alify/write-fields`, object permissions and explicit API exposure. External MCP server/client transport is separately configured, not bundled or anonymously enabled.
+- **Declared vendor adapters:** Timber 2.x/Twig 3 escaped public scalars; WooCommerce CRUD-only `woo_order` editors/helpers with HPOS and generic Woo REST metadata protection; Polylang presentation strings, independent linked values and explicit scalar-copy policies. These are not claims of Elementor, WPML or every Woo editor/API integration.
+- **Optional managed GitHub releases:** fixed trusted repository, stable installable archive + SHA-256 asset, cached opt-in checks and fail-closed download verification; administrator-only local support diagnostics. No hosted licensing, telemetry, automatic release publication or invented vendor support commitments.
+
+Trusted opt-ins (all are strict booleans, off by default): `ALIFY_CF_SIDEBAR`, `ALIFY_CF_ABILITIES`, `ALIFY_CF_TIMBER`, `ALIFY_CF_WOOCOMMERCE`, `ALIFY_CF_POLYLANG`, `ALIFY_CF_GITHUB_UPDATES`. Provider plugins/libraries and their own WordPress/PHP requirements still apply. Existing raw getters and default privacy behavior are unchanged. The detailed contract includes registration examples, permissions, rollback limitations and deployment instructions.
+
 ## Scoped conditions and interactive maps (0.33.0)
 
 ### Independent Group / Repeater / Flexible-layout conditions
 
-Basic children now support `condition` using the same eligible source types, operators, nested ALL/ANY limits, cycle checks and 16-link maximum as root fields. A source must be a **sibling in the same Group or the same individual row/layout**. No ancestor/root, other-row, cross-layout or cross-group lookup. Hidden sources never match any operator; required children validate only when visible. Root container required/cardinality rules still apply. Nested containers remain unsupported.
+Basic children now support `condition` using the same eligible source types, operators, nested ALL/ANY limits, cycle checks and 16-link maximum as root fields. A source must be a **sibling in the same Group or the same individual row/layout**. No ancestor/root, other-row, cross-layout or cross-group lookup. Hidden sources never match any operator; required children validate only when visible. Root container required/cardinality rules still apply. v0.34.0 adds bounded nested containers under the current contract.
 
 The builder exposes **Scoped sibling conditions (advanced JSON)** beside each subfield, with its internal key shown. Example: `{"field":"field_local_toggle","operator":"equals","value":"1"}`. Use local keys, not labels/names. Reusable definitions remap these keys when materialized; JSON/PHP configurations retain the conditions. **Portable schema v11 / plugin 0.33.0+** is required, recursively including Flexible children. Earlier-version declarations reject before import/runtime Local JSON loading; versions 1–10 remain supported for their existing features.
 
@@ -69,7 +83,7 @@ The native field-group builder now has **Reusable field definitions** controls. 
 
 - Copies have independently generated deterministic keys and prefixed root names; local container-child names remain local. Internal sibling conditions are remapped to the new keys. Name/key collisions, unavailable dependencies, external condition references and recursive Clone dependencies reject.
 - **Snapshot semantics, not live inheritance:** saved groups and exports contain ordinary materialized fields. Updating/deleting a source does not rewrite existing copies, metadata or layouts. No automatic content/name migration is implied. Trusted PHP macro registrations must keep their library dependencies available and register definitions before groups.
-- PHP definitions and managed administrator snapshots occupy separate ownership slots: at most **50 each**; managed snapshots share one private nonautoload option capped at **1 MiB**. A composition is bounded by **eight structural/composition levels, 2,000 visited nodes, 200 fields per list and 1 MiB expanded output**; ordinary existing container limits still apply (20 basic children, 10 Flexible layouts, 50 rows). These are composition safeguards, not new nested-container support or larger content-row limits. Prefixed names are at most 80 bytes, prefixes at most 40.
+- PHP definitions and managed administrator snapshots occupy separate ownership slots: at most **50 each**; managed snapshots share one private nonautoload option capped at **1 MiB**. A composition is bounded by **eight structural/composition levels, 2,000 visited nodes, 200 fields per list and 1 MiB expanded output**; ordinary existing container limits still apply (20 children, 10 Flexible layouts, 50 rows). Version 0.34.0 separately adds bounded nested containers; these library limits do not enlarge content-row limits. Prefixed names are at most 80 bytes, prefixes at most 40.
 - Library composition does not weaken field privacy/REST/public-output flags. Existing settings are copied—review exposure controls before saving. Conditions must be self-contained within their sibling definition. Library records are configuration, not content or callbacks. Materialized JSON/PHP/Local JSON remains portable without the source library; exporting/synchronizing the reusable registry itself is not implemented.
 
 ```php
@@ -577,7 +591,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 ### Repeater limits and save behavior
 
-- **Single level only**, maximum **20 subfields** and **50 rows** per repeater. DOM pagination, duplication and drag/keyboard ordering are available; v0.33.0 adds local sibling conditions. Nested repeaters remain unsupported.
+- **Single level only**, maximum **20 subfields** and **50 rows** per repeater. DOM pagination, duplication and drag/keyboard ordering are available; v0.33.0 adds local sibling conditions. v0.34.0 adds bounded nested repeaters.
 - A whole repeater can be a conditional target. It cannot be a condition source. Hidden repeaters preserve all saved rows and skip validation.
 - Each row is sanitized against its schema, including required and media checks. A newly selected media ID requires attachment edit permission; existing repeater attachment IDs may survive reordering without that permission.
 - If any row is invalid, **all previous rows for that repeater are retained** and the existing save-error notice identifies the repeater. Other valid fields may still save. Errors are displayed at repeater level, not against individual subfields. Best-effort rejected-input recovery is available as described below.
@@ -618,7 +632,7 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 
 ## Flexible Content
 
-Choose **Flexible Content** and define 1–10 uniquely named layouts, each containing 1–20 basic subfields (including media/gallery). Editors choose a layout, add rows and move/remove them. A field holds at most 50 rows in any mixture of its layouts. There are no nested containers or layout-level conditions; v0.33.0 supports conditions between basic siblings inside each row/layout; whole-field visibility is supported, but Flexible fields cannot be condition sources.
+Choose **Flexible Content** and define 1–10 uniquely named layouts, each containing 1–20 basic subfields (including media/gallery). Editors choose a layout, add rows and move/remove them. A field holds at most 50 rows in any mixture of its layouts. There are no layout-level conditions; v0.34.0 adds bounded nested containers; v0.33.0 supports conditions between basic siblings inside each row/layout; whole-field visibility is supported, but Flexible fields cannot be condition sources.
 
 ```php
 foreach (alify_get_layouts('sections', get_the_ID()) as $row) {
@@ -651,7 +665,7 @@ $settings = alify_get_option('profile', 'site');
 - The whole Group is validated atomically. An invalid required subfield, unauthorized new attachment or incomplete payload retains the previous complete object. Post publication and core REST validation include Groups.
 - A required Group needs at least one nonempty subfield (an unchecked toggle does not count); individually required subfields must always validate when the Group is visible.
 - Optional checkbox/toggle-only Groups can be cleared. Missing completion markers never clear saved data.
-- Whole-Group conditional visibility is supported; Groups cannot be condition sources. v0.33.0 adds sibling subfield conditions; nested Group/Repeater containers remain unsupported.
+- Whole-Group conditional visibility is supported; Groups cannot be condition sources. v0.33.0 adds sibling subfield conditions; v0.34.0 adds bounded mixed nested containers (see the current contract).
 - Group schemas and subfield keys participate in JSON transfer (the destination needs Group support, version 0.8.0+). Image/file defaults reset during transfer as with other fields. Errors/recovery are shown at the Group boundary, not individually per subfield.
 - `alify_get_field()` also returns the associative object. `alify_get_group()` returns an empty array before the first save; escape subfield output for its context. Renaming subfields does not migrate existing data.
 
@@ -767,7 +781,7 @@ Defaults, automatic taxonomy/user modification, cross-site ID migration and nest
 - **Tab, Accordion and Message** are root-level, editor-only presentation fields. Tabs/accordions organize following siblings; they do not disable or clear values in closed sections. Messages allow bounded paragraph/list/emphasis/link HTML (HTTP/HTTPS only), not scripts, event handlers or embeds. These fields cannot be required, conditional, REST-exposed or stored as values. Use unique field names even for presentation fields. Native invalid controls reveal their section.
 - Rich text is now supported in **basic Group, Repeater and Flexible** subfields. `toolbar` selects `full` or `basic`; `editor_mode` selects `both`, `visual` or `text`; `media_buttons` is opt-in and also requires the current user's `upload_files` capability. This does not grant upload privileges or make media-only HTML satisfy a required field.
 - Repeater/Flexible rows have drag handles, existing keyboard move buttons, duplicate and expand/collapse controls. Duplication synchronizes the source editor and uses a pristine template with fresh names/IDs, never a live TinyMCE iframe clone. Native row moves destroy/recreate the affected editors after the DOM move; removal destroys editors. Selected ordered IDs, clear markers and input state are preserved.
-- `collapsed` sets initial row presentation; `row_label` names a direct safe scalar subfield. Passwords, custom types and rich/structured values are never used as row-label sources. Row labels are editor text, not a new stored value. Existing 200 root / 20 subfield / 50 row / 10 Flexible layout limits remain; there is no nested-container or pagination promise.
+- `collapsed` sets initial row presentation; `row_label` names a direct safe scalar subfield. Passwords, custom types and rich/structured values are never used as row-label sources. Row labels are editor text, not a new stored value. Existing 200 root / 20 subfield / 50 row / 10 Flexible layout limits remain; v0.34.0 adds bounded nested composition; pagination remains DOM-only.
 
 ### Content Models UI
 
@@ -832,7 +846,7 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle (0.33.0):** 805 PHP contracts on PHP 7.4/8.3, 93 JavaScript tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions locally. Verified in [CI run 40770133129](https://github.com/alifywork/fieldsPlugin/actions/runs/40770133129): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium local-condition reorder/duplicate/new-row persistence and consent-triggered mocked Maps/Places selection/save/reload, with clean WordPress debug logs. Google provider responses remain controlled fixtures, not live-service certification. Roadmap: **67/77 complete within declared scopes; 10 pending**.
+**Previous bundle (0.33.0):** 805 PHP contracts on PHP 7.4/8.3, 93 JavaScript tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions locally. Verified in [CI run 40770133129](https://github.com/alifywork/fieldsPlugin/actions/runs/40770133129): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium local-condition reorder/duplicate/new-row persistence and consent-triggered mocked Maps/Places selection/save/reload, with clean WordPress debug logs. Google provider responses remain controlled fixtures, not live-service certification. Roadmap: **67/77 complete within declared scopes; 10 pending**.
 
 **Previous bundle (0.32.0):** local checks pass: 805 PHP contracts on PHP 7.4/8.3, 88 JS tests, 1,016 minimum / 1,019 modern WordPress SQLite assertions. Verified in [CI run 40767256561](https://github.com/alifywork/fieldsPlugin/actions/runs/40767256561): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium ACF content planning/apply/media remapping/rollback and reusable-definition save/insert/group persistence/delete/nonce flows, with clean WordPress debug logs. At that release: **65/77 complete within declared scopes; 12 pending**.
 

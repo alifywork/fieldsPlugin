@@ -118,6 +118,9 @@ final class Alify_CF_API {
         $post = get_post($post_id); $field = $post ? self::field($post->post_type, $name, $post->ID) : null;
         if (!$field || !in_array($field['type'], array('repeater', 'flexible'), true) || !is_int($index) || $index < 0) { return new WP_Error('alify_row', 'Use a valid zero-based row index and container field.'); }
         $rows = alify_get_field($name, $post_id); $rows = is_array($rows) ? $rows : array();
+        // This helper has an explicit index contract: bind original rows before splicing/replacement.
+        foreach ($rows as &$original_row) { if ($field['type'] === 'flexible') { if (is_array($original_row['fields'] ?? null)) { $original_row['fields']['__row_origin'] = Alify_CF_Scoped_Conditions::origin($original_row['fields']); } } elseif (is_array($original_row)) { $original_row['__row_origin'] = Alify_CF_Scoped_Conditions::origin($original_row); } } unset($original_row);
+        if (!$remove && is_array($row)) { if ($field['type'] === 'flexible' && is_array($row['fields'] ?? null)) { if (!array_key_exists('__row_origin', $row['fields'])) { $row['fields']['__row_origin'] = $rows[$index]['fields']['__row_origin'] ?? ''; } } elseif ($field['type'] === 'repeater' && !array_key_exists('__row_origin', $row)) { $row['__row_origin'] = $rows[$index]['__row_origin'] ?? ''; } }
         if ($remove) { if (!array_key_exists($index, $rows)) { return new WP_Error('alify_row', 'Row does not exist.'); } array_splice($rows, $index, 1); }
         else { if (!is_array($row) || $index > count($rows)) { return new WP_Error('alify_row', 'Invalid row.'); } $rows[$index] = $row; }
         return self::write(array($name => Alify_CF_Publication::stored_payload($field, array_values($rows))), $post_id);
