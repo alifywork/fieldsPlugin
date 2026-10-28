@@ -119,6 +119,16 @@ The adapter checks the explicitly trusted public repository **alifywork/fieldsPl
 
 Opt-out means no managed update checks. Checks are cached six hours (15 minutes after unavailable/error). Normal WordPress update permission/settings control installation. The download filter freshly retrieves the SHA-256 file, verifies the downloaded temporary archive and fails closed on mismatch, stale/unavailable offered release, or another filter attempting to replace the verified package. A checksum served by the same trusted publisher is integrity checking over HTTPS, **not independent code signing** or protection from a compromised publisher. No license server, account activation, telemetry, automatic support uploads or invented commercial promises.
 
+Build installable assets without publishing anything (Python 3.9+):
+
+```sh
+python3 tests/package-release.test.py
+python3 tools/package-release.py --output /tmp/alify-release-0.34.0
+(cd /tmp/alify-release-0.34.0 && sha256sum --check alify-custom-field.zip.sha256)
+```
+
+The allowlisted deterministic archive has the `alify-custom-field/` plugin root; Git metadata, tests, tools, dependencies and local settings are excluded. Header/runtime versions must agree. A differing existing package is not silently overwritten. Publishing those two files to the trusted stable GitHub release remains an explicit maintainer operation, not an automatic side effect.
+
 For a manual installation/update: back up the site and field definitions, review the changelog and supported scopes, verify the release/checksum, install the plugin folder and retain the previous archive/database backup for rollback. WordPress updates do not migrate field values automatically.
 
 `alify_support_snapshot()` is an explicit administrator-only local diagnostic helper containing plugin/WordPress/PHP versions, multisite flag, composition depth and enabled-adapter flags. It contains no keys, values, usernames, paths or customer/order identifiers and sends nothing anywhere. Share only reviewed diagnostics and a redacted reproducible issue through the repository's issue workflow. Pricing, hosted distribution and vendor support commitments are product decisions outside this implementation.

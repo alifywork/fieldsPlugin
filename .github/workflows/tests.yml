@@ -112,6 +112,8 @@ jobs:
           extensions: mysqli, dom, mbstring, zip, intl, gd
           tools: composer:v2
           coverage: none
+      - name: Installable release archive contracts
+        run: python3 tests/package-release.test.py
       - name: Native WordPress 6.9 Abilities and core development contracts
         run: bash tests/integration/run.sh
       - uses: actions/setup-node@v4
