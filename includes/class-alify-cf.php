@@ -8,6 +8,7 @@ final class Alify_CF {
 
     public static function boot() {
         add_action('init', array(__CLASS__, 'register'));
+        add_action('admin_notices', array(__CLASS__, 'notices'));
         add_action('add_meta_boxes', array(__CLASS__, 'boxes'));
         add_action('save_post', array(__CLASS__, 'save'), 10, 2);
         add_action('admin_enqueue_scripts', array(__CLASS__, 'assets'));
@@ -17,7 +18,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'image' => 'Image', 'file' => 'File');
     }
 
     public static function register() {
@@ -49,6 +50,10 @@ final class Alify_CF {
         if (!$screen || (!$screen->post_type) || ('post' !== $screen->base && 'edit' !== $screen->base)) { return; }
         if ($screen->post_type !== self::GROUP && !self::groups($screen->post_type)) { return; }
         wp_enqueue_style('alify-cf', plugins_url('assets/admin.css', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION);
+        if ($screen->post_type !== self::GROUP && $screen->base === 'post') {
+            if (current_user_can('upload_files')) { wp_enqueue_media(); }
+            wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
+        }
         if ($screen->post_type === self::GROUP && $screen->base === 'post') {
             wp_enqueue_script('alify-cf-builder', plugins_url('assets/builder.js', ALIFY_CF_FILE), array('jquery', 'jquery-ui-sortable'), ALIFY_CF_VERSION, true);
             wp_localize_script('alify-cf-builder', 'AlifyCF', array('types' => self::types()));
@@ -104,6 +109,9 @@ final class Alify_CF {
             if ($field['instructions']) { echo '<p id="' . esc_attr($id . '-help') . '" class="description">' . esc_html($field['instructions']) . '</p>'; }
             $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help') . '"';
             switch ($field['type']) {
+                case 'image':
+                case 'file':
+                    self::media_field($field, $value, $id, $input); break;
                 case 'textarea':
                     echo '<textarea' . $attrs . $required . ' rows="4">' . esc_textarea(is_scalar($value) ? $value : '') . '</textarea>'; break;
                 case 'select':
@@ -123,13 +131,19 @@ final class Alify_CF {
         }
     }
 
-    private static function clean_value($field, $value) {
+    public static function clean_value($field, $value) {
         if ($field['type'] === 'checkbox') {
             return array_values(array_intersect(array_map('strval', array_keys(self::choices($field))), array_map('sanitize_text_field', is_array($value) ? $value : array())));
         }
         if (!is_scalar($value)) { return ''; }
         $value = (string) $value;
         switch ($field['type']) {
+            case 'image':
+            case 'file':
+                if (!preg_match('/^[1-9][0-9]*$/', $value)) { return ''; }
+                $attachment = get_post((int) $value);
+                if (!$attachment || $attachment->post_type !== 'attachment' || $attachment->post_status === 'trash' || ($field['type'] === 'image' && !wp_attachment_is_image($attachment->ID))) { return ''; }
+                return (int) $value;
             case 'textarea': return sanitize_textarea_field($value);
             case 'email': return is_email($value) ? sanitize_email($value) : '';
             case 'url': return esc_url_raw($value, array('http', 'https'));
@@ -137,7 +151,7 @@ final class Alify_CF {
             case 'true_false': return $value === '1' ? '1' : '0';
             case 'select': return array_key_exists($value, self::choices($field)) ? $value : '';
             case 'date':
-                $date = DateTime::createFromFormat('!Y-m-d', $value);
+                $date = strpos($value, chr(0)) === false ? DateTime::createFromFormat('!Y-m-d', $value) : false;
                 return $date && $date->format('Y-m-d') === $value ? $value : '';
             default: return sanitize_text_field($value);
         }
@@ -146,36 +160,91 @@ final class Alify_CF {
     public static function save($id, $post) {
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE || wp_is_post_revision($id) || !current_user_can('edit_post', $id)) { return; }
         if ($post->post_type === self::GROUP) {
-            if (!current_user_can('manage_options') || !isset($_POST['alify_schema_nonce'], $_POST['alify_schema']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['alify_schema_nonce'])), 'alify_schema_' . $id)) { return; }
+            if (!current_user_can('manage_options') || !isset($_POST['alify_schema_nonce'], $_POST['alify_schema']) || !is_string($_POST['alify_schema_nonce']) || !is_string($_POST['alify_schema']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['alify_schema_nonce'])), 'alify_schema_' . $id)) { return; }
             $raw = json_decode(wp_unslash($_POST['alify_schema']), true);
-            if (!is_array($raw) || count($raw) > 200) { return; }
-            $fields = array(); $names = array();
+            $location_raw = $_POST['alify_location'] ?? 'post';
+            $location = is_string($location_raw) ? sanitize_key(wp_unslash($location_raw)) : '';
+            $errors = array();
+            if (!isset(self::post_types()[$location]) || in_array($location, array(self::GROUP, 'attachment'), true)) { $errors[] = 'Choose a valid post type.'; }
+            if (!is_array($raw) || count($raw) > 200) { self::error($id, array('Invalid field schema. A maximum of 200 fields is supported. Existing configuration was retained.')); return; }
+            $fields = array(); $names = array(); $keys = array();
             foreach ($raw as $field) {
-                if (!is_array($field)) { continue; }
-                $name = sanitize_key($field['name'] ?? '');
-                $type = sanitize_key($field['type'] ?? 'text');
-                if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || !isset(self::types()[$type])) { continue; }
+                if (!is_array($field)) { $errors[] = 'Invalid field configuration.'; continue; }
+                foreach (array('name', 'type', 'label', 'key', 'instructions', 'choices') as $property) {
+                    if (isset($field[$property]) && !is_string($field[$property])) { $errors[] = 'Invalid field setting: ' . $property; continue 2; }
+                }
+                $name = $field['name'] ?? '';
+                $type = $field['type'] ?? 'text';
+                if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || !isset(self::types()[$type]) || trim($field['label'] ?? '') === '') { $errors[] = 'Each field needs a label, supported type, and unique valid name: ' . $name; continue; }
                 $names[$name] = true;
-                $clean = array('key' => sanitize_key($field['key'] ?? '') ?: 'field_' . wp_generate_uuid4(), 'name' => $name, 'label' => sanitize_text_field($field['label'] ?? $name), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
+                $key = sanitize_key($field['key'] ?? '') ?: 'field_' . wp_generate_uuid4();
+                if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
+                $keys[$key] = true;
+                $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
                 $clean['default'] = self::clean_value($clean, $field['default'] ?? '');
                 $fields[] = $clean;
             }
-            update_post_meta($id, self::SCHEMA, $fields);
-            $location = sanitize_key(wp_unslash($_POST['alify_location'] ?? 'post'));
-            if (isset(self::post_types()[$location]) && !in_array($location, array(self::GROUP, 'attachment'), true)) { update_post_meta($id, self::LOCATION, $location); }
+            // Reserve names across published and draft groups on the same post type.
+            $others = get_posts(array('post_type' => self::GROUP, 'post_status' => array('publish', 'draft', 'pending', 'private', 'future'), 'numberposts' => -1, 'exclude' => array($id), 'meta_key' => self::LOCATION, 'meta_value' => $location));
+            foreach ($others as $other) {
+                foreach (self::schema($other->ID) as $field) {
+                    if (isset($names[$field['name']])) { $errors[] = 'Field name "' . $field['name'] . '" is already used by group "' . $other->post_title . '". Use a different name.'; }
+                }
+            }
+            if ($errors) { self::error($id, array_merge(array('Field configuration was not saved. Existing fields and location were retained.'), $errors)); return; }
+            update_post_meta($id, self::SCHEMA, wp_slash($fields));
+            update_post_meta($id, self::LOCATION, $location);
             return;
         }
+        $errors = array();
         foreach (self::groups($post->post_type) as $group) {
             $nonce = $_POST['alify_values_nonce_' . $group->ID] ?? '';
             if (!is_string($nonce) || !wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'alify_values_' . $id . '_' . $group->ID)) { continue; }
             $values = isset($_POST['alify_values'][$group->ID]) && is_array($_POST['alify_values'][$group->ID]) ? wp_unslash($_POST['alify_values'][$group->ID]) : array();
             foreach (self::schema($group->ID) as $field) {
                 $value = self::clean_value($field, $values[$field['name']] ?? '');
-                // Required values are enforced server-side too; retain the previous value on invalid submissions.
-                if ($field['required'] && ($value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1'))) { continue; }
-                update_post_meta($id, '_alify_cf_' . $field['name'], $value);
+                $submitted = $values[$field['name']] ?? '';
+                $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1');
+                $invalid = ($submitted !== '' && $submitted !== array() && $value === '');
+                if (($field['required'] && $empty) || $invalid) {
+                    $errors[] = $field['label'] . ': ' . ($field['required'] && $empty ? 'a valid value is required.' : 'invalid value.') . ' Previous value retained.';
+                    continue;
+                }
+                if (in_array($field['type'], array('image', 'file'), true) && $value !== '' && (string) alify_get_field($field['name'], $id) !== (string) $value && !current_user_can('edit_post', $value)) {
+                    $errors[] = $field['label'] . ': you cannot select this attachment. Previous value retained.';
+                    continue;
+                }
+                update_post_meta($id, '_alify_cf_' . $field['name'], wp_slash($value));
             }
         }
+        if ($errors) { self::error($id, $errors); }
+    }
+
+    private static function error($id, $messages) {
+        set_transient('alify_cf_errors_' . get_current_user_id() . '_' . $id, $messages, 120);
+    }
+
+    public static function notices() {
+        $screen = get_current_screen();
+        $id = isset($_GET['post']) && is_scalar($_GET['post']) ? absint($_GET['post']) : 0;
+        if (!$screen || $screen->base !== 'post' || !$id || !current_user_can('edit_post', $id)) { return; }
+        $key = 'alify_cf_errors_' . get_current_user_id() . '_' . $id;
+        $errors = get_transient($key);
+        if (!is_array($errors) || !$errors) { return; }
+        delete_transient($key);
+        echo '<div class="notice notice-error" role="alert"><p><strong>Alify Custom Field — some changes were not saved</strong></p><ul>';
+        foreach ($errors as $error) { echo '<li>' . esc_html($error) . '</li>'; }
+        echo '</ul><p>The post itself may still have been saved or published. Correct the fields and save again.</p></div>';
+    }
+
+    private static function media_field($field, $value, $id, $input) {
+        $attachment = $value ? get_post((int) $value) : null;
+        $valid = $attachment && $attachment->post_type === 'attachment' && $attachment->post_status !== 'trash';
+        $url = $valid && $field['type'] === 'image' ? wp_get_attachment_image_url($attachment->ID, 'thumbnail') : '';
+        echo '<div class="alify-media" data-type="' . esc_attr($field['type']) . '"><input type="hidden" id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" value="' . esc_attr($value) . '">';
+        echo '<div class="alify-media-preview" aria-live="polite"><img alt="" src="' . esc_url($url ?: '') . '"' . ($url ? '' : ' hidden') . '><span>' . esc_html($valid ? $attachment->post_title : ($value ? 'Attachment unavailable — remove or replace it.' : 'No ' . $field['type'] . ' selected')) . '</span></div>';
+        if (current_user_can('upload_files')) { echo '<button type="button" class="button" data-media="choose">Choose ' . esc_html($field['type']) . '</button> '; }
+        echo '<button type="button" class="button-link-delete" data-media="remove"' . ($value ? '' : ' hidden') . '>Remove</button></div>';
     }
 
     public static function columns($columns) {
