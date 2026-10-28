@@ -23,7 +23,7 @@ final class Alify_CF_Repeater {
             }
             $names[$name] = true; $keys[$key] = true;
             $clean = array('name' => $name, 'key' => $key, 'type' => $type, 'label' => sanitize_text_field($field['label']), 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'required' => !empty($field['required']));
-            $clean['default'] = Alify_CF::clean_value($clean, $field['default'] ?? '');
+            $clean['default'] = $type === 'gallery' ? array() : Alify_CF::clean_value($clean, $field['default'] ?? '');
             $result[] = $clean;
         }
         return $result;
@@ -38,6 +38,9 @@ final class Alify_CF_Repeater {
         foreach ((array) $old as $row) {
             if (!is_array($row)) { continue; }
             foreach ($field['sub_fields'] as $sub) {
+                if ($sub['type'] === 'gallery') {
+                    foreach ((array) ($row[$sub['name']] ?? array()) as $image_id) { if (is_scalar($image_id)) { $allowed_media[] = (string) $image_id; } }
+                }
                 if (in_array($sub['type'], array('image', 'file'), true) && !empty($row[$sub['name']])) { $allowed_media[] = (string) $row[$sub['name']]; }
             }
         }
@@ -47,9 +50,9 @@ final class Alify_CF_Repeater {
             $out = array();
             foreach ($field['sub_fields'] as $sub) {
                 $raw = $row[$sub['name']] ?? '';
-                $value = Alify_CF::clean_value($sub, $raw);
+                $value = $sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw);
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
-                if ((!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) { return ''; }
+                if (($sub['type'] === 'gallery' && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) { return ''; }
                 if ($permissions && in_array($sub['type'], array('image', 'file'), true) && $value !== '' && !in_array((string) $value, $allowed_media, true) && !current_user_can('edit_post', $value)) { return ''; }
                 $out[$sub['name']] = $value;
             }

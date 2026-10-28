@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater'}};
+    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -207,4 +207,101 @@ test('repeater row cap and move boundaries survive conditional refresh', () => {
     assert.equal(d.querySelector('[data-row-action="up"]').disabled, true);
     d.querySelector('[data-row-action="remove"]').click();
     assert.equal(add.disabled, false); w.close();
+});
+
+function galleryMarkup(name = 'values[photos]', limit = 3) {
+    return `<div class="alify-gallery" data-limit="${limit}"><div class="alify-gallery-items"></div><input type="hidden" class="alify-gallery-complete" name="${name}[__complete]" value="1"><div class="alify-gallery-footer"><button type="button" data-gallery="add">Add</button><button type="button" data-gallery="clear">Clear</button><span class="alify-gallery-count"></span></div><p class="alify-gallery-status"></p></div>`;
+}
+function mockGalleryMedia(w) {
+    w.selection = [];
+    w.wp = {media: options => {
+        w.galleryOptions = options;
+        return {on(event, callback) { this.callback = callback; }, state() { return {get() { return {toJSON() { return w.selection; }}; }}; }, open() { this.callback(); }};
+    }};
+}
+function galleryEditor() {
+    const condition = JSON.stringify({field: 'photos', operator: 'equals', value: '50'}).replace(/"/g, '&quot;');
+    const dom = new JSDOM(`<div class="alify-values"><div class="alify-value" data-field-key="photos" data-field-type="gallery">${galleryMarkup()}</div><div class="alify-value" data-field-key="caption" data-condition="${condition}"><input required></div></div>`, {runScripts: 'outside-only', url: 'https://example.test/wp-admin/post.php'});
+    const w = dom.window; w.confirm = () => true; mockGalleryMedia(w);
+    w.eval(fs.readFileSync('assets/gallery.js', 'utf8'));
+    w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    return w;
+}
+const galleryImage = id => ({id, type: 'image', filename: 'Image ' + id, url: 'https://example.test/' + id + '.png'});
+test('gallery picker appends unique images, submits ordered IDs, moves, removes and clears', () => {
+    const w = galleryEditor(), d = w.document;
+    w.selection = [galleryImage(50), galleryImage(52), galleryImage(50)];
+    d.querySelector('[data-gallery="add"]').click();
+    const ids = () => Array.from(d.querySelectorAll('.alify-gallery-items input')).map(input => input.value);
+    assert.equal(w.galleryOptions.multiple, true); assert.equal(w.galleryOptions.library.type, 'image');
+    assert.deepEqual(ids(), ['50', '52']);
+    assert.equal(d.querySelector('.alify-gallery-items input').name, 'values[photos][ids][]');
+    assert.equal(d.querySelector('[data-field-key="caption"]').hidden, false, 'Gallery source condition uses ID membership, not marker value');
+    d.querySelector('[data-gallery="down"]').click(); assert.deepEqual(ids(), ['52', '50']);
+    d.querySelectorAll('[data-gallery="up"]')[1].click(); assert.deepEqual(ids(), ['50', '52']);
+    d.querySelector('[data-gallery="remove"]').click(); assert.deepEqual(ids(), ['52']);
+    assert.equal(d.querySelector('[data-field-key="caption"]').hidden, true);
+    d.querySelector('[data-gallery="clear"]').click(); assert.deepEqual(ids(), []);
+    assert.equal(d.querySelector('.alify-gallery-complete').value, '1'); w.close();
+});
+test('gallery rejects over-limit batches atomically and preserves button limits after refresh', () => {
+    const w = galleryEditor(), d = w.document;
+    w.selection = [galleryImage(50), galleryImage(52)]; d.querySelector('[data-gallery="add"]').click();
+    w.selection = [galleryImage(54), galleryImage(55)]; d.querySelector('[data-gallery="add"]').click();
+    assert.equal(d.querySelectorAll('.alify-gallery-item').length, 2);
+    assert.match(d.querySelector('.alify-gallery-status').textContent, /not changed/);
+    w.selection = [galleryImage(54)]; d.querySelector('[data-gallery="add"]').click();
+    d.querySelector('[data-field-key="caption"] input').dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.querySelector('[data-gallery="add"]').disabled, true);
+    assert.equal(d.querySelector('[data-gallery="up"]').disabled, true);
+    d.querySelector('[data-gallery="remove"]').click();
+    assert.equal(d.querySelector('[data-gallery="add"]').disabled, false); w.close();
+});
+test('gallery validates media selection and renders unsafe filenames/URLs safely', () => {
+    const w = galleryEditor(), d = w.document;
+    w.selection = [{id: 51, type: 'application', url: 'https://example.test/file.pdf'}];
+    d.querySelector('[data-gallery="add"]').click();
+    assert.equal(d.querySelectorAll('.alify-gallery-item').length, 0);
+    w.selection = [{id: 50, type: 'image', filename: '<script>bad()</script>', url: 'javascript:alert(1)'}];
+    d.querySelector('[data-gallery="add"]').click();
+    assert.equal(d.querySelectorAll('script, .alify-gallery-item img').length, 0);
+    assert.equal(d.querySelector('.alify-gallery-title').textContent, '<script>bad()</script>'); w.close();
+});
+test('gallery works in newly added repeater rows with independent names and controls', () => {
+    const w = repeaterEditor(), d = w.document;
+    d.querySelector('template').content.querySelector('.alify-row').insertAdjacentHTML('beforeend', galleryMarkup('values[team][rows][__ROW__][photos]'));
+    mockGalleryMedia(w); w.eval(fs.readFileSync('assets/gallery.js', 'utf8'));
+    d.querySelector('[data-row-action="add"]').click(); d.querySelector('[data-row-action="add"]').click();
+    const galleries = d.querySelectorAll('.alify-gallery');
+    w.selection = [galleryImage(50)]; galleries[0].querySelector('[data-gallery="add"]').click();
+    w.selection = [galleryImage(52)]; galleries[1].querySelector('[data-gallery="add"]').click();
+    const a = galleries[0].querySelector('.alify-gallery-items input'), b = galleries[1].querySelector('.alify-gallery-items input');
+    assert.equal(a.value, '50'); assert.equal(b.value, '52'); assert.notEqual(a.name, b.name);
+    assert.match(a.name, /\[new_\d+_\d+\]\[photos\]\[ids\]\[\]/); assert.equal(a.name.includes('__ROW__'), false); w.close();
+});
+test('gallery builder supports top-level/subfield types without unsupported defaults', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Photos'); set(w, 'type', 'gallery');
+    assert.equal(d.querySelector('[data-prop="default"]'), null);
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
+    set(w, 'type', 'repeater'); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'gallery'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].type, 'gallery'); assert.equal(d.querySelector('[data-sub-prop="default"]'), null); w.close();
+});
+
+test('gallery conditional targets disable submitted IDs while hidden and restore boundaries', () => {
+    const w = galleryEditor(), d = w.document;
+    const group = d.querySelector('.alify-values');
+    group.insertAdjacentHTML('afterbegin', '<div class="alify-value" data-field-key="show" data-field-type="true_false"><input type="checkbox" value="1" checked></div>');
+    const photos = d.querySelector('[data-field-key="photos"]');
+    photos.dataset.condition = JSON.stringify({field: 'show', operator: 'equals', value: '1'});
+    // A conditional source cannot drive another rule; test only the gallery target here.
+    d.querySelector('[data-field-key="caption"]').dataset.condition = 'null';
+    w.selection = [galleryImage(50)]; d.querySelector('[data-gallery="add"]').click();
+    group.querySelector('[type="checkbox"]').click();
+    assert.equal(photos.hidden, true); assert.equal(photos.querySelector('.alify-gallery-items input').disabled, true);
+    assert.equal(photos.querySelector('.alify-gallery-complete').disabled, true);
+    group.querySelector('[type="checkbox"]').click();
+    assert.equal(photos.hidden, false); assert.equal(photos.querySelector('.alify-gallery-items input').disabled, false);
+    assert.equal(photos.querySelector('[data-gallery="up"]').disabled, true); w.close();
 });

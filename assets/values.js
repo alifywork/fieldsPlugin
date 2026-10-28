@@ -52,7 +52,9 @@
                     if (source && source.dataset.fieldType !== 'repeater' && !JSON.parse(source.dataset.condition || 'null')) {
                         const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                         let values;
-                        if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
+                        if (source.dataset.fieldType === 'gallery') {
+                            values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
+                        } else if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
                             values = inputs.filter(input => input.checked).map(input => input.value);
                             if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
                         } else values = inputs.length ? [inputs[0].value] : [''];
@@ -66,6 +68,7 @@
                 field.querySelectorAll('.alify-repeater').forEach(refreshRows);
             });
         });
+        document.dispatchEvent(new Event('alify:visibility'));
     }
     document.addEventListener('input', refreshConditions);
     document.addEventListener('change', refreshConditions);

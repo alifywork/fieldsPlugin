@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Add Gallery fields to posts, options pages and single-level repeater subfields.
+- Add native multi-image selection, thumbnails, deduplication, earlier/later moves and single/all removal controls.
+- Store ordered integer attachment IDs, bounded to 50 images per gallery.
+- Validate image types, existence, trash state and new-selection permissions; retain previous values for invalid/incomplete submissions.
+- Extend conditional logic to gallery membership and empty/nonempty checks, preserving hidden selections.
+- Preserve control limits after conditional refresh and support galleries in dynamically added repeater rows.
+- Expand verification to 19 admin interaction tests and 145 PHP contract assertions.
+
 ## 0.5.0
 
 - Add built-in Site Settings and `alify_add_options_page()` for additional global settings pages.

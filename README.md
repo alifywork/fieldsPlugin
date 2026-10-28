@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.5.0 — options pages release**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.0 — gallery release**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,9 +13,10 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File and Repeater.
+- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File, Repeater and Gallery.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
+- Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
 - Attachment IDs validated by type and attachment edit permissions on selection.
 - Atomic schema validation and duplicate-name protection across active/draft groups on the same post type.
 - Per-user, per-post save-error notices that name rejected fields and preserve prior values.
@@ -77,6 +78,49 @@ if ($url) {
 
 On staging, select/upload an image and a PDF; save and reload, replace and remove them, then test a required empty media field. Attempt to submit a PDF ID for an Image field or a non-attachment post ID for either field. Confirm the previous value survives with an error notice. Verify media selection as administrator and editor, and clearing as a custom role without upload permission.
 
+## Gallery fields
+
+Choose **Gallery** in a field group or repeater subfield. Use **Add Images** to select multiple images in the native WordPress media picker. New selections append in selection order; images already in the gallery are not duplicated. Use the earlier/later arrow buttons to reorder, **Remove** for a single image, or **Remove all** to clear it. These actions never delete files from the Media Library.
+
+```php
+// Gallery values are ordered arrays of attachment IDs, not URLs or image arrays.
+foreach ((array) alify_get_field('property_gallery', get_the_ID()) as $image_id) {
+    echo wp_get_attachment_image((int) $image_id, 'large');
+}
+
+// Options Pages use the same value shape.
+foreach ((array) alify_get_option('brand_gallery') as $image_id) {
+    echo wp_get_attachment_image((int) $image_id, 'thumbnail');
+}
+
+// Inside a repeater row:
+foreach (alify_get_rows('projects') as $project) {
+    foreach (($project['photos'] ?? array()) as $image_id) {
+        echo wp_get_attachment_image((int) $image_id, 'medium');
+    }
+}
+```
+
+### Gallery behavior and limits
+
+- Maximum **50 images per gallery**, including galleries inside rows. Gallery defaults, drag sorting, pagination, captions editing and configurable min/max settings are not implemented. New galleries start empty; a required gallery needs at least one valid image.
+- JavaScript is required for gallery controls. Selecting an over-limit batch rejects the whole new selection with a message; current images remain unchanged.
+- Saved values are unique integer attachment IDs in display order. Unsaved values read as `null`; an explicitly cleared optional gallery saves as `[]`. `alify_the_field()` / `alify_the_option()` do not output arrays.
+- The server validates positive integer IDs, image attachment type, existence and trash status. Newly selected IDs require attachment edit permission; existing IDs can be retained/reordered without that permission. The Add Images button requires `upload_files`; removal does not.
+- An invalid image, missing completion marker or truncated submission retains the **whole previous gallery**. An invalid gallery in a repeater retains the whole repeater; an invalid gallery on an options page rejects the whole page save. Host input-variable limits still apply to large galleries/repeaters.
+- Deleted/unavailable images are shown with a warning label; remove them before saving a visible gallery. This avoids silently dropping stale content.
+- Top-level galleries support conditional logic as sources and targets. Equality means selected-ID membership; empty/not-empty checks the selection count. Hidden galleries preserve their stored values. Subfield conditions remain unsupported.
+- Converting an existing field to/from Gallery does not migrate its old value. Structural changes should be tested on a backup/staging site.
+
+### Gallery staging checks
+
+1. Select/upload three images, save/reload, reorder them, remove one, save again, and verify frontend order in classic and block editors.
+2. Select an existing image again and confirm it is not duplicated. Remove all, save/reload, and verify `[]` for an optional gallery; repeat with required enabled and confirm previous data is retained.
+3. Test Gallery in a newly added repeater row and on Site Settings. Verify independent control names, row ordering and options-page atomic saves.
+4. Test each conditional operator with selected image IDs and hide/reveal a required gallery; confirm hidden values survive and hidden inputs do not block validation.
+5. Test non-image IDs, trashed/deleted attachments, invalid/missing markers, restricted attachment permissions, and a large form near the host's input-variable limit.
+6. Verify keyboard earlier/later controls, mobile layouts, no-upload roles, real media-modal cancellation, and the 50-image cap.
+
 ## Options Pages
 
 A built-in **Site Settings** submenu is available under **Alify Custom Field**. To populate it:
@@ -86,7 +130,7 @@ A built-in **Site Settings** submenu is available under **Alify Custom Field**. 
 3. Publish the group, then visit **Alify Custom Field → Site Settings**.
 4. Enter global values and click **Save Settings**.
 
-All twelve field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
+All thirteen field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
 
 ```php
 // Read from the built-in 'site' page (not from a post).
@@ -143,7 +187,7 @@ alify_the_option('footer_text', 'footer');
 
 ## Repeater fields
 
-Select **Repeater** as the field type, then add 1–20 subfields in its card. Each subfield has a local name, label, type, instructions, choices, default and required setting. All eleven basic types (including Image/File) work as subfields. Add, remove and move subfields with the builder buttons.
+Select **Repeater** as the field type, then add 1–20 subfields in its card. Each subfield has a local name, label, type, instructions, choices, default and required setting. All twelve non-repeater types (including Image/File/Gallery) work as subfields. Add, remove and move subfields with the builder buttons.
 
 In the post editor, use **Add Row**, **Remove row**, and the up/down buttons to manage row order. A repeater starts empty; subfield defaults apply to newly added rows, not retroactively to existing rows. Marking the repeater required means at least one valid row is required. JavaScript is required for row management.
 
@@ -171,7 +215,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 ### Repeater staging checks
 
 1. Create a `team_members` repeater with required `name`, optional `email`, checkbox `roles`, and image `photo`. Add three rows, save/reload, reorder, remove and save again. Check template output order.
-2. Test all eleven subfield types, Unicode, quotes and backslashes. Confirm choice arrays, unchecked toggles and cleared media round-trip correctly.
+2. Test all twelve subfield types, Unicode, quotes and backslashes. Confirm choice arrays, unchecked toggles and cleared media round-trip correctly.
 3. Try invalid email, a PDF in an Image subfield and a missing required name. Verify the entire previous repeater is retained with a notice.
 4. Remove every optional row; confirm it stays empty after reload. Mark the repeater required and try saving zero rows.
 5. Add a top-level toggle condition to the repeater; hide it, save, reveal it and verify rows survive and hidden required subfields do not block saving.
@@ -184,7 +228,7 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 - Each field supports **one rule**, referencing an **unconditional non-repeater field in the same group**. AND/OR groups, cross-group references and conditional chains are not implemented.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
-- Checkbox equality tests whether the comparison key is selected; inequality tests absence. An unchecked True / False field counts as empty; number/text `0` does not.
+- Checkbox/Gallery equality tests whether the comparison key/image ID is selected; inequality tests absence. An unchecked True / False field counts as empty; number/text `0` does not.
 - Rules reference stable field keys, so renaming/reordering the source does not break them. Removing a referenced source requires updating/disabling its rules before the schema can save. Self-references, cycles and chains are rejected with the previous schema retained.
 - Initially visible fields are calculated from saved values/defaults. JavaScript is required for live updates and disabling hidden inputs so browser validation ignores them.
 - At save time, rules use sanitized submitted source values, not old saved values. Hidden field values are **preserved**, not cleared, even if a forged request submits them. Visible fields retain the existing validation behavior. Sanitization of invalid/HTML input can change a source value on the server; use plain, valid source values for comparisons.
@@ -205,18 +249,18 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Rejected input is not repopulated.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested repeaters, Gallery, Flexible Content, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
+- No nested repeaters, Flexible Content, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Verification
 
-Automated checks for 0.5.0:
+Automated checks for 0.6.0:
 
 ```sh
 npm ci
-npm test       # 13 jsdom tests for builder, media, conditions and repeaters
+npm test       # 19 jsdom tests for builder, media, galleries, conditions and repeaters
 npm run check # JavaScript syntax
-php tests/php-unit.php # 113 assertions with isolated WordPress stubs
+php tests/php-unit.php # 145 assertions with isolated WordPress stubs
 ```
 
 PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP files were also parsed against PHP 7.4 grammar. Tests use stubs for WordPress and the media frame, not a live WordPress database or browser. Activation, real media uploads, native sorting and editor integration still require staging checks below.
@@ -224,7 +268,7 @@ PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP fi
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all twelve types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all thirteen types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.
