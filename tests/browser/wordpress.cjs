@@ -531,7 +531,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.goto(base + '/wp-admin/nav-menus.php?action=edit&menu=' + fixture.native_menu);
         const itemPanel = page.locator('#menu-item-' + fixture.native_item); await itemPanel.locator('.item-edit').click();
         const itemInput = page.locator(`[name="alify_object_values[menu_item:${fixture.native_item}][${fixture.item_group}][item_note]"]`); await itemInput.fill('Native item note');
-        await Promise.all([page.waitForNavigation(), page.locator('#save_menu_footer').click()]);
+        try { await Promise.all([page.waitForNavigation(), page.locator('#save_menu_footer').click()]); } catch (error) { const diagnostic = await page.evaluate(() => ({url: location.href, invalid: Array.from(document.querySelectorAll(':invalid')).map(node => ({tag: node.tagName, name: node.name, id: node.id, type: node.type, hidden: !!node.closest('[hidden]')})), active: document.activeElement?.id})); console.log('::error title=Native menu submission::' + JSON.stringify(diagnostic)); throw error; }
         await itemPanel.locator('.item-edit').click(); check(await itemInput.inputValue(), 'Native item note', 'Native navigation-menu item field persists');
         await page.goto(base + '/?alify_frontend_test=' + fixture.advanced_post);
         await page.locator('[data-editor-tab]').nth(1).click(); const frontendText = page.locator(`[name="alify_values[${fixture.advanced_group}][advanced_text]"]`); await frontendText.fill('Frontend native form');

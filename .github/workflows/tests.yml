@@ -119,8 +119,8 @@ jobs:
           node-version: '22'
       - name: Install pinned provider fixtures outside the checkout
         run: |
-          curl --fail --location --retry 3 https://github.com/woocommerce/woocommerce/releases/download/10.3.6/woocommerce.zip -o /tmp/woocommerce.zip
-          echo '29c4998ee54bd1187f6038635924fca0cc8da3216e4a1c73876a49fc1e33347b  /tmp/woocommerce.zip' | sha256sum --check
+          curl --fail --location --retry 3 https://github.com/woocommerce/woocommerce/releases/download/10.9.0/woocommerce.zip -o /tmp/woocommerce.zip
+          echo '5fa62d9714da89c4dfa2c0b888b3fc6a4fb8f80559a95970da610ea6439f8095  /tmp/woocommerce.zip' | sha256sum --check
           unzip -q /tmp/woocommerce.zip -d "$ALIFY_WP_ROOT/wp-content/plugins"
           git clone --depth 1 --branch 3.9.1 https://github.com/polylang/polylang.git "$ALIFY_WP_ROOT/wp-content/plugins/polylang"
           composer install --working-dir="$ALIFY_WP_ROOT/wp-content/plugins/polylang" --no-dev --no-interaction --no-progress --no-scripts --prefer-dist
