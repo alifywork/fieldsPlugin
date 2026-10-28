@@ -126,4 +126,4 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 
 ## Delivery log
 
-- **v0.18.0 — Radio Button:** first sequential feature. See README/CHANGELOG and the feature tests for the exact supported scope. Next: **Button Group**. Subsequent work follows the numbered queue unless a dependency requires reordering, which must be recorded here.
+- **v0.18.0 — Radio Button:** first sequential feature. See README/CHANGELOG and the feature tests for the exact supported scope. Verified in [CI run 40693944722](https://github.com/alifywork/fieldsPlugin/actions/runs/40693944722): all four native targets pass (325 backend / 101 browser / 24 HTTP persistence checks), plus 385 isolated PHP assertions and 48 JS tests. Next: **Button Group**. Subsequent work follows the numbered queue unless a dependency requires reordering, which must be recorded here.

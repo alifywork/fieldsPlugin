@@ -6,7 +6,7 @@
 - Support posts/Options/basic Group, Repeater and Flexible subfields, conditional sources/targets, the core REST save bridge and schema-only JSON transfer.
 - Reject unknown keys and malformed types while retaining previous scalar/container/Options values. Read checked radio choices, not hidden sentinels, in browser conditions.
 - Add a sequential development roadmap covering the missing/partial ACF-comparison capabilities; next feature is Button Group.
-- Local checks pass: 385 isolated PHP assertions, 48 JS tests and 325 backend assertions on each existing SQLite WordPress/PHP target. Native/browser CI verification is recorded after completion.
+- Feature checks pass on all four existing native-PHP targets: 325 backend, 101 browser and 24 HTTP persistence assertions; 385 isolated PHP assertions and 48 JS tests pass. Both local PHP-WASM/SQLite targets also pass 325 backend assertions. Verified in CI run 40693944722.
 
 ## 0.17.0
 
