@@ -2,6 +2,8 @@
 // Isolated contract tests with WordPress stubs, not a substitute for WP integration tests.
 define('ABSPATH', __DIR__);
 $meta = array(); $transients = array(); $posts = array(); $allowed = true; $denied = array();
+function post_password_required($post) { return !empty($post->post_password); }
+function is_post_publicly_viewable($post) { return $post->post_status === 'publish'; }
 function wp_is_post_revision($id) { return false; }
 function current_user_can($cap, $id = 0) { global $allowed, $denied; return $allowed && !in_array($id, $denied, true); }
 function wp_verify_nonce($nonce, $action) { return $nonce === 'valid'; }
@@ -687,4 +689,25 @@ same(array(), Alify_CF::validate_values(array($rich), array('copy' => array()), 
 $errors = array(); Alify_CF_Repeater::schema(array($rich), $errors); same(true, (bool) $errors, 'Dynamic containers reject unsupported rich-text subfields');
 $target = field('conditional_copy'); $target['condition'] = array('field' => 'field_copy', 'operator' => 'not_empty', 'value' => ''); $errors = array();
 Alify_CF::validate_schema(array($rich, $target), 'post', 0, $errors); same(true, (bool) $errors, 'Rich text cannot be an ambiguous condition source');
+$posts[801] = (object) array('ID' => 801, 'post_type' => 'post', 'post_status' => 'publish');
+$posts[802] = (object) array('ID' => 802, 'post_type' => 'page', 'post_status' => 'private');
+$posts[803] = (object) array('ID' => 803, 'post_type' => 'post', 'post_status' => 'trash');
+$posts[804] = (object) array('ID' => 804, 'post_type' => 'attachment', 'post_status' => 'inherit');
+same(801, Alify_CF_Post_Object::clean('801'), 'Post reference stores an integer ID');
+same(802, Alify_CF_Post_Object::clean(802), 'Post reference accepts supported private pages structurally');
+foreach (array('0801', '0', '-1', 0, true, array(), '801x', '99999999999999999999999', '9999', '803', '804') as $bad) { same('', Alify_CF_Post_Object::clean($bad), 'Post reference rejects noncanonical/dead/unsupported targets'); }
+$denied = array(802);
+same('', Alify_CF_Post_Object::clean('802', null, true), 'New unreadable reference is rejected');
+same(802, Alify_CF_Post_Object::clean('802', 802, true), 'Unchanged existing unreadable reference may be retained without exposing its title');
+$ref_field = field('related', 'post_object'); $errors = array();
+same(array(), Alify_CF::validate_values(array($ref_field), array('related' => '802'), array(), $errors), 'Root validation rejects new unreadable reference');
+$errors = array(); same(array('related' => ''), Alify_CF::validate_values(array($ref_field), array('related' => ''), array('related' => 801), $errors), 'Optional post reference explicitly clears');
+$ref_field['required'] = true; $errors = array(); same(array(), Alify_CF::validate_values(array($ref_field), array('related' => ''), array('related' => 801), $errors), 'Required post reference rejects clear');
+$ref_rows = field('refs', 'repeater'); $ref_rows['sub_fields'] = array($ref_field); $issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($ref_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'related' => '802'))), null, true, $issue, $location), 'Unreadable post selection rejects entire row container');
+same(array('row' => 0, 'subfield' => 'related'), $location, 'Post reference rejection identifies exact subfield');
+same(array(array('related' => 802)), Alify_CF_Repeater::clean($ref_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'related' => '802'))), array(array('related' => 802)), true), 'Existing reference pool permits safe row reorder');
+$meta[10]['_alify_cf_related'] = 802; same(null, alify_get_post_object('related', 10), 'Typed getter does not return unreadable private object');
+$meta[10]['_alify_cf_related'] = 801; same($posts[801], alify_get_post_object('related', 10), 'Typed getter returns viewable post object');
+$denied = array();
 echo "PASS: $count PHP contract assertions\n";

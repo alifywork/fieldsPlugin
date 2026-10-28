@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -602,4 +602,38 @@ test('rich editor tears down before metabox movement and recreates from saved te
     const ui = {item: [d.querySelector('.postbox')]};
     handlers.sortstart({}, ui); assert.equal(textarea.value, '<p>Latest</p>'); assert.equal(removed, 1);
     handlers.sortstop({}, ui); assert.equal(initialized, 2); assert.equal(textarea.value, '<p>Latest</p>'); w.close();
+});
+
+
+function postPicker() {
+    const dom = new JSDOM('<div class="alify-value"><div class="alify-post-object"><input type="hidden" name="related"><p class="alify-post-selected"></p><button data-post-clear>Clear</button><input data-post-search><select data-post-type><option value="">Both</option></select><button data-post-find>Search</button><div class="alify-post-results"></div><p class="alify-post-status"></p><button data-post-prev>Previous</button><button data-post-next>Next</button></div></div>', {runScripts: 'outside-only'});
+    const w = dom.window; w.AlifyPostObject = {url: '/wp-admin/admin-ajax.php', nonce: 'test'};
+    w.eval(fs.readFileSync('assets/post-object.js', 'utf8')); return w;
+}
+test('post picker renders safe search text, selects IDs and clears explicitly', async () => {
+    const w = postPicker(), d = w.document; let request;
+    w.fetch = async (url, options) => { request = options; return {ok: true, json: async () => ({success: true, data: {items: [{id: 80, title: '<img src=x>', type: 'page'}]}})}; };
+    d.dispatchEvent(new w.Event('alify:visibility')); assert.equal(d.querySelector('[data-post-next]').disabled, true);
+    d.querySelector('[data-post-find]').click(); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(request.body.get('action'), 'alify_cf_search_posts'); assert.equal(request.body.get('page'), '1');
+    assert.equal(d.querySelector('.alify-post-results img'), null);
+    d.querySelector('[data-post-id]').click(); assert.equal(d.querySelector('[name="related"]').value, '80');
+    d.querySelector('[data-post-clear]').click(); assert.equal(d.querySelector('[name="related"]').value, ''); w.close();
+});
+test('post picker discards stale search responses after the query changes', async () => {
+    const w = postPicker(), d = w.document, pending = [];
+    w.fetch = () => new Promise(resolve => pending.push(resolve));
+    d.querySelector('[data-post-find]').click();
+    const search = d.querySelector('[data-post-search]'); search.value = 'New'; search.dispatchEvent(new w.Event('input', {bubbles: true}));
+    d.querySelector('[data-post-find]').click();
+    pending[0]({ok: true, json: async () => ({success: true, data: {items: [{id: 1, title: 'Stale', type: 'post'}]}})});
+    pending[1]({ok: true, json: async () => ({success: true, data: {items: [{id: 2, title: 'Current', type: 'page'}]}})});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(d.querySelectorAll('[data-post-id]').length, 1); assert.equal(d.querySelector('[data-post-id]').dataset.postId, '2'); w.close();
+});
+test('Post Object builder omits site-local defaults and offers basic subfields', () => {
+    const w = builder(); w.document.getElementById('alify-add').click(); set(w, 'label', 'Related'); set(w, 'type', 'post_object');
+    assert.equal(w.document.querySelector('[data-prop="default"]'), null);
+    set(w, 'type', 'repeater'); w.document.querySelector('[data-sub-action="add"]').click();
+    assert.notEqual(w.document.querySelector('[data-sub-prop="type"] option[value="post_object"]'), null); w.close();
 });

@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.15.0 — WYSIWYG rich-text field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.16.0 — searchable Post Object field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -28,6 +28,27 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
+
+## Post Object field
+
+**Post Object (`post_object`)** is a single post/page reference with a searchable selector, type filter, Previous/Next pages and explicit Clear selection. It works on post/Options fields and as a basic Group/Repeater/Flexible subfield. References store canonical IDs, not copied content or titles. WordPress scalar post-meta reads return a string ID; serialized container/Options values retain integer IDs.
+
+- This increment supports **posts and pages only**, with publish/private/draft/pending/future statuses. Attachments, revisions, trash, auto-drafts and custom post types are excluded. Multi-select Relationship fields are a separate future feature.
+- Search requires authentication, a user-scoped nonce and `edit_posts`, `edit_pages` or `manage_options`. Each result also passes object-level read permissions; password-protected targets require password access or edit permission. Only IDs, readable titles and types are returned—no content or unfiltered totals.
+- Queries fetch at most 20 candidates per page, pages 1–100. Permission-filtered pages can be empty; Next does not imply that another readable result exists. Refine the search instead of expecting exhaustive browsing. Search terms are capped at 200 bytes.
+- New references require read access. An unchanged pre-existing reference (or the same saved container's reference moved between rows) can be retained after access loss, without disclosing its title. Deleted/unsupported targets are rejected until explicitly cleared/replaced; saved content is not silently rewritten.
+- Required fields need a valid nonempty reference. Optional fields explicitly clear to `''`; malformed/forged IDs reject with the previous scalar/container retained. Options saves stay page-atomic.
+- Defaults are always empty and reset during JSON transfer because IDs are site-local. JSON transfers schema only, not referenced posts; destination plugins need **0.16.0+**.
+- Whole-field conditional visibility works; source comparisons use the canonical ID string. Existing subfield-condition/nesting limits still apply.
+
+```php
+$related = alify_get_post_object('related', get_the_ID()); // WP_Post or null.
+// Resolves only currently public/viewable or permitted targets, not unreadable private content.
+if ($related) {
+    printf('<a href="%s">%s</a>', esc_url(get_permalink($related)), esc_html(get_the_title($related)));
+}
+// Raw ID: alify_get_field('related', $post_id), or alify_get_option('related', 'site').
+```
 
 ## WYSIWYG rich-text field
 
@@ -394,7 +415,7 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.15.0:
+Previous verified baseline (0.15.0; Post Object development checks extend it):
 
 ```sh
 npm ci

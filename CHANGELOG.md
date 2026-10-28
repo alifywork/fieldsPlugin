@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0
+
+- Add single Post Object references with AJAX search, post/page filtering, bounded pagination and explicit clearing on posts, Options Pages and basic container subfields.
+- Require search nonce/authoring capability and per-object read/password access; never return unreadable titles, content or unfiltered totals. Discard stale search responses and reset pagination when queries change.
+- Validate canonical IDs/statuses; retain prior scalar/container on rejection and allow unchanged saved references after access loss without revealing their title.
+- Add permission-aware `alify_get_post_object()` and schema-only JSON transfer with empty site-local defaults. CPT filtering, multi-select relationships and cross-site reference migration remain out of scope.
+
 ## 0.15.0
 
 - Feature checks pass on all four existing native-PHP targets: 262 backend, 85 browser and 24 HTTP persistence assertions; 325 isolated PHP assertions and 41 JS tests also pass.

@@ -56,7 +56,7 @@
             if (!ids.includes(description.id)) ids.push(description.id);
             control.setAttribute('aria-describedby', ids.join(' '));
         });
-        const target = controls.find(control => control.matches('[data-rich-editor]')) || controls[0] || message;
+        const target = controls.find(control => control.matches('[data-rich-editor], [data-post-search]')) || controls[0] || message;
         if (target === message) message.tabIndex = -1;
         if (scope !== field) {
             const jump = document.createElement('button'); jump.type = 'button'; jump.className = 'button-link alify-error-jump'; jump.textContent = 'Go to invalid field';

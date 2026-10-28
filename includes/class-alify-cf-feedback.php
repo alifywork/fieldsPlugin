@@ -46,6 +46,11 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'post_object') {
+            if ($raw === '') { return ''; }
+            $id = Alify_CF_Post_Object::clean($raw);
+            return $id !== '' && ((is_scalar($previous) && (string) $id === (string) $previous) || Alify_CF_Post_Object::readable($id)) ? $id : $previous;
+        }
         if ($field['type'] === 'wysiwyg') { return is_string($raw) ? wp_kses_post(substr($raw, 0, 100000)) : ''; }
         if ($field['type'] === 'link') {
             if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1') { return $previous; }

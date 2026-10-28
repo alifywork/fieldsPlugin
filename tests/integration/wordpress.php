@@ -623,6 +623,58 @@ try {
     $rich_json = json_decode(Alify_CF_Transfer::export_json($diagnostic_group, $export_nonce), true); $rich_json['group']['location'] = 'options:color-transfer';
     $rich_import = Alify_CF_Transfer::import_json(wp_json_encode($rich_json), $import_nonce); $fixtures[] = $rich_import;
     expect_same(Alify_CF::schema($diagnostic_group), Alify_CF::schema($rich_import), 'JSON round trip preserves WYSIWYG schema/default HTML');
+    $_POST = array();
+    $reference_public = fixture_post('page'); wp_update_post(array('ID' => $reference_public, 'post_title' => 'Alify Reference target Public', 'post_status' => 'publish'));
+    $reference_private = fixture_post('page'); wp_update_post(array('ID' => $reference_private, 'post_title' => 'Alify Reference target Secret', 'post_status' => 'private'));
+    $reference_password = fixture_post('page'); wp_update_post(array('ID' => $reference_password, 'post_title' => 'Alify Reference target Password', 'post_status' => 'publish', 'post_password' => 'fixture-password'));
+    $reference_author = wp_insert_user(array('user_login' => 'alify-ref-' . wp_generate_uuid4(), 'user_pass' => wp_generate_password(30), 'role' => 'author'));
+    $reference_field = test_field('related', 'post_object', true);
+    $reference_group = test_field('reference_group', 'group'); $reference_group['sub_fields'] = array($reference_field);
+    $reference_rows = test_field('reference_rows', 'repeater'); $reference_rows['sub_fields'] = array($reference_field);
+    $reference_blocks = test_field('reference_blocks', 'flexible'); $reference_blocks['layouts'] = array(array('key' => 'layout_references', 'name' => 'references', 'label' => 'References', 'sub_fields' => array($reference_field)));
+    $reference_schema = array($reference_field, $reference_group, $reference_rows, $reference_blocks);
+    configure_group($diagnostic_group, $reference_schema);
+    $reference_data = array('related' => (string) $reference_public, 'reference_group' => array('__complete' => '1', 'fields' => array('related' => (string) $reference_public)), 'reference_rows' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'related' => (string) $reference_public))), 'reference_blocks' => array('__complete' => '1', 'rows' => array(array('layout' => 'references', '__complete' => '1', 'fields' => array('related' => (string) $reference_public)))));
+    save_values($diagnostic_post, $diagnostic_group, $reference_data);
+    expect_same((string) $reference_public, alify_get_field('related', $diagnostic_post), 'Post Object saves canonical IDs using WordPress scalar metadata semantics');
+    expect_same($reference_public, alify_get_post_object('related', $diagnostic_post)->ID, 'Typed Post Object getter resolves viewable page');
+    expect_same(array('related' => $reference_public), alify_get_group('reference_group', $diagnostic_post), 'Post Object works in Group');
+    expect_same(array(array('related' => $reference_public)), alify_get_rows('reference_rows', $diagnostic_post), 'Post Object works in Repeater');
+    expect_same(array(array('layout' => 'references', 'fields' => array('related' => $reference_public))), alify_get_layouts('reference_blocks', $diagnostic_post), 'Post Object works in Flexible');
+    $reference_nonce = wp_create_nonce('alify_cf_search_posts');
+    $reference_search = Alify_CF_Post_Object::search('Alify Reference target', 'page', '1', $reference_nonce);
+    expect_same(true, in_array($reference_private, array_column($reference_search['items'], 'id'), true), 'Administrator search can see readable private page');
+    expect_same(false, array_key_exists('total', $reference_search), 'Search does not expose unfiltered totals');
+    expect_same(true, is_wp_error(Alify_CF_Post_Object::search('', '', 1, 'invalid')), 'Search rejects invalid nonce');
+    expect_same(true, is_wp_error(Alify_CF_Post_Object::search('', 'attachment', 1, $reference_nonce)), 'Search rejects unsupported type');
+    expect_same(true, is_wp_error(Alify_CF_Post_Object::search('', '', 101, $reference_nonce)), 'Search bounds pagination');
+    wp_set_current_user($reference_author); $author_nonce = wp_create_nonce('alify_cf_search_posts');
+    $author_search = Alify_CF_Post_Object::search('Alify Reference target', 'page', 1, $author_nonce);
+    expect_same(array($reference_public), array_column($author_search['items'], 'id'), 'Author search omits unreadable private/password-protected page identities');
+    ob_start(); Alify_CF_Post_Object::render($reference_field, $reference_private, 'private-reference', 'related'); $reference_html = ob_get_clean();
+    expect_same(false, strpos($reference_html, 'Alify Reference target Secret') !== false, 'Unavailable saved selection never exposes private title');
+    $reference_errors = array(); $ref_updates = Alify_CF::validate_values(array($reference_field), array('related' => (string) $reference_private), array(), $reference_errors);
+    expect_same(array(), $ref_updates, 'Forged new unreadable post ID rejected with real permissions');
+    $reference_errors = array(); expect_same(array('related' => $reference_private), Alify_CF::validate_values(array($reference_field), array('related' => (string) $reference_private), array('related' => $reference_private), $reference_errors), 'Unchanged old private reference may be retained after access loss');
+    wp_set_current_user(0); expect_same($reference_public, alify_get_post_object('related', $diagnostic_post)->ID, 'Public typed getter works without login');
+    expect_same(true, is_wp_error(Alify_CF_Post_Object::search('', '', 1, wp_create_nonce('alify_cf_search_posts'))), 'Unauthenticated search has no authoring permission');
+    wp_set_current_user($admin->ID);
+    $reference_bad = $reference_data; $reference_bad['related'] = '999999999';
+    $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $diagnostic_post); $request->set_param('status', 'publish');
+    $reference_bad['__group_complete'] = '1'; $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $reference_bad)));
+    expect_same(400, rest_do_request($request)->get_status(), 'REST rejects unsupported referenced attachment');
+    $reference_data['__group_complete'] = '1'; $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $reference_data)));
+    expect_same(200, rest_do_request($request)->get_status(), 'REST accepts valid post reference in same-request save');
+    configure_group($diagnostic_options, $reference_schema, 'options:diagnostics');
+    $diagnostic_request['alify_values'] = array($diagnostic_options => $reference_data); $diagnostic_errors = array();
+    expect_same(true, Alify_CF_Options::save('diagnostics', $diagnostic_request, $diagnostic_errors), 'Options supports Post Object and basic subfields');
+    expect_same($reference_public, alify_get_option('related', 'diagnostics'), 'Options reference getter returns integer');
+    $reference_saved = Alify_CF_Options::data('diagnostics'); $diagnostic_request['alify_values'][$diagnostic_options] = $reference_bad;
+    expect_same(false, Alify_CF_Options::save('diagnostics', $diagnostic_request, $diagnostic_errors), 'Invalid Options post reference rejects whole page');
+    expect_same($reference_saved, Alify_CF_Options::data('diagnostics'), 'Failed reference save preserves options page atomically');
+    $ref_json = json_decode(Alify_CF_Transfer::export_json($diagnostic_group, $export_nonce), true); $ref_json['group']['location'] = 'options:color-transfer';
+    $ref_import = Alify_CF_Transfer::import_json(wp_json_encode($ref_json), $import_nonce); $fixtures[] = $ref_import;
+    expect_same(Alify_CF::schema($diagnostic_group), Alify_CF::schema($ref_import), 'JSON transfers Post Object schemas with empty site-local defaults');
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
@@ -640,5 +692,6 @@ try {
     delete_option('alify_cf_options_row-limits');
     delete_option('alify_cf_options_diagnostics');
     Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
+    if (isset($reference_author)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($reference_author); }
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }
