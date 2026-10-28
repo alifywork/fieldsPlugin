@@ -7,7 +7,7 @@
 - Validate whole values atomically across posts, options and core REST saves; reject unknown layouts, incomplete rows and unauthorized new media while retaining previous values.
 - Support JSON schema transfer, bounded recovery, whole-field conditions, publication validation and `alify_get_layouts()`.
 - Warn on removed saved layouts instead of silently dropping them. Nested containers, per-layout conditions and migrations remain unsupported.
-- Add isolated PHP/jsdom, real WordPress and real-browser Flexible regressions to the native-PHP SQLite/MySQL matrix.
+- Verify all four native-PHP SQLite/MySQL targets with 160 backend and 30 real-browser assertions per target, plus 201 isolated PHP assertions and 26 jsdom tests.
 
 ## 0.8.0
 

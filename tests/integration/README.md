@@ -25,29 +25,29 @@ The GitHub Actions workflow runs this suite using native PHP. In the Arena sandb
 
 | WordPress | PHP runtime | Database | Result |
 |---|---|---|---|
-| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB | 141 assertions passed, clean debug log |
-| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB | 141 assertions passed, clean debug log |
+| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB | 160 assertions passed, clean debug log |
+| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB | 160 assertions passed, clean debug log |
 
 These are explicit test targets, **not a claim that 6.8.3 is the latest WordPress release**, or a recommendation to deploy an old version. Keep production WordPress/PHP patched.
 
-Coverage includes activation persistence, init registration, all 14 field schemas, Unicode/quotes/backslashes, scalar and serialized metadata types, galleries/repeaters, cleared toggles/checkboxes, real nonce rejection, revision-save guards, editor/anonymous access checks, hidden-field preservation, options isolation/atomicity/autoload, real options form rendering, inline validation, rejected-input recovery/clearing, user isolation and stale-schema recovery rejection. Publication regressions cover Classic invalid/valid publish and schedule transitions, existing-public status preservation, REST pre-write rejection, same-request values, omitted payloads, new-post creation, authentication, write-only responses and autosaves.
+Coverage includes activation persistence, init registration, all 15 field schemas, Unicode/quotes/backslashes, scalar and serialized metadata types, galleries/repeaters, cleared toggles/checkboxes, real nonce rejection, revision-save guards, editor/anonymous access checks, hidden-field preservation, options isolation/atomicity/autoload, real options form rendering, inline validation, rejected-input recovery/clearing, user isolation and stale-schema recovery rejection. Publication regressions cover Classic invalid/valid publish and schedule transitions, existing-public status preservation, REST pre-write rejection, same-request values, omitted payloads, new-post creation, authentication, write-only responses and autosaves.
 
 ## Native MySQL 8 CI target
 
 The CI matrix also runs the same backend and Chromium suites against a disposable **MySQL 8.0** service, on both PHP/WordPress pairs. This is separate from the locally observed SQLite results above. No MySQL server/native PHP is installed in the Arena sandbox; MySQL results come from the actual CI jobs.
 
-**Verified in native-PHP CI, 2026-10-28:** [run 40668605180](https://github.com/alifywork/fieldsPlugin/actions/runs/40668605180) passed all four targets:
+**Verified in native-PHP CI, 2026-10-28:** [run 40669752864](https://github.com/alifywork/fieldsPlugin/actions/runs/40669752864) passed all four targets:
 
 | WordPress | Native PHP | Database | Backend | Real Chromium |
 |---|---|---|---|---|
-| 6.2 | 7.4 | MySQL 8.0 | 141 assertions passed | 27 assertions passed |
-| 6.8.3 | 8.3 | MySQL 8.0 | 141 assertions passed | 27 assertions passed |
-| 6.2 | 7.4 | SQLite | 141 assertions passed | 27 assertions passed |
-| 6.8.3 | 8.3 | SQLite | 141 assertions passed | 27 assertions passed |
+| 6.2 | 7.4 | MySQL 8.0 | 160 assertions passed | 30 assertions passed |
+| 6.8.3 | 8.3 | MySQL 8.0 | 160 assertions passed | 30 assertions passed |
+| 6.2 | 7.4 | SQLite | 160 assertions passed | 30 assertions passed |
+| 6.8.3 | 8.3 | SQLite | 160 assertions passed | 30 assertions passed |
 
-Browser coverage now includes actual JSON download and schema inspection, uploaded and pasted imports with redirect to a draft, Unicode/quote/backslash preservation, conflict rejection, invalid nonce and malformed upload. Backend transfer checks also cover capabilities, format/version/size, unavailable locations, nested repeaters, duplicate names/keys, site-local media-default resets and no partial groups after rejection. Group regressions cover structured metadata, nested gallery/media types, whole-object retention, Classic publication, REST payload/omitted-payload saves, options atomicity, JSON round trips and rejection of nested containers. Native browser checks include a second image picker inside a Group and Group text/checkbox/image persistence after Classic save and Gutenberg reload.
+Browser coverage now includes actual JSON download and schema inspection, uploaded and pasted imports with redirect to a draft, Unicode/quote/backslash preservation, conflict rejection, invalid nonce and malformed upload. Backend transfer checks also cover capabilities, format/version/size, unavailable locations, nested repeaters, duplicate names/keys, site-local media-default resets and no partial groups after rejection. Group regressions cover structured metadata, nested gallery/media types, whole-object retention, Classic publication, REST payload/omitted-payload saves, options atomicity, JSON round trips and rejection of nested containers. Flexible regressions also cover mixed layouts, whole-list retention, Classic/REST publication, omitted REST payloads, options atomicity and schema transfer. Native browser checks include Group image selection, Group persistence, mixed Flexible ordering after Classic save, and Flexible content after Gutenberg save/reload.
 
-All jobs also passed PHP syntax, 179 isolated PHP assertions, 24 jsdom tests and eight runner safety guards; backend and browser debug-log checks were clean. This verifies the named targets, not every MySQL/MariaDB release or plugin/theme combination.
+All jobs also passed PHP syntax, 201 isolated PHP assertions, 26 jsdom tests and eight runner safety guards; backend and browser debug-log checks were clean. This verifies the named targets, not every MySQL/MariaDB release or plugin/theme combination.
 
 For a local native-PHP run, first create a dedicated empty database and least-privileged database user on a local MySQL instance, then export:
 
@@ -85,7 +85,7 @@ Use only a disposable test server; never expose this setup as a production servi
 
 `ALIFY_BROWSER_URL` defaults to `http://127.0.0.1:8080`; `CHROMIUM_EXECUTABLE` optionally selects an installed Chromium executable. The test blocks external browser requests. The native PHP router is for this disposable server only. Local PHP.wasm's CLI server was unstable under browser concurrency, so local browser verification used a scratch Node PHPRequestHandler server instead; the native-PHP server is exercised in CI.
 
-**Earlier local browser baseline (0.6.2):** 14 Chromium assertions passed on WordPress 6.8.3 / PHP.wasm 8.3.33: actual Classic rejection/redirect/recovery/correction; native gallery media modal; ordered gallery/repeater persistence after save/reload; actual Gutenberg rejection/inline feedback/correction; raw REST omitted-field rejection; no uncaught page JavaScript errors. These are not jsdom/media mocks. The current native-PHP CI results above supersede this baseline with 27 assertions per target; its remote results are separate from this local observation.
+**Earlier local browser baseline (0.6.2):** 14 Chromium assertions passed on WordPress 6.8.3 / PHP.wasm 8.3.33: actual Classic rejection/redirect/recovery/correction; native gallery media modal; ordered gallery/repeater persistence after save/reload; actual Gutenberg rejection/inline feedback/correction; raw REST omitted-field rejection; no uncaught page JavaScript errors. These are not jsdom/media mocks. The current native-PHP CI results above supersede this baseline with 30 assertions per target; its remote results are separate from this local observation.
 
 ## Still pending
 

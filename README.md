@@ -130,7 +130,7 @@ A built-in **Site Settings** submenu is available under **Alify Custom Field**. 
 3. Publish the group, then visit **Alify Custom Field → Site Settings**.
 4. Enter global values and click **Save Settings**.
 
-All fourteen field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
+All fifteen field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
 
 ```php
 // Read from the built-in 'site' page (not from a post).
@@ -330,12 +330,12 @@ Automated checks for 0.9.0:
 
 ```sh
 npm ci
-npm test       # 24 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 26 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 179 assertions with isolated WordPress stubs
+php tests/php-unit.php # 201 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 141 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 160 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -356,12 +356,12 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 141 backend and 27 Chromium assertions in [CI run 40668605180](https://github.com/alifywork/fieldsPlugin/actions/runs/40668605180), with clean debug-log checks. The browser checks include actual JSON transfer plus Group text/checkbox/image persistence in Classic and Group persistence after Gutenberg save/reload. These remote results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 160 backend and 30 Chromium assertions in [CI run 40669752864](https://github.com/alifywork/fieldsPlugin/actions/runs/40669752864), with clean debug-log checks. The browser checks include actual JSON transfer, Group media persistence, mixed Flexible layout ordering after Classic save and Flexible content persistence after Gutenberg save/reload. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all fourteen types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all fifteen types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.
