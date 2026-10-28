@@ -43,6 +43,7 @@ final class Alify_CF_API {
         return $out;
     }
     public static function register_group($definition) {
+        $definition = apply_filters('alify_cf/field_group_definition', $definition);
         if (!is_array($definition) || !is_string($definition['key'] ?? null) || !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $definition['key']) || !is_string($definition['title'] ?? null) || trim($definition['title']) === '') { return new WP_Error('alify_group', 'Registration requires a stable key and title.'); }
         $key = $definition['key']; $id = -1 - (int) hexdec(substr(hash('sha256', $key), 0, 7));
         foreach (self::$groups as $other_key => $group) { if ($other_key !== $key && $group['id'] === $id) { return new WP_Error('alify_group', 'Registration identifier collision.'); } }

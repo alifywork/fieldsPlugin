@@ -364,7 +364,7 @@ final class Alify_CF {
                 if (isset($names[$field['name']])) { $errors[] = 'Field name "' . $field['name'] . '" is already used by group "' . $other->post_title . '". Use a different name.'; }
             }
         }
-        foreach ($fields as $field) { if ((!empty($field['api_read']) || !empty($field['public_output'])) && Alify_CF_Password::contains($field)) { $errors[] = 'Password-containing fields cannot be exposed for reading/output.'; } }
+        foreach ($fields as $field) { if ((!empty($field['api_read']) || !empty($field['public_output'])) && (Alify_CF_Password::contains($field) || Alify_CF_API::contains_custom($field))) { $errors[] = 'Password/custom-containing fields cannot be exposed for reading/output.'; } }
         return $fields;
     }
 

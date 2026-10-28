@@ -68,7 +68,14 @@
     function restore(root) { root.querySelectorAll(selector).forEach(textarea => { if (textarea.dataset.richEnabled === '1') enable(textarea); }); }
     document.addEventListener('click', event => {
         const button = event.target.closest('[data-row-action="up"], [data-row-action="down"], [data-row-action="remove"], [data-flex-action="up"], [data-flex-action="down"], [data-flex-action="remove"]');
-        if (!button || button.disabled) return; const row = button.closest('.alify-row, .alify-flex-row'); if (!row) return; detach(row); queueMicrotask(() => { if (row.isConnected) restore(row); });
+        if (!button || button.disabled) return; const row = button.closest('.alify-row, .alify-flex-row'); if (!row) return;
+        const action = button.dataset.rowAction || button.dataset.flexAction, affected = [row];
+        const sibling = action === 'down' ? row.nextElementSibling : action === 'up' ? row.previousElementSibling : null;
+        if (sibling) affected.push(sibling);
+        affected.forEach(detach);
+        // A native click can run a microtask checkpoint between capture and bubble listeners.
+        // Restore only in the next task, after every DOM move handler has completed.
+        setTimeout(() => affected.forEach(item => { if (item.isConnected) restore(item); }), 0);
     }, true);
     window.AlifyRichText = {sync, focus, detach, restore, enable};
 })();
