@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.23.0 — temporal display and return formats**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.28.0 — bundled editor and developer APIs**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Taxonomy, User, Page Link, Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Icon Picker, Tab, Accordion, Message, Taxonomy, User, Page Link, Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -147,13 +147,13 @@ if ($related) {
 
 ## WYSIWYG rich-text field
 
-**WYSIWYG Editor (`wysiwyg`)** is a top-level post/Options field. Start with the escaped HTML textarea, or choose **Enable Visual/Text editor** for WordPress's native TinyMCE/Quicktags interface: paragraphs/headings, bold/italic, lists, quotes, links and undo/redo. JavaScript/editor initialization is not required to submit the textarea fallback.
+**WYSIWYG Editor (`wysiwyg`)** supports post/Options roots and basic Group/Repeater/Flexible subfields (0.28.0+). Start with the escaped HTML textarea, or choose **Enable Visual/Text editor** for WordPress's native TinyMCE/Quicktags interface: paragraphs/headings, bold/italic, lists, quotes, links and undo/redo. JavaScript/editor initialization is not required to submit the textarea fallback.
 
 - Visual content is synchronized to the real field before normal form submission and Gutenberg's same-request REST payload. Text-tab edits are not overwritten by the inactive Visual editor. Explicit HTML paragraphs are preserved (`wpautop` conversion is disabled). Native editor instances are saved/removed/reinitialized around Classic metabox sorting.
 - All submitted HTML and defaults use **`wp_kses_post()`**, including administrator input; `unfiltered_html` does not bypass this field policy. Event handlers, executable URLs and disallowed elements are removed. No shortcodes, embeds, blocks or theme filters are executed by the field.
 - Empty paragraphs, NBSP and invisible spacing normalize to `''`. Required means **nonblank text**: formatting-only or media-only content does not satisfy it. Optional blank formatting explicitly clears; invalid non-string payloads are rejected. Existing saved-value retention/publication rules apply.
 - Recovery is separately KSES-filtered and escaped into the textarea. A hidden conditional rich field preserves its stored value. WYSIWYG can be a conditional target but **not a source**.
-- This increment excludes Group/Repeater/Flexible subfields, media-upload buttons and configurable toolbars. Unsupported rich subfields are rejected, not silently downgraded.
+- Version 0.28.0 adds dynamic subfields, opt-in upload-capability-checked media buttons and bounded toolbar/editor presets; see the bundled features below.
 - JSON transfers the field schema and sanitized HTML default only; destination plugins need **0.15.0+**.
 
 ```php
@@ -400,7 +400,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, Relationship, structured Link, WYSIWYG and Password fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
+- Each field supports **1–10 total leaf rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, Relationship, structured Link, WYSIWYG and Password fields cannot be sources. Nested ALL/ANY groups are available through advanced JSON (0.28.0+); cross-group references and conditional chains remain unimplemented.
 - Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
@@ -476,7 +476,7 @@ Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`)
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value; invalid new publication/scheduling is blocked. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested containers, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
+- No nested containers, anonymous REST value reads, revision restoration or ACF data/API compatibility. Version 0.28.0 adds trusted PHP registration and opt-in authenticated read/write routes; the existing editor-only bridge remains distinct.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Validation feedback and input recovery
@@ -560,18 +560,84 @@ All three work on post/Options roots and supported basic container subfields. Us
 
 Single values clear with `''`; multiple editor-bridge payloads use `{"__complete":"1","ids":[...]}` and explicit empty `{"__complete":"1"}`. Malformed, truncated, unknown or disallowed values retain the previous field/container; Options retains the whole page. Required values cannot clear. Raw IDs/tokens remain available even where formatted records are privacy-filtered: **raw metadata is not an authorization API**, so themes must enforce their own access policy and context-escape output.
 
-Defaults, conditional-source use, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Imports accept v1–v7, and exports contain configuration, not selected site-local IDs or user records.
+Defaults, conditional-source use, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v8, and exports contain configuration, not selected site-local IDs or user records.
+
+## Bundled editor and developer features (0.28.0)
+
+### Presentation and rich rows
+
+- **Icon Picker** stores a validated `dashicons-*` identifier from 40 bundled WordPress Dashicons; an optional `icons` allowlist narrows choices. No uploaded SVG, arbitrary HTML, external icon libraries or executable markup.
+- **Tab, Accordion and Message** are root-level, editor-only presentation fields. Tabs/accordions organize following siblings; they do not disable or clear values in closed sections. Messages allow bounded paragraph/list/emphasis/link HTML (HTTP/HTTPS only), not scripts, event handlers or embeds. These fields cannot be required, conditional, REST-exposed or stored as values. Use unique field names even for presentation fields. Native invalid controls reveal their section.
+- Rich text is now supported in **basic Group, Repeater and Flexible** subfields. `toolbar` selects `full` or `basic`; `editor_mode` selects `both`, `visual` or `text`; `media_buttons` is opt-in and also requires the current user's `upload_files` capability. This does not grant upload privileges or make media-only HTML satisfy a required field.
+- Repeater/Flexible rows have drag handles, existing keyboard move buttons, duplicate and expand/collapse controls. Duplication synchronizes the source editor and uses a pristine template with fresh names/IDs, never a live TinyMCE iframe clone. Native row moves destroy/recreate the affected editors after the DOM move; removal destroys editors. Selected ordered IDs, clear markers and input state are preserved.
+- `collapsed` sets initial row presentation; `row_label` names a direct safe scalar subfield. Passwords, custom types and rich/structured values are never used as row-label sources. Row labels are editor text, not a new stored value. Existing 200 root / 20 subfield / 50 row / 10 Flexible layout limits remain; there is no nested-container or pagination promise.
+
+### Content Models UI
+
+Open **Alify Custom Field → Content Models** to create/update Options pages, post types and taxonomies. Models have `alify_` identifiers (maximum 19 characters), labels, applicable public/REST/hierarchical/archive flags, and taxonomy target types. At most 30 definitions of each kind are supported. Existing other-source identifiers cannot be overwritten. Post types use ordinary WordPress post capabilities and title/editor/thumbnail/revision supports; dedicated custom capability generation is not included.
+
+Definitions are stored as configuration, not content. Changes take effect on the next request; resave **Settings → Permalinks** after changing public routes. The page provides schema-only JSON export and bounded, atomic **new-identifiers-only** import (256 KiB); planned imported post types can be taxonomy targets. Unregistering never deletes posts, terms or values. Saved content and declared group/taxonomy dependencies block unregistering. This UI is not a term/profile/comment/widget field editor or a content migration tool.
+
+### Trusted PHP registration and writes
+
+Register deployment code after the relevant post types/taxonomies/Options pages exist, e.g. at `init` priority 30:
+
+```php
+add_action('init', function () {
+    alify_register_field_group(array(
+        'key' => 'theme_article_fields',
+        'title' => 'Article details',
+        'location' => 'post',
+        'fields' => array(array(
+            'name' => 'article_credit', 'label' => 'Credit', 'type' => 'text',
+            'api_read' => false, 'api_write' => false, 'public_output' => false,
+        )),
+    ));
+}, 30);
+```
+
+- Registration returns `true` or `WP_Error`. Missing keys are stable hashes of the deployment group/name path. `alify_register_field($group_key, $field)` appends/revalidates a field. Duplicate names are rejected across database and registered groups on the same location. Re-registering the same key replaces that in-memory definition; it does not migrate stored data. PHP groups appear in applicable editors but are not database-editable copies.
+- `alify_update_fields($name_to_editor_payload, $post_id)` / `alify_update_field($name, $payload, $post_id)` require the current user's `edit_post` capability. Revisions and internal field-group posts are not writable through these helpers. `alify_update_options($values, $page = 'site')` / `alify_update_option($name, $payload, $page = 'site')` require `manage_options`.
+- Writes merge unchanged schema siblings, validate affected groups before persistence, reject unknown/hidden fields, preserve permission checks and return `true` or `WP_Error`. Composite arguments are the documented **complete editor payloads**, not arbitrary canonical getter values. Required invalid unchanged siblings can block a write. Options use one option write; post multi-meta storage errors trigger best-effort restoration, **not a database transaction or concurrent-write lock**. Trusted hooks must not mutate storage behind these helpers.
+- `alify_each_row($name, $post_id)` yields canonical rows; `alify_get_sub_field($row, $name)` reads from the explicit row context (no global loop pointer). `alify_update_row($name, $zero_based_index, $canonical_row, $post_id)` replaces a row or appends at the current row count. `alify_delete_row($name, $zero_based_index, $post_id)` removes/reindexes. Row helpers repack canonical containers and revalidate the entire value; sparse indices are rejected. Options-specific row mutation wrappers are not provided.
+- `alify_export_group_php($group_id)` requires `manage_options` and returns PHP registration source for database or registered groups. Review and save that source in your theme/plugin repository. Export strips site-local media/post and Password defaults; custom types and referenced configurations must exist on the destination. Do not evaluate untrusted exported/uploaded PHP. This is manual configuration deployment, **not automatic Local JSON synchronization**.
+
+Trusted extensions can use `alify_cf/field_group_definition` (filter before registration validation), `alify_cf/registered_group` (action: key, normalized definition), and `alify_cf/before_api_write` / `alify_cf/after_api_write` (actions: normalized updates, object ID/page slug, is-options boolean). The latter actions cover these API writes, not every legacy WordPress metadata mutation. Reentrant API writes are rejected.
+
+`alify_register_field_type('x_example', $callbacks)` registers a trusted PHP scalar extension: required `label`, callable `clean($field, $raw)` and `render($field, $value, $id, $input_name, $error_id)`; optional `settings($field, &$errors)` and `format($field, $raw)`. Cleaners return strings up to 65,536 bytes. Settings cannot override structural or exposure properties. Plugins own their callbacks' validation, output escaping and assets. Raw getters stay raw; formatted getters invoke the optional formatter. Custom types are not condition sources, and custom-containing fields cannot be exposed for REST reads/public output. Unknown custom types fail schema validation; there is no JavaScript settings-plugin interface yet.
+
+### Explicit REST and public disclosure
+
+All exposure flags default off. Root-field builder checkboxes control `api_read`, `api_write`, and `public_output`; nested fields follow the opted-in containing value, not independent endpoints.
+
+- Authenticated **GET/POST** `/wp-json/alify/v1/posts/{id}` require `edit_post` for that post. `/wp-json/alify/v1/options/{page}` requires `manage_options` and a registered page. Standard WordPress REST authentication/nonces apply; no custom token bypass is provided.
+- GET returns opted-in raw `values` plus a minimal `schema` map (`type`, `required`, `read`, `write`), not user objects or a full JSON Schema generator. POST accepts `{"values":{"article_credit":"Example"}}`; only `api_write` fields are accepted and the general validation/write helper runs. A successful POST returns `{"saved":true}`. Password values may be explicitly write-only; Password/custom-containing values cannot opt into read/output. No revision, term, user, comment or menu endpoints are implied.
+- `[alify_field name="article_credit" post_id="123"]` returns HTML-escaped scalar text only for `public_output` fields on publicly viewable, non-password-protected posts. Draft/private/protected posts, Password, User, custom types, WYSIWYG and composite values produce no public output. **Opting in intentionally discloses that value publicly.** This is not a rich-HTML rendering shortcut.
+- On WordPress versions with Block Bindings, source **`alify/field`** takes `args: {name: "article_credit"}` and the block's `postId` context. It shares the same public scalar policy. This is a basic native source, **not a custom-block framework, sidebar/datastore, Attributes-panel picker or live-preview implementation**. On WordPress 6.2 the binding registration is safely skipped.
+
+### Reference filters and nested conditions
+
+- Post Object/Relationship `taxonomy_filters` accept up to 10 ANDed clauses: `[{"taxonomy":"category","terms":[12,34],"operator":"IN"}]` (`IN` / `NOT IN`; maximum 50 existing IDs per clause). Terms in an IN clause are alternatives, and descendants are not implicitly included. The builder accepts JSON; the editor dropdown can narrow a configured IN selection. Filters apply to search and save and never grant object access. Nonpublic taxonomy names are shown only to users with assignment capability. IDs are site-local configuration; remap them explicitly on deployment.
+- Conditions support mixed nested `all`/`any` groups with at most **three group levels and ten total leaves**. Flat controls remain; **Edit nested ALL/ANY JSON** opens the advanced representation. Leaf shapes remain `{field: "field_key", operator: "equals", value: "text"}`.
+- New literal, case-sensitive operators `contains`, `starts_with`, `ends_with` compare each scalar/selected item; an empty comparison never matches. Comparison strings are limited to 1,000 bytes. Arbitrary regex/patterns are deliberately not implemented. Sources must remain unconditional eligible siblings; scoped subfield conditions, cross-group references and chains/cycles are still pending.
+- **Schema JSON v8 / plugin 0.28.0+** gates new editor/exposure/filter settings, nested/extended conditions, custom types and dynamic rich subfields. Imports accept v1–v8. Older destinations must reject v8 rather than silently discard these settings. Schema transfer is not selected-ID/content migration.
+
+This bundle does **not** complete the entire 77-item roadmap. Remaining integrations, object locations, deeper containers, migrations, revisions, frontend forms, external provider fields and managed distribution remain explicitly pending in `DEVELOPMENT-ROADMAP.md`.
 
 ## Verification
 
-Automated checks for 0.27.0:
+Automated checks for 0.28.0:
 
 ```sh
 npm ci
-npm test       # 74 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 78 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
+
+**Current bundle:** 783 PHP contracts on both runtimes, 78 JavaScript tests, and clean-debug-log SQLite integration runs with 694 assertions on WordPress 6.2 / PHP 7.4 and 697 on WordPress 6.8.3 / PHP 8.3 (three extra version-gated Block Binding callback checks). All four native targets passed the bundled implementation in [CI run 40716485422](https://github.com/alifywork/fieldsPlugin/actions/runs/40716485422), including 694 backend / 204 browser / 24 HTTP persistence checks before those extra callback assertions were added. The matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite and MySQL 8.
+
+Historical selector-batch baseline follows for comparison, not the current test count.
 
 Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 600 assertions per target:
 

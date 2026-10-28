@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.0
+
+- Bundle Icon Picker, root Tab/Accordion/Message layouts, safe message HTML and upload-capability-gated WYSIWYG toolbar/mode/media presets.
+- Support rich editors in basic Group/Repeater/Flexible subfields; add pristine-template row duplication, native drag handles/keyboard moves, collapse controls and safe scalar labels. Destroy/recreate editors after native DOM moves, not during a capture-phase microtask.
+- Add administrator Content Models UI for managed Options pages/post types/taxonomies, portable bounded JSON, collision checks and content/dependency-aware unregistering (never content deletion).
+- Add trusted PHP group/field/custom-type registration, stable generated keys, capability-checked post/Options writes, row helpers, registration/write extension points and PHP configuration export. Post multi-meta recovery is best-effort, not a database transaction.
+- Add opt-in authenticated REST read/minimal-schema/write endpoints, safe public scalar shortcode and version-gated basic native Block Bindings source. Password/custom-containing reads and protected/private output remain forbidden.
+- Add reference taxonomy filters/editor narrowing and bounded nested mixed ALL/ANY conditions with literal contains/prefix/suffix operators. Regex, conditional chains, nested containers and other object locations are not included.
+- Gate new schema behavior with JSON v8; accept v1–v8. No automatic Local JSON sync, ACF import/migration or third-party adapter parity is implied.
+- Local checks: 783 PHP contracts on PHP 7.4/8.3, 78 JavaScript tests, 694 real WordPress backend assertions on 6.2 and 697 on 6.8.3 (three extra version-gated native Block Binding callback checks). All four native targets pass the implementation in CI run 40716485422: 694 backend / 204 browser / 24 HTTP persistence checks before those extra callback assertions. Roadmap: 24 newly completed, 42 complete overall / 35 pending; not all 59 requested gaps are closed.
+
 ## 0.27.0
 
 - Add searchable single/multiple Taxonomy, User and Page Link fields on roots, Options and supported basic container subfields, with bounded ordered selection and explicit clearing.
