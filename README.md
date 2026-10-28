@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.29.0 — native contexts, deployment and editing**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.30.0 — conditional dependencies and native blocks**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -31,7 +31,45 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.29.0 adds native contexts, Local JSON, revisions/forms, location rules, pagination/layout limits and bounded literal patterns. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.30.0 adds acyclic conditional chains, reference-selection sources and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+
+## Conditional dependencies and native custom blocks (0.30.0)
+
+### Conditional chains and reference sources
+
+Root sibling fields can now depend on other conditional sibling fields, independently of their definition/DOM order. **Cycles, self/missing references and dependency paths longer than 16 links are rejected**, including cycles in ANY branches that happen not to run. Invalid/cyclic runtime groups fail closed for conditional fields. Existing limits remain: ten leaves per field and three ALL/ANY group levels.
+
+A hidden source is **unavailable**, not an empty value: none of its leaves match, including `empty` and `not_equals`. Other available branches in an ANY group can still match. Hiding a chain preserves stored values and retained DOM input values. Classic forms ignore hidden submitted values; the explicit PHP/REST write APIs reject a request that explicitly asks to write hidden fields, without partially changing an upstream source. Re-enable a source to edit its dependents.
+
+**Relationship, multiple Post Object, Taxonomy, User and Page Link** can now be condition sources. Single sources compare their canonical ID/token; lists use ANY-selected-token matching. `equals` means exact key/ID/token membership, `not_equals` means no item matches, and `empty`/`not_empty` inspect the selection. Existing literal/pattern operators compare individual canonical token strings, not display labels, URLs or formatted object returns. Search text, complete markers and picker buttons never count as selections. Selection permissions and reference validation remain unchanged; conditions do not grant object access.
+
+Password, WYSIWYG, custom scalar callbacks, Group/Repeater/Flexible, Link and Google Map remain ineligible sources. Cross-group references and per-row/subfield conditions remain unsupported. Chains/new reference-source semantics require **schema JSON v10**; downgrade attempts reject before import, and Local JSON supports versions 1–10 with the same gate.
+
+### Native dynamic-block API
+
+Trusted PHP can register a dynamic Gutenberg block on `init`:
+
+```php
+add_action('init', function () {
+    alify_register_block_type('alify/notice-card', [
+        'title' => 'Notice card',
+        'fields' => [
+            ['name' => 'headline', 'label' => 'Headline', 'type' => 'text'],
+            ['name' => 'count', 'label' => 'Count', 'type' => 'number', 'default' => 0],
+            ['name' => 'enabled', 'label' => 'Enabled', 'type' => 'true_false', 'default' => false],
+        ],
+        'render_callback' => function ($values, $block) {
+            return '<section><h2>' . esc_html($values['headline']) . '</h2></section>';
+        },
+    ]);
+}, 20);
+```
+
+The API returns `true` or `WP_Error`. It registers native API-v2 attribute schemas and a PHP renderer; editor assets provide Inspector controls, insertion and authenticated native server-side preview from immutable debounced attribute snapshots. WordPress handles ordinary post-content saving/reloading, capabilities and core revisions. The optional `$block` is a `WP_Block` during normal block rendering, or null when a caller directly uses `WP_Block_Type::render()`; do not assume a post context always exists.
+
+**Attributes are public serialized post content, not private Alify metadata. Do not put passwords, credentials or private field values in them.** Supported controls are Text, Textarea, integer Number (±1,000,000), True/False and single Select. Text is limited to 2,000 UTF-8 bytes; Select accepts 1–100 configured key/label choices and an empty choice. Scalar types/defaults are strict; zero/false are retained. Maximum 30 blocks/request, 20 controls/block, and 128 KiB rendered HTML. Reserved/duplicate names, unsupported types/settings and malformed defaults reject registration; existing native block names are never replaced.
+
+Only declared sanitized attribute values reach the trusted callback. Rendered output passes `wp_kses_post`; scripts/arbitrary embeds are not passed through. Native WordPress attribute preparation may replace invalid serialized attributes with declared defaults; the extra validator rejects values that still violate plugin limits at render. This is **not** whole-post atomic validation or a new block-content migration endpoint. There is no required-field/publish gate, private field-group reuse, nested/container controls, custom inline canvas editor, static HTML fallback after deactivation, or ACF block/schema compatibility. Use ordinary PHP deployment for these trusted definitions; field-group JSON does not contain callback code.
 
 ## Native contexts, deployment and editing (0.29.0)
 
@@ -60,7 +98,7 @@ Trusted extensions register a unique `x_` predicate using `alify_register_locati
 
 Create a trusted deployment directory and define `ALIFY_CF_JSON_DIR` before plugin initialization (for example, an existing `WP_CONTENT_DIR . '/alify-json'`). This is opt-in: no directory is silently created, and no HTTP request can select a filesystem path. Administrator group saves atomically replace their deployment-key JSON file when writable. Files include location predicates and schema version; draft/trash database definitions take precedence over runtime files. Deleting/trashing a deployed definition writes a tombstone, so it cannot silently reappear on another deployment.
 
-**Local JSON** lists files and offers capability-/nonce-checked, hash-guarded database synchronization. Published file-only definitions load automatically as runtime groups. Sync checks key ownership and conflicting definitions and attempts snapshot rollback on failed persistence; it is not a transactional database guarantee. Bounds: 100 files, 1 MiB each, supported schema versions 1–9; symlink files/directories are rejected. This is Alify's own format, not ACF JSON import or content migration.
+**Local JSON** lists files and offers capability-/nonce-checked, hash-guarded database synchronization. Published file-only definitions load automatically as runtime groups. Sync checks key ownership and conflicting definitions and attempts snapshot rollback on failed persistence; it is not a transactional database guarantee. Bounds: 100 files, 1 MiB each, supported schema versions 1–10; symlink files/directories are rejected. This is Alify's own format, not ACF JSON import or content migration.
 
 ### Revisions, autosaves and frontend forms
 
@@ -76,7 +114,7 @@ Repeater `page_size` is 0 (off) or 1–50. Pagination hides existing DOM rows bu
 
 Flexible layouts support `min_rows`/`max_rows` (0–50) and `disabled`. Limits are validated on the server before cleaning; disabled layouts prohibit row-count growth while existing rows remain editable. Picker/Add/Clone/Remove controls reflect those limits. No nested containers, layout renaming/migration or unlimited content promise is implied.
 
-Conditional operators now include **`glob`**, alongside literal contains/prefix/suffix. This is an anchored, case-sensitive, literal ASCII pattern, **not regex/PCRE**: only `*` is special (zero or more characters); `.`, `?`, brackets and backslashes are literal. Pattern: 1–256 printable ASCII characters and at most four stars. Source: at most 4,096 ASCII characters (tabs/CR/LF allowed). Non-ASCII/over-budget inputs do not match. Matching uses bounded literal searches on both PHP and JavaScript, never evaluates user-supplied regex, and supports selected scalar lists with ANY-item semantics. Conditional chains, conditional sources and dynamic subfield conditions remain pending.
+Conditional operators now include **`glob`**, alongside literal contains/prefix/suffix. This is an anchored, case-sensitive, literal ASCII pattern, **not regex/PCRE**: only `*` is special (zero or more characters); `.`, `?`, brackets and backslashes are literal. Pattern: 1–256 printable ASCII characters and at most four stars. Source: at most 4,096 ASCII characters (tabs/CR/LF allowed). Non-ASCII/over-budget inputs do not match. Matching uses bounded literal searches on both PHP and JavaScript, never evaluates user-supplied regex, and supports selected scalar lists with ANY-item semantics. Version 0.30.0 adds root conditional chains and reference-selection sources; dynamic subfield conditions remain pending.
 
 ### Explicit remote output
 
@@ -165,7 +203,7 @@ Date, Time and Date Time now have separate **Editor display preview** and **Form
 - The form/REST payload is `{__complete: '1', ids: [42, 51]}`. An explicit clear sends the marker with an empty/omitted `ids` list. Missing markers, malformed/non-list IDs, unavailable targets or new unreadable references reject the entire list; a container subfield failure retains its whole container. Options saves remain page-atomic.
 - Existing saved unreadable references may be retained/reordered or explicitly removed; their titles remain redacted. Deleted targets must be removed/replaced rather than silently discarded.
 - Required means at least one reference; configured minimum can require more when nonempty. Legacy limits are 0–50; v0.26 adds CPT/status filters and cardinality settings (see Reference configuration). Defaults, bidirectional writes and cross-site ID migration remain unsupported.
-- Relationship can be conditionally shown, but is not a condition source in this increment. JSON transfers schemas only with empty defaults; destination plugins need **0.17.0+**.
+- Relationship can be conditionally shown and, since 0.30.0, can drive conditions through selected-ID membership. JSON transfers schemas only with empty defaults; destination plugins need **0.17.0+**.
 
 ```php
 $posts = alify_get_relationship('related_many', get_the_ID()); // Viewable WP_Post objects, saved order.
@@ -452,12 +490,12 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **1–10 total leaf rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, Relationship, structured Link, WYSIWYG and Password fields cannot be sources. Nested ALL/ANY groups are available through advanced JSON (0.28.0+); cross-group references and conditional chains remain unimplemented.
+- Each field supports **1–10 total leaf rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources are eligible scalar/choice/media/gallery/reference selections in the same group, including acyclic conditional sources (0.30.0+). Containers, structured Link/Map, WYSIWYG, custom callbacks and Password cannot be sources. Nested ALL/ANY groups are available through advanced JSON; cross-group and per-row conditions remain unsupported.
 - Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
-- Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
+- Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**, literal **Contains/Starts with/Ends with**, and bounded ASCII **Matches * pattern**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
 - Checkbox/Gallery equality tests whether the comparison key/image ID is selected; inequality tests absence. An unchecked True / False field counts as empty; number/text `0` does not.
-- Rules reference stable field keys, so renaming/reordering the source does not break them. Removing a referenced source requires updating/disabling its rules before the schema can save. Self-references, cycles and chains are rejected with the previous schema retained.
+- Rules reference stable field keys, so renaming/reordering the source does not break them. Removing a referenced source requires updating/disabling its rules before the schema can save. Self-references, cycles and chains exceeding 16 links are rejected with the previous schema retained.
 - Initially visible fields are calculated from saved values/defaults. JavaScript is required for live updates and disabling hidden inputs so browser validation ignores them.
 - At save time, rules use sanitized submitted source values, not old saved values. Hidden field values are **preserved**, not cleared, even if a forged request submits them. Visible fields retain the existing validation behavior. Sanitization of invalid/HTML input can change a source value on the server; use plain, valid source values for comparisons.
 - Conditional logic is an editing convenience, **not authorization**. Template helpers still return saved hidden values; explicitly apply any frontend display and permission checks in your template.
@@ -528,7 +566,7 @@ Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`)
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value; invalid new publication/scheduling is blocked. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested containers, anonymous REST value reads, revision restoration or ACF data/API compatibility. Version 0.28.0 adds trusted PHP registration and opt-in authenticated read/write routes; the existing editor-only bridge remains distinct.
+- No nested containers, anonymous REST value reads or ACF data/API compatibility. Validated revision restoration is available since 0.29.0. Version 0.28.0 adds trusted PHP registration and opt-in authenticated read/write routes; the existing editor-only bridge remains distinct.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Validation feedback and input recovery
@@ -596,7 +634,7 @@ Post Object and Relationship support the following on post/Options roots and sup
 
 - **Allowed post types:** 1–20 registered `show_ui` post types, entered as one slug per line. Attachments, revisions and Alify field groups are excluded. Legacy schemas still target only posts/pages. A CPT must be registered on every request and on the destination site before schema import.
 - **Allowed statuses:** a nonempty subset of `publish`, `private`, `draft`, `pending`, `future`. Type/status constraints apply to server validation as well as search. Changing filters does not migrate stored references; invalid saves retain the previous value/container/page rather than silently dropping targets.
-- **Multiple Post Object:** ordered, deduplicated IDs, using the same add/remove/reorder picker as Relationship. The complete write-bridge payload is `{"__complete":"1","ids":[12,34]}`; `{"__complete":"1"}` clears an optional list. Incomplete/malformed payloads retain the previous list. Multiple Post Object is not a conditional source (single Post Object retains its existing source behavior). Defaults are unsupported; changing scalar/list mode does not migrate saved values.
+- **Multiple Post Object:** ordered, deduplicated IDs, using the same add/remove/reorder picker as Relationship. The complete write-bridge payload is `{"__complete":"1","ids":[12,34]}`; `{"__complete":"1"}` clears an optional list. Incomplete/malformed payloads retain the previous list. Since 0.30.0, multiple Post Object can be a condition source using selected-ID membership; single Post Object keeps its scalar-ID behavior. Defaults are unsupported; changing scalar/list mode does not migrate saved values.
 - **Cardinality:** multiple Post Object and Relationship accept minimum 0–50 and maximum 1–50. Minimum applies when nonempty; Required disallows empty. The picker prevents additions above maximum, while the server enforces both bounds without truncation.
 - **Formatted returns:** `id` (default/raw behavior) or `object` through opt-in formatted getters. Single Post Object returns a viewable `WP_Post` or `null`; lists return ordered viewable objects and omit unavailable targets. Current permissions/password protection still apply; filters do not grant access. Raw getters remain IDs. Existing `alify_get_post_object()` / `alify_get_relationship()` resolvers also recognize registered CPTs; use configured formatted getters when field-specific filters must govern resolution.
 - Search remains nonce/capability checked, paginated (20 queried candidates per page, up to 100 pages), and read-permission filtered. Filter values sent by the picker are search constraints, **not authorization**; no private totals or unreadable titles are returned. Changing permissions can leave a page empty. No taxonomy filtering or bidirectional writes yet.
@@ -612,7 +650,7 @@ All three work on post/Options roots and supported basic container subfields. Us
 
 Single values clear with `''`; multiple editor-bridge payloads use `{"__complete":"1","ids":[...]}` and explicit empty `{"__complete":"1"}`. Malformed, truncated, unknown or disallowed values retain the previous field/container; Options retains the whole page. Required values cannot clear. Raw IDs/tokens remain available even where formatted records are privacy-filtered: **raw metadata is not an authorization API**, so themes must enforce their own access policy and context-escape output.
 
-Defaults, conditional-source use, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v8, and exports contain configuration, not selected site-local IDs or user records.
+Defaults, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets and, since 0.30.0, canonical token sources. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Current imports accept v1–v10 within their feature gates, and exports contain configuration, not selected site-local IDs or user records.
 
 ## Bundled editor and developer features (0.28.0)
 
@@ -671,10 +709,10 @@ All exposure flags default off. Root-field builder checkboxes control `api_read`
 
 - Post Object/Relationship `taxonomy_filters` accept up to 10 ANDed clauses: `[{"taxonomy":"category","terms":[12,34],"operator":"IN"}]` (`IN` / `NOT IN`; maximum 50 existing IDs per clause). Terms in an IN clause are alternatives, and descendants are not implicitly included. The builder accepts JSON; the editor dropdown can narrow a configured IN selection. Filters apply to search and save and never grant object access. Nonpublic taxonomy names are shown only to users with assignment capability. IDs are site-local configuration; remap them explicitly on deployment.
 - Conditions support mixed nested `all`/`any` groups with at most **three group levels and ten total leaves**. Flat controls remain; **Edit nested ALL/ANY JSON** opens the advanced representation. Leaf shapes remain `{field: "field_key", operator: "equals", value: "text"}`.
-- New literal, case-sensitive operators `contains`, `starts_with`, `ends_with` compare each scalar/selected item; an empty comparison never matches. Comparison strings are limited to 1,000 bytes. Arbitrary regex/patterns are deliberately not implemented. Sources must remain unconditional eligible siblings; scoped subfield conditions, cross-group references and chains/cycles are still pending.
-- **Schema JSON v8 / plugin 0.28.0+** gates new editor/exposure/filter settings, nested/extended conditions, custom types and dynamic rich subfields. Imports accept v1–v8. Older destinations must reject v8 rather than silently discard these settings. Schema transfer is not selected-ID/content migration.
+- New literal, case-sensitive operators `contains`, `starts_with`, `ends_with` compare each scalar/selected item; an empty comparison never matches. Comparison strings are limited to 1,000 bytes. Arbitrary regex is not implemented; bounded ASCII glob patterns are available in 0.29.0+. Version 0.30.0 adds acyclic sibling chains and reference-token sources; scoped subfield/cross-group conditions remain pending. Cycles are rejected.
+- **Schema JSON v8 / plugin 0.28.0+** gates new editor/exposure/filter settings, nested/extended conditions, custom types and dynamic rich subfields. The original v0.28 importer accepted v1–v8; the current importer also accepts v9/v10 within their gates. Older destinations must reject v8 rather than silently discard these settings. Schema transfer is not selected-ID/content migration.
 
-This bundle does **not** complete the entire 77-item roadmap. Remaining integrations, object locations, deeper containers, migrations, revisions, frontend forms, external provider fields and managed distribution remain explicitly pending in `DEVELOPMENT-ROADMAP.md`.
+The entire 77-item roadmap is **not** complete. Versions 0.29/0.30 add scoped object editors, revisions/forms, conditional dependencies and scalar blocks. Deeper containers, migrations, row-scoped conditions, interactive maps, native post-field sidebar/datastore and dedicated integrations/distribution remain tracked in `DEVELOPMENT-ROADMAP.md`.
 
 ## Verification
 
@@ -682,12 +720,12 @@ Automated checks for 0.28.0:
 
 ```sh
 npm ci
-npm test       # 78 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 84 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle (0.29.0):** 783 PHP contracts on PHP 7.4/8.3, 81 JavaScript tests, and clean-debug-log SQLite runs with 851 assertions on WordPress 6.2/PHP 7.4 and 854 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets and Chromium flows pass in [CI run 40754083740](https://github.com/alifywork/fieldsPlugin/actions/runs/40754083740), including the new profile/term/attachment/menu/frontend scenarios and clean WordPress debug logs. The declared native matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8; this is not a latest-version certification.
+**Current bundle (0.30.0):** 805 PHP contracts on PHP 7.4/8.3, 84 JavaScript tests, and clean-debug-log SQLite runs with 886 assertions on WordPress 6.2/PHP 7.4 and 889 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets pass in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779), including real Chromium chain/User-source frontend flows and custom-block Inspector, refreshed PHP preview, save/reload and public rendering, with clean WordPress debug logs. The declared matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8, not a latest-version certification.
 
 Historical selector-batch baseline follows for comparison, not the current test count.
 

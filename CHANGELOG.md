@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.30.0
+
+- Add root sibling conditional chains with PHP/JS dependency graphs, order-independent evaluation, whole-graph cycle detection and a 16-link ceiling. Hidden sources never satisfy any dependent leaf, even empty/not-equals; existing hidden-value retention and explicit API rejection remain.
+- Add Relationship, multiple Post Object, Taxonomy, User and Page Link condition sources using selected canonical ID/token membership. Never compare search inputs, completeness markers or labels. Password/composite/custom callback sources, cross-group and row-scoped conditions stay unsupported.
+- Add trusted `alify_register_block_type()` for native API-v2 dynamic blocks: public scalar attribute schemas, Inspector controls, native authenticated PHP preview and standard post-content persistence. Support bounded text/textarea/integer/toggle/select controls, strict defaults, collision/reserved-name protection, output size limits and post-safe HTML.
+- Public block attributes are not private field storage. No private field-group reuse, container controls, required-field publication gate, arbitrary PHP/code JSON, inline block editor or ACF compatibility is implied. Direct native type rendering supports WordPress's two-argument callback invocation too.
+- Add JSON v10 gates for conditional chains/new reference sources; preserve earlier declared versions. Extend opt-in Local JSON through v10.
+- Local feature checks: 805 PHP contracts, 84 JS tests and 886/889 real WordPress SQLite assertions on the existing minimum/current matrix. All four native PHP/SQLite/MySQL targets, real Chromium feature flows and clean WordPress debug logs pass in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779). Roadmap: 61 complete within declared scopes / 16 pending.
+
 ## 0.29.0
 
 - Add existing-user/term/comment/menu/menu-item editors and capability-checked object metadata APIs, opt-in authenticated REST routes, attachment `edit_attachment` persistence and classic saved-widget adapters. Block widgets/Customizer remain unsupported.
