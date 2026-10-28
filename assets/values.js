@@ -63,6 +63,14 @@
         return target;
     }
     window.AlifyValidation = {show: showError, focus: focusError, clear: clearError};
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-link-clear]');
+        if (!button || button.disabled) return;
+        const root = button.closest('.alify-link');
+        root.querySelectorAll('input:not([type="hidden"]), select').forEach(control => { control.value = ''; });
+        const url = root.querySelector('input[type="url"]');
+        url.dispatchEvent(new Event('input', {bubbles: true})); url.focus();
+    });
     function syncColor(event) {
         const root = event.target.closest('.alify-color');
         if (!root) return;
@@ -137,7 +145,7 @@
                         if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
                         const source = fields.find(item => item.dataset.fieldKey === rule.field);
                         let matched = false;
-                        if (source && !['repeater', 'group', 'flexible'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
+                        if (source && !['repeater', 'group', 'flexible', 'link'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
                             const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                             let values;
                             if (source.dataset.fieldType === 'gallery') {
@@ -153,7 +161,7 @@
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
                     visible = !!rules.length && (!rule.rules || ['all', 'any'].includes(rule.relation)) && validSources && (rule.relation === 'any' ? matches.some(Boolean) : matches.every(Boolean));
                 }
                 field.hidden = !visible;

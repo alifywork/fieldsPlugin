@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0
+
+- Add atomic Link records (HTTP(S) URL, optional sanitized title and same/new-tab target) to the builder, post/Options controls and basic container subfields.
+- Add explicit Clear link, required URL validation, complete-payload checks and `alify_get_link()`; preserve saved records/containers on rejection and recover escaped attempts separately.
+- Reject executable/relative/credential-bearing URLs, malformed structures and unsupported targets. No URL fetching or automatic HTML rendering.
+- Carry Link values through Classic and core REST saves, Options page atomicity and schema-only JSON transfer. Configurable composite defaults and Link-as-condition-source are not included.
+
 ## 0.13.0
 
 - Verify feature development on all four existing native-PHP targets: 230 backend, 76 browser and 18 HTTP persistence assertions; 287 isolated PHP assertions and 35 JS tests also pass.

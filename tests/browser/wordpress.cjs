@@ -27,6 +27,9 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('accent').inputValue(), '#000000', 'Explicit Apply commits black even when native swatch has not changed');
         await page.locator('[data-color-picker]').evaluate(node => { node.value = '#2271b1'; node.dispatchEvent(new Event('input', {bubbles: true})); });
         check(await value('accent').inputValue(), '#2271b1', 'Native color picker updates submitted color text');
+        await page.locator('.alify-link input[type="url"]').fill('https://example.com/path?q=1&b=2');
+        await page.locator('.alify-link input[type="text"]').fill('Visit example');
+        await page.locator('.alify-link select').selectOption('_blank');
         await value('opens').fill('09:30');
         await value('subtitle').fill('Classic subtitle');
         await page.locator('.alify-group [type="text"]').fill('Classic profile');
@@ -76,7 +79,12 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
         check(await value('accent').inputValue(), '#2271b1', 'Color survives Classic save/reload');
         check(await value('opens').inputValue(), '09:30', 'Time survives Classic save/reload without conversion');
+        check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/path?q=1&b=2', 'Link URL survives actual Classic save/reload');
+        check(await page.locator('.alify-link input[type="text"]').inputValue(), 'Visit example', 'Link title survives actual Classic save/reload');
+        check(await page.locator('.alify-link select').inputValue(), '_blank', 'Link target survives actual Classic save/reload');
+        await page.locator('[data-link-clear]').click();
         await page.locator('[data-color-clear]').click(); await saveClassic();
+        check(await page.locator('.alify-link input[type="url"]').inputValue(), '', 'Explicit Link clear survives actual save/reload');
         check(await value('accent').inputValue(), '', 'Cleared color remains empty after actual save/reload');
         check(await page.locator('.alify-flex-row input[name$="[layout]"]').evaluateAll(nodes => nodes.map(node => node.value)), ['text', 'hero'], 'Mixed Flexible layout order survives Classic save/reload');
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Classic flexible body', 'Flexible row values survive Classic save');
@@ -144,6 +152,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-group [type="checkbox"][value="a"]').check();
         await value('show_details').check();
         await value('details').fill('Block ALL'); await value('alternate').fill('Block ANY');
+        await page.locator('.alify-link input[type="url"]').fill('https://example.com/block');
+        await page.locator('.alify-link input[type="text"]').fill('Block link');
         await page.locator('.editor-post-publish-button').click();
         await page.waitForFunction(() => wp.data.select('core/editor').getCurrentPost().status === 'publish');
         check(await page.evaluate(() => wp.data.select('core/editor').getCurrentPost().status), 'publish', 'Gutenberg correction publishes');
@@ -152,6 +162,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Gutenberg flexible body', 'Flexible content survives Gutenberg REST save/reload');
         check(await value('details').inputValue(), 'Block ALL', 'ALL target survives Gutenberg REST save/reload');
         check(await value('alternate').inputValue(), 'Block ANY', 'ANY target survives Gutenberg REST save/reload');
+        check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/block', 'Link components survive same-request Gutenberg REST save/reload');
         const bypass = await page.evaluate(async ({base, id}) => {
             const response = await fetch(base + '/?rest_route=/wp/v2/posts/' + id, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-WP-Nonce': wpApiSettings.nonce}, body: JSON.stringify({status: 'publish'})});
             return {status: response.status, body: await response.json()};
@@ -166,7 +177,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 2, 'Row-bound schema exports as v2 for safe older-importer rejection');
-        check(exported.group.fields.length, 11, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 12, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});

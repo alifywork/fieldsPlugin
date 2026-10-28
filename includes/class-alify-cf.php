@@ -1,5 +1,6 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
+require_once __DIR__ . '/class-alify-cf-link.php';
 require_once __DIR__ . '/class-alify-cf-repeater.php';
 require_once __DIR__ . '/class-alify-cf-group.php';
 require_once __DIR__ . '/class-alify-cf-flexible.php';
@@ -30,7 +31,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
     }
 
     public static function register() {
@@ -163,6 +164,8 @@ final class Alify_CF {
         $container_error = $error_id && in_array($field['type'], array('group', 'repeater', 'flexible'), true);
         if ($container_error) { echo '<div class="alify-container-error" role="group" aria-invalid="true" aria-describedby="' . esc_attr($error_id) . '">'; }
         switch ($field['type']) {
+            case 'link':
+                Alify_CF_Link::render($field, $value, $id, $input, $error_id); break;
             case 'gallery':
                 Alify_CF_Gallery::render($field, $value, $id, $input); break;
             case 'flexible':
@@ -199,6 +202,7 @@ final class Alify_CF {
     }
 
     public static function clean_value($field, $value) {
+        if ($field['type'] === 'link') { return Alify_CF_Link::clean($value); }
         if ($field['type'] === 'flexible') { return Alify_CF_Flexible::clean($field, $value); }
         if ($field['type'] === 'group') { return Alify_CF_Group::clean($field, $value); }
         if ($field['type'] === 'gallery') { return Alify_CF_Gallery::clean($value); }
@@ -255,7 +259,7 @@ final class Alify_CF {
                 if (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field)) { $clean = array_merge($clean, $limits); }
             }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
-            $clean['default'] = in_array($type, array('repeater', 'gallery', 'group', 'flexible'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
+            $clean['default'] = in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
             $clean['condition'] = Alify_CF_Conditions::clean($field['condition'] ?? null, $errors, $name);
             $fields[] = $clean;
         }
@@ -266,7 +270,7 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
                 }
-                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible'), true) || $source['key'] === $field['key'] || $source['condition']) {
+                if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link'), true) || $source['key'] === $field['key'] || $source['condition']) {
                     $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
                 }
             }
@@ -342,7 +346,7 @@ final class Alify_CF {
             }
             $submitted = $values[$field['name']] ?? '';
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
-            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
+            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if (($field['required'] && $empty) || $invalid) {
                 if (!$issue && $field['type'] === 'group' && $field['required'] && $empty) { $issue = 'Fill at least one subfield in this Group.'; }
                 if (!$issue && $field['type'] === 'flexible' && $field['required'] && $empty) { $issue = 'Add at least one layout row.'; }

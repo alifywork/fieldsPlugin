@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.13.0 — Color Picker and Time fields**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.14.0 — structured Link field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, Number, Email, URL, Link, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -28,6 +28,29 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
+
+## Link field
+
+**Link (`link`)** combines URL, optional title and same/new-tab selection in one atomic value. It works on posts and Options Pages and as a basic Group/Repeater/Flexible subfield. Stored values are `['url' => 'https://example.com', 'title' => 'Visit', 'target' => '_blank']`; same-tab target is `''`. A completely cleared optional link stores `[]`.
+
+- Only absolute **HTTP(S)** URLs are supported. Relative/protocol-relative URLs, mailto/tel/FTP, embedded credentials, whitespace/control characters and executable schemes are rejected. Use ASCII/punycode hostnames.
+- Required means a valid URL is mandatory; title remains optional. Use **Clear link** to reset all components. A title/target without a URL is an incomplete value, not a clear request.
+- Missing or malformed structures retain the entire previous Link; invalid container subfields retain the whole container. Options saves remain page-atomic. Attempted input recovery is escaped and separate from saved data.
+- Link defaults are empty in this increment (no configurable composite defaults). Link may be conditionally shown but is **not a condition source**. Existing nesting/subfield-condition limits still apply.
+- REST submits `{__complete: '1', url: 'https://example.com', title: 'Visit', target: '_blank'}` under the normal field name. All components and the completion marker are required; an explicit clear sends three empty strings with the marker.
+- JSON transfers schema only; destination versions older than **0.14.0** reject the unknown type. No URL fetching, link search or content migration is performed.
+
+```php
+$link = alify_get_link('cta', get_the_ID()); // Validated record, or [].
+// Options: $link = alify_get_option('cta', 'site');
+if ($link) {
+    printf('<a href="%s" target="%s"%s>%s</a>',
+        esc_url($link['url']), esc_attr($link['target'] ?: '_self'),
+        $link['target'] === '_blank' ? ' rel="noopener noreferrer"' : '',
+        esc_html($link['title'] ?: $link['url'])
+    );
+}
+```
 
 ## Color Picker and Time
 
@@ -352,7 +375,7 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.13.0:
+Previous verified baseline (0.13.0; Link development checks extend it):
 
 ```sh
 npm ci

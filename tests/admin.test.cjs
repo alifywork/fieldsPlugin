@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -541,4 +541,19 @@ test('builder exposes Color and Time types with format-specific defaults guidanc
     set(w, 'type', 'time'); set(w, 'default', '09:30');
     assert.equal(schema(w)[0].type, 'time'); assert.equal(schema(w)[0].default, '09:30');
     assert.match(w.document.body.textContent, /24-hour HH:MM/); w.close();
+});
+
+
+test('Link clear resets all components but preserves completion and focuses URL', () => {
+    const dom = new JSDOM('<div class="alify-value"><fieldset class="alify-link"><input type="url" value="https://example.com"><input type="text" value="Visit"><select><option value="">Same</option><option value="_blank" selected>New</option></select><input type="hidden" value="1"><button type="button" data-link-clear>Clear</button></fieldset></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    d.querySelector('[data-link-clear]').click();
+    assert.equal(d.querySelector('input[type="url"]').value, ''); assert.equal(d.querySelector('input[type="text"]').value, '');
+    assert.equal(d.querySelector('select').value, ''); assert.equal(d.querySelector('input[type="hidden"]').value, '1');
+    assert.equal(d.activeElement, d.querySelector('input[type="url"]')); w.close();
+});
+
+test('Link builder hides unsupported defaults and serializes its type', () => {
+    const w = builder(); w.document.getElementById('alify-add').click(); set(w, 'label', 'Call to action'); set(w, 'type', 'link');
+    assert.equal(schema(w)[0].type, 'link'); assert.equal(w.document.querySelector('[data-prop="default"]'), null); w.close();
 });

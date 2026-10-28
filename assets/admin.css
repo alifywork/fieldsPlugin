@@ -18,3 +18,6 @@
 .alify-color { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .alify-color input[type="text"] { max-width: 180px; }
 .alify-color input[type="color"] { width: 44px; height: 34px; padding: 2px; cursor: pointer; }
+
+.alify-link { display: grid; grid-template-columns: minmax(80px, auto) minmax(0, 1fr); align-items: center; gap: 8px; }
+.alify-link [data-link-clear] { justify-self: start; }

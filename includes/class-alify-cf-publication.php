@@ -16,6 +16,7 @@ final class Alify_CF_Publication {
     }
 
     public static function stored_payload($field, $value) {
+        if ($field['type'] === 'link') { return array('__complete' => '1', 'url' => is_array($value) ? ($value['url'] ?? '') : '', 'title' => is_array($value) ? ($value['title'] ?? '') : '', 'target' => is_array($value) ? ($value['target'] ?? '') : ''); }
         if ($field['type'] === 'gallery') { return array('__complete' => '1', 'ids' => is_array($value) ? $value : array()); }
         if ($field['type'] === 'flexible') {
             $rows = array();

@@ -650,4 +650,26 @@ same(array(array('accent' => '#aabbcc', 'opens' => '09:30')), Alify_CF_Repeater:
 $old_scalar = array('accent' => '#112233', 'opens' => '08:00'); $errors = array();
 same(array(), Alify_CF::validate_values(array(field('accent', 'color'), field('opens', 'time')), array('accent' => 'bad', 'opens' => '24:00'), $old_scalar, $errors), 'Invalid nonempty optional color/time are rejected, not silently cleared');
 $errors = array(); same(array('accent' => '', 'opens' => ''), Alify_CF::validate_values(array(field('accent', 'color'), field('opens', 'time')), array('accent' => '', 'opens' => ''), $old_scalar, $errors), 'Optional color and time explicitly clear');
+$link_payload = array('__complete' => '1', 'url' => 'https://example.com/path?q=1&b=2#part', 'title' => '<b>Visit</b>', 'target' => '_blank');
+$link_value = array('url' => $link_payload['url'], 'title' => 'Visit', 'target' => '_blank');
+same($link_value, Alify_CF::clean_value(field('cta', 'link'), $link_payload), 'Link returns a structured sanitized record');
+$empty_link = array('__complete' => '1', 'url' => '', 'title' => '', 'target' => '');
+same(array(), Alify_CF_Link::clean($empty_link), 'Explicit complete empty link clears');
+foreach (array('javascript:alert(1)', 'data:text/html,test', '//example.com', '/relative', 'mailto:a@example.com', 'ftp://example.com', 'https://user:pass@example.com', "https://example.com/\n", 'https://example.com/a b', 'https://example.com/\\evil') as $url) {
+    $bad = $link_payload; $bad['url'] = $url; same('', Alify_CF_Link::clean($bad), 'Link rejects unsupported or malformed URL');
+}
+foreach (array(array(), '', array('url' => 'https://example.com'), array_merge($link_payload, array('title' => array())), array_merge($link_payload, array('target' => '_top')), array_merge($empty_link, array('title' => 'Partial')), array_merge($empty_link, array('target' => '_blank'))) as $bad) {
+    same('', Alify_CF_Link::clean($bad), 'Link rejects incomplete or malformed structures');
+}
+$errors = array(); same(array('cta' => array()), Alify_CF::validate_values(array(field('cta', 'link')), array('cta' => $empty_link), array('cta' => $link_value), $errors), 'Optional link explicitly clears');
+$errors = array(); same(array(), Alify_CF::validate_values(array(field('cta', 'link', true)), array('cta' => $empty_link), array('cta' => $link_value), $errors), 'Required link rejects empty');
+$errors = array(); same(array(), Alify_CF::validate_values(array(field('cta', 'link')), array(), array('cta' => $link_value), $errors), 'Missing optional Link payload cannot silently delete saved data');
+$link_rows = field('links', 'repeater'); $link_rows['sub_fields'] = array(field('cta', 'link'));
+same(array(array('cta' => $link_value)), Alify_CF_Repeater::clean($link_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'cta' => $link_payload)))), 'Link works inside repeaters');
+same('', Alify_CF_Repeater::clean($link_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1')))), 'Incomplete optional Link rejects the whole container');
+$meta[10]['_alify_cf_cta'] = $link_value; same($link_value, alify_get_link('cta', 10), 'Typed link getter returns saved record');
+same(array(), alify_get_link('missing_link', 10), 'Typed link getter returns empty array before save');
+$errors = array(); $link_target = field('details'); $link_target['condition'] = array('field' => 'field_cta', 'operator' => 'not_empty', 'value' => '');
+Alify_CF::validate_schema(array(field('cta', 'link'), $link_target), 'post', 0, $errors);
+same(true, (bool) $errors, 'Link cannot be an ambiguous conditional source');
 echo "PASS: $count PHP contract assertions\n";

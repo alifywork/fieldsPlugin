@@ -46,6 +46,10 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'link') {
+            if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1') { return $previous; }
+            return array('url' => self::text($raw['url'] ?? ''), 'title' => self::text($raw['title'] ?? ''), 'target' => in_array($raw['target'] ?? '', array('', '_blank'), true) ? ($raw['target'] ?? '') : '');
+        }
         if ($field['type'] === 'flexible') {
             // Invalid structures retain the saved rows; valid rows use the shared bounded recovery.
             if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1' || !is_array($raw['rows'] ?? array()) || count($raw['rows'] ?? array()) > 50) { return $previous; }
