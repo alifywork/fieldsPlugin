@@ -514,6 +514,30 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await modelForm.locator('input[name="slug"]').fill('alify_browser'); await modelForm.locator('input[name="label"]').fill('Browser managed options');
         await Promise.all([page.waitForNavigation(), modelForm.locator('button').click()]);
         check((await page.locator('body').textContent()).includes('options: alify_browser'), true, 'Content Models UI saves nonce-checked configuration');
+        // Existing contexts render in native editors; CSRF/capability checks are backend-covered too.
+        await page.goto(base + '/wp-admin/profile.php');
+        const profileInput = page.locator(`[name="alify_object_values[user:${fixture.user_id}][${fixture.profile_group}][profile_note]"]`);
+        await profileInput.fill('Native profile note'); await Promise.all([page.waitForNavigation(), page.locator('#submit').click()]); check(await profileInput.inputValue(), 'Native profile note', 'Native user profile fields persist');
+        await page.goto(base + '/wp-admin/term.php?taxonomy=category&tag_ID=' + fixture.selector_terms[0] + '&post_type=post');
+        const termInput = page.locator(`[name="alify_object_values[term:${fixture.selector_terms[0]}][${fixture.term_group}][term_note]"]`);
+        await termInput.fill('Native term note'); await Promise.all([page.waitForNavigation(), page.locator('#submit').click()]);
+        await page.goto(base + '/wp-admin/term.php?taxonomy=category&tag_ID=' + fixture.selector_terms[0] + '&post_type=post'); check(await termInput.inputValue(), 'Native term note', 'Native taxonomy-term edit fields persist');
+        await page.goto(base + '/wp-admin/post.php?post=' + fixture.images[0] + '&action=edit');
+        const attachmentInput = page.locator(`[name="alify_values[${fixture.attachment_group}][media_note]"]`); await attachmentInput.fill('Native attachment note');
+        await Promise.all([page.waitForNavigation(), page.locator('#publish').click()]); check(await attachmentInput.inputValue(), 'Native attachment note', 'Attachment edit-screen fields persist');
+        await page.goto(base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-objects&context=menu:' + fixture.native_menu);
+        const menuInput = page.locator(`[name="alify_object_values[menu:${fixture.native_menu}][${fixture.menu_group}][menu_note]"]`); await menuInput.fill('Native menu note');
+        await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save object fields', exact: true}).click()]); check(await menuInput.inputValue(), 'Native menu note', 'Dedicated navigation-menu field editor persists values');
+        await page.goto(base + '/wp-admin/nav-menus.php?action=edit&menu=' + fixture.native_menu);
+        const itemPanel = page.locator('#menu-item-' + fixture.native_item); await itemPanel.locator('.item-edit').click();
+        const itemInput = page.locator(`[name="alify_object_values[menu_item:${fixture.native_item}][${fixture.item_group}][item_note]"]`); await itemInput.fill('Native item note');
+        await Promise.all([page.waitForNavigation(), page.locator('#save_menu_footer').click()]);
+        await itemPanel.locator('.item-edit').click(); check(await itemInput.inputValue(), 'Native item note', 'Native navigation-menu item field persists');
+        await page.goto(base + '/?alify_frontend_test=' + fixture.advanced_post);
+        await page.locator('[data-editor-tab]').nth(1).click(); const frontendText = page.locator(`[name="alify_values[${fixture.advanced_group}][advanced_text]"]`); await frontendText.fill('Frontend native form');
+        await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save fields', exact: true}).click()]);
+        check(await frontendText.inputValue(), 'Frontend native form', 'Frontend form submits through nonce-protected validated endpoint');
+        const frontendAnonymous = await browser.newContext(); try { const denied = await frontendAnonymous.request.get(base + '/?alify_frontend_test=' + fixture.advanced_post); check(denied.status(), 403, 'Frontend editing remains authenticated-only'); } finally { await frontendAnonymous.close(); }
         check(errors, [], 'No uncaught browser JS errors');
         console.log(`PASS: ${checks} real browser assertions + ${persistenceChecks} HTTP options persistence assertions (Classic, Gutenberg, media, JSON, options).`);
     } finally { await context.close(); await browser.close(); }

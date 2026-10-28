@@ -278,7 +278,7 @@
                         if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
                         const source = fields.find(item => item.dataset.fieldKey === rule.field);
                         let matched = false;
-                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
+                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
                             const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                             let values;
                             if (source.dataset.fieldType === 'select') {
@@ -303,7 +303,7 @@
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'taxonomy', 'user', 'page_link', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_') && !JSON.parse(item.dataset.condition || 'null')));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map', 'taxonomy', 'user', 'page_link', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_') && !JSON.parse(item.dataset.condition || 'null')));
                     function evaluate(node) { if (node.rules) { const children = node.rules.map(evaluate); return node.relation === 'any' ? children.some(Boolean) : children.every(Boolean); } return matches[rules.indexOf(node)]; }
                     visible = validTree && validSources && evaluate(rule);
                 }

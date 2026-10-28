@@ -30,6 +30,7 @@ final class Alify_CF_Publication {
             }
             return array('__complete' => '1', 'rows' => $rows);
         }
+        if ($field['type'] === 'google_map') { $out = is_array($value) ? $value : array(); return array_replace(array('lat' => '', 'lng' => '', 'address' => '', 'zoom' => 15), $out, array('__complete' => '1')); }
         if ($field['type'] === 'group') {
             $out = array();
             foreach ($field['sub_fields'] as $sub) { $out[$sub['name']] = self::stored_payload($sub, is_array($value) && array_key_exists($sub['name'], $value) ? $value[$sub['name']] : $sub['default']); }
@@ -50,7 +51,7 @@ final class Alify_CF_Publication {
     /** Validate all published groups using a complete submitted payload, or saved values. */
     public static function assess($post_type, $id, $submitted = null) {
         $errors = array(); $feedback = array(); $updates = array(); $names = array();
-        foreach (Alify_CF::groups($post_type) as $group) {
+        foreach (Alify_CF::groups($post_type, $id) as $group) {
             $schema = Alify_CF::schema($group->ID); $previous = array(); $values = array();
             foreach ($schema as $field) {
                 $name = $field['name'];

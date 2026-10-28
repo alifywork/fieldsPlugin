@@ -44,7 +44,8 @@
         document.querySelectorAll('.alify-repeater, .alify-flexible').forEach(container => {
             const list = container.querySelector('.alify-rows, .alify-flex-rows'); if (!list) return;
             Array.from(list.children).forEach(row => {
-                const clone = row.querySelector('[data-row-tool="clone"]'); if (clone) clone.disabled = !!container.closest('.alify-value[hidden]') || list.children.length >= Number(container.dataset.limit);
+                const layoutName = row.querySelector('input[name$="[layout]"]')?.value, layoutSetting = JSON.parse(container.dataset.layoutLimits || '[]').find(item => item.name === layoutName);
+                const clone = row.querySelector('[data-row-tool="clone"]'); if (clone) clone.disabled = (!!layoutSetting && (layoutSetting.disabled || Array.from(list.children).filter(item => item.querySelector('input[name$="[layout]"]')?.value === layoutName).length >= layoutSetting.max)) || !!container.closest('.alify-value[hidden]') || list.children.length >= Number(container.dataset.limit);
                 const name = container.dataset.rowLabel, sub = name ? Array.from(row.querySelectorAll('[data-subfield]')).find(item => item.dataset.subfield === name) : null;
                 let label = row.querySelector('.alify-extra-row-label');
                 if (!label) { label = document.createElement('span'); label.className = 'alify-extra-row-label'; row.querySelector('.alify-row-bar')?.appendChild(label); }

@@ -26,6 +26,7 @@ final class Alify_CF_Post_Object {
         return (is_post_publicly_viewable($post) && !post_password_required($post)) || self::readable($id, $field) ? $post : null;
     }
     public static function assets() {
+        wp_enqueue_script('alify-cf-pagination', plugins_url('assets/pagination.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
         wp_enqueue_script('alify-cf-layout', plugins_url('assets/layout.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
         wp_enqueue_script('alify-cf-rows', plugins_url('assets/rows.js', ALIFY_CF_FILE), array('jquery-ui-sortable', 'alify-cf-rich-text'), ALIFY_CF_VERSION, true);
         wp_enqueue_script('alify-cf-selector', plugins_url('assets/selector.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);

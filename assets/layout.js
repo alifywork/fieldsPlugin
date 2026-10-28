@@ -3,7 +3,8 @@
     function icon(input) { const preview = input.parentElement.querySelector('[data-icon-preview]'); if (preview) preview.className = /^dashicons-[a-z0-9-]+$/.test(input.value) ? 'dashicons ' + input.value : ''; }
     document.querySelectorAll('[data-icon-picker]').forEach(icon);
     document.addEventListener('change', event => { if (event.target.matches('[data-icon-picker]')) icon(event.target); });
-    document.querySelectorAll('.alify-values').forEach(group => {
+    function prepare() { document.querySelectorAll('.alify-values').forEach(group => {
+        if (group.dataset.alifyLayoutReady) return; group.dataset.alifyLayoutReady = '1';
         let tab = null, accordion = null; const tabs = [];
         const fields = Array.from(group.children).filter(element => element.matches('.alify-value'));
         if (!fields.some(field => ['tab', 'accordion'].includes(field.dataset.fieldType))) return;
@@ -23,5 +24,7 @@
         group.addEventListener('invalid', event => {
             let node = event.target.parentElement; while (node && node !== group) { if (node.dataset.editorSection) { node.hidden = false; const control = group.querySelector('[aria-controls="' + node.id + '"]'); if (control) { control.setAttribute(node.dataset.editorSection === 'tab' ? 'aria-selected' : 'aria-expanded', 'true'); } } node = node.parentElement; }
         }, true);
-    });
+    }); }
+    const observer = new MutationObserver(records => { if (records.some(record => Array.from(record.addedNodes).some(node => node.nodeType === 1 && (node.matches?.('.alify-values') || node.querySelector?.('.alify-values'))))) { prepare(); document.querySelectorAll('[data-icon-picker]').forEach(icon); } });
+    observer.observe(document.body, {childList: true, subtree: true}); prepare();
 })();

@@ -23,7 +23,7 @@ final class Alify_CF_Transfer {
         $location = get_post_meta($id, Alify_CF::LOCATION, true);
         $errors = array(); $fields = Alify_CF::validate_schema(Alify_CF::schema($id), $location, $id, $errors);
         if ($errors) { return new WP_Error('alify_transfer_schema', implode(' ', $errors)); }
-        $json = wp_json_encode(array('format' => 'alify-custom-field', 'version' => self::version($fields), 'group' => array('title' => $post->post_title, 'location' => $location, 'fields' => self::portable($fields))), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = wp_json_encode(array('format' => 'alify-custom-field', 'version' => isset(Alify_CF_Objects::locations()[$location]) || $location === 'attachment' || get_post_meta($id, '_alify_cf_location_rules', true) ? 9 : self::version($fields), 'group' => array('title' => $post->post_title, 'location' => $location, 'fields' => self::portable($fields), 'rules' => get_post_meta($id, '_alify_cf_location_rules', true) ?: array())), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if (!is_string($json) || strlen($json) > self::MAX_BYTES) { return new WP_Error('alify_transfer_size', 'Export exceeds the 1 MiB transfer limit.'); }
         return $json;
     }
@@ -32,15 +32,16 @@ final class Alify_CF_Transfer {
     private static function version($fields) {
         $version = 1;
         foreach ($fields as $field) {
-            if (Alify_CF_API::custom($field['type']) || Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker' || array_intersect(array_keys($field), array('api_read', 'api_write', 'public_output', 'content', 'icons', 'toolbar', 'editor_mode', 'media_buttons', 'row_label', 'collapsed', 'taxonomy_filters')) || self::advanced_conditions($field['condition'] ?? null)) { $version = 8; }
+            if (isset($field['page_size']) || in_array($field['type'], array('oembed', 'google_map'), true)) { $version = 9; }
+            if (Alify_CF_API::custom($field['type']) || Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker' || array_intersect(array_keys($field), array('api_read', 'api_write', 'public_output', 'content', 'icons', 'toolbar', 'editor_mode', 'media_buttons', 'row_label', 'collapsed', 'taxonomy_filters')) || self::advanced_conditions($field['condition'] ?? null)) { $version = max($version, 8); }
             if (Alify_CF_Selector::supported($field)) { $version = max($version, 7); }
             if (Alify_CF_Reference_Settings::supported($field) && array_intersect(array_keys($field), array('post_types', 'post_statuses', 'multiple', 'min_items', 'max_items', 'return_format'))) { $version = max($version, 6); }
             if (array_intersect(array_keys($field), array('alpha', 'palette', 'allowed_mimes', 'preview_size', 'min_bytes', 'max_bytes', 'min_items', 'max_items')) || ((Alify_CF_Field_Settings::media($field) || $field['type'] === 'link') && array_key_exists('return_format', $field)) || ($field['type'] === 'link' && !empty($field['default']))) { $version = max($version, 5); }
             if (Alify_CF_Choice::supported($field['type']) && (array_key_exists('layout', $field) || array_key_exists('multiple', $field) || array_key_exists('searchable', $field) || array_key_exists('return_format', $field) || ($field['type'] === 'checkbox' && !empty($field['default'])))) { $version = max($version, 4); }
             if (Alify_CF_Temporal_Format::formats($field['type']) && (array_key_exists('display_format', $field) || array_key_exists('return_format', $field))) { $version = max($version, 3); }
             if ($field['type'] === 'repeater' && (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field))) { $version = max($version, 2); }
-            if (isset($field['sub_fields'])) { foreach ($field['sub_fields'] as $sub) { if ($sub['type'] === 'wysiwyg') { $version = 8; } } $version = max($version, self::version($field['sub_fields'])); }
-            foreach ($field['layouts'] ?? array() as $layout) { foreach ($layout['sub_fields'] as $sub) { if ($sub['type'] === 'wysiwyg') { $version = 8; } } $version = max($version, self::version($layout['sub_fields'])); }
+            if (isset($field['sub_fields'])) { foreach ($field['sub_fields'] as $sub) { if ($sub['type'] === 'wysiwyg') { $version = max($version, 8); } } $version = max($version, self::version($field['sub_fields'])); }
+            foreach ($field['layouts'] ?? array() as $layout) { if (array_intersect(array_keys($layout), array('min_rows', 'max_rows', 'disabled'))) { $version = 9; } foreach ($layout['sub_fields'] as $sub) { if ($sub['type'] === 'wysiwyg') { $version = max($version, 8); } } $version = max($version, self::version($layout['sub_fields'])); }
         }
         return $version;
     }
@@ -66,18 +67,19 @@ final class Alify_CF_Transfer {
         if (is_wp_error($auth)) { return $auth; }
         if (!is_string($json) || strlen($json) > self::MAX_BYTES || trim($json) === '') { return new WP_Error('alify_transfer_size', 'Provide JSON no larger than 1 MiB.'); }
         $object = json_decode($json, false, 32);
-        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2, 3, 4, 5, 6, 7, 8), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
+        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2, 3, 4, 5, 6, 7, 8, 9), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
             return new WP_Error('alify_transfer_format', 'Invalid Alify JSON or unsupported format version.');
         }
         $group = json_decode($json, true, 32)['group'];
         if (!is_string($group['title'] ?? null) || !is_string($group['location'] ?? null) || trim(sanitize_text_field($group['title'])) === '') { return new WP_Error('alify_transfer_group', 'Group title and registered location are required.'); }
-        $errors = array(); $fields = Alify_CF::validate_schema(self::portable_input($group['fields']), $group['location'], 0, $errors);
+        $errors = array(); $rules = Alify_CF_Location_Rules::clean($group['rules'] ?? null, $errors); if ($rules && $object->version < 9) { $errors[] = 'Location rules need JSON v9.'; } if (($object->version < 9) && (isset(Alify_CF_Objects::locations()[$group['location']]) || $group['location'] === 'attachment')) { $errors[] = 'Object locations require schema JSON v9.'; } $fields = Alify_CF::validate_schema(self::portable_input($group['fields']), $group['location'], 0, $errors);
         if ($errors) { return new WP_Error('alify_transfer_schema', implode(' ', $errors)); }
         // Do not pass through source IDs, statuses, values, capabilities or arbitrary metadata.
         $id = wp_insert_post(wp_slash(array('post_type' => Alify_CF::GROUP, 'post_status' => 'draft', 'post_title' => sanitize_text_field($group['title']))), true);
         if (is_wp_error($id)) { return $id; }
         update_post_meta($id, Alify_CF::SCHEMA, wp_slash($fields));
         update_post_meta($id, Alify_CF::LOCATION, $group['location']);
+        update_post_meta($id, '_alify_cf_location_rules', wp_slash($rules));
         if (Alify_CF::schema($id) !== $fields || get_post_meta($id, Alify_CF::LOCATION, true) !== $group['location']) {
             wp_delete_post($id, true);
             return new WP_Error('alify_transfer_write', 'Import could not be stored. The new group was removed.');

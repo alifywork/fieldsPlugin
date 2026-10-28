@@ -31,7 +31,7 @@ final class Alify_CF_Conditions {
         $results = array();
         foreach (self::rules($condition) as $rule) {
             $source = null; foreach ($schema as $candidate) { if ($candidate['key'] === $rule['field']) { $source = $candidate; break; } }
-            if (!$source || Alify_CF_Editor_Fields::presentation($source['type']) || Alify_CF_API::custom($source['type']) || Alify_CF_Selector::supported($source) || Alify_CF_Reference_Settings::multiple($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'), true) || !empty($source['condition']) || $source['key'] === $field['key']) { return false; }
+            if (!$source || Alify_CF_Editor_Fields::presentation($source['type']) || Alify_CF_API::custom($source['type']) || Alify_CF_Selector::supported($source) || Alify_CF_Reference_Settings::multiple($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map'), true) || !empty($source['condition']) || $source['key'] === $field['key']) { return false; }
             $value = $values[$source['key']] ?? ''; $items = is_array($value) ? array_map('strval', array_filter($value, 'is_scalar')) : array((string) $value);
             $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0')); $matches = in_array($rule['value'], $items, true); $operator = $rule['operator'];
             if (in_array($operator, array('contains', 'starts_with', 'ends_with'), true)) {

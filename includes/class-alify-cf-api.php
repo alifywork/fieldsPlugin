@@ -15,7 +15,9 @@ final class Alify_CF_API {
             }
         }, 20);
     }
+    public static function unregister_group($key) { if (!is_string($key)) { return false; } $exists = isset(self::$groups[$key]); unset(self::$groups[$key]); return $exists; }
     public static function groups($location = null) { return array_values(array_filter(self::$groups, function($group) use ($location) { return $location === null || $group['location'] === $location; })); }
+    public static function definition($id) { foreach (self::$groups as $group) { if ($group['id'] === $id) { return $group; } } return null; }
     public static function schema($id) { foreach (self::$groups as $group) { if ($group['id'] === $id) { return $group['fields']; } } return null; }
     public static function types() { $out = array(); foreach (self::$types as $type => $callbacks) { $out[$type] = $callbacks['label']; } return $out; }
     public static function custom($type) { return isset(self::$types[$type]); }
@@ -47,11 +49,11 @@ final class Alify_CF_API {
         if (!is_array($definition) || !is_string($definition['key'] ?? null) || !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $definition['key']) || !is_string($definition['title'] ?? null) || trim($definition['title']) === '') { return new WP_Error('alify_group', 'Registration requires a stable key and title.'); }
         $key = $definition['key']; $id = -1 - (int) hexdec(substr(hash('sha256', $key), 0, 7));
         foreach (self::$groups as $other_key => $group) { if ($other_key !== $key && $group['id'] === $id) { return new WP_Error('alify_group', 'Registration identifier collision.'); } }
-        $location = $definition['location'] ?? 'post'; $errors = array();
+        $location = $definition['location'] ?? 'post'; $errors = array(); $rules = Alify_CF_Location_Rules::clean($definition['rules'] ?? null, $errors);
         $raw_fields = $definition['fields'] ?? null; self::stable_keys($raw_fields, $key);
         $fields = Alify_CF::validate_schema($raw_fields, $location, $id, $errors);
         if ($errors) { return new WP_Error('alify_schema', implode(' ', $errors)); }
-        self::$groups[$key] = array('key' => $key, 'id' => $id, 'title' => sanitize_text_field($definition['title']), 'location' => $location, 'fields' => $fields);
+        self::$groups[$key] = array('key' => $key, 'id' => $id, 'title' => sanitize_text_field($definition['title']), 'location' => $location, 'fields' => $fields, 'rules' => $rules);
         do_action('alify_cf/registered_group', $key, self::$groups[$key]); return true;
     }
     private static function stable_keys(&$fields, $prefix) { if (!is_array($fields)) { return; } foreach ($fields as &$field) { if (!is_array($field) || !is_string($field['name'] ?? '')) { continue; } $path = $prefix . '/' . ($field['name'] ?? ''); if (empty($field['key'])) { $field['key'] = 'field_' . substr(hash('sha256', $path), 0, 24); } if (isset($field['sub_fields'])) { self::stable_keys($field['sub_fields'], $path); } if (isset($field['layouts']) && is_array($field['layouts'])) { foreach ($field['layouts'] as &$layout) { if (is_array($layout) && isset($layout['sub_fields'])) { self::stable_keys($layout['sub_fields'], $path . '/' . (is_string($layout['name'] ?? null) ? $layout['name'] : '')); } } unset($layout); } } unset($field); }
@@ -59,8 +61,8 @@ final class Alify_CF_API {
         if (!is_string($key) || !isset(self::$groups[$key])) { return new WP_Error('alify_group', 'Unknown registered group.'); }
         $definition = self::$groups[$key]; $definition['fields'][] = $field; return self::register_group($definition);
     }
-    public static function field($location, $name) {
-        $matches = array(); foreach (Alify_CF::groups($location) as $group) { foreach (Alify_CF::schema($group->ID) as $field) { if ($field['name'] === $name) { $matches[] = $field; } } } return count($matches) === 1 ? $matches[0] : null;
+    public static function field($location, $name, $object = 0) {
+        $matches = array(); foreach (Alify_CF::groups($location, $object) as $group) { foreach (Alify_CF::schema($group->ID) as $field) { if ($field['name'] === $name) { $matches[] = $field; } } } return count($matches) === 1 ? $matches[0] : null;
     }
     public static function write($values, $object, $options = false) {
         if (self::$writing) { return new WP_Error('alify_reentrant', 'Recursive Alify API writes are not permitted.'); }
@@ -74,7 +76,7 @@ final class Alify_CF_API {
         }
         if (!is_array($values) || !$values || count($values) > 200) { return new WP_Error('alify_values', 'Supply 1–200 named editor-payload values.'); }
         $known = array(); $updates = array(); $errors = array();
-        foreach (Alify_CF::groups($location) as $group) {
+        foreach (Alify_CF::groups($location, $object) as $group) {
             $schema = Alify_CF::schema($group->ID); $payload = array(); $touches = false;
             foreach ($schema as $field) {
                 $name = $field['name']; $known[$name] = true;
@@ -110,7 +112,7 @@ final class Alify_CF_API {
     }
     public static function mutate_row($name, $index, $row, $post_id, $remove = false) {
         if (!current_user_can('edit_post', $post_id)) { return new WP_Error('alify_forbidden', 'Post update not permitted.'); }
-        $post = get_post($post_id); $field = $post ? self::field($post->post_type, $name) : null;
+        $post = get_post($post_id); $field = $post ? self::field($post->post_type, $name, $post->ID) : null;
         if (!$field || !in_array($field['type'], array('repeater', 'flexible'), true) || !is_int($index) || $index < 0) { return new WP_Error('alify_row', 'Use a valid zero-based row index and container field.'); }
         $rows = alify_get_field($name, $post_id); $rows = is_array($rows) ? $rows : array();
         if ($remove) { if (!array_key_exists($index, $rows)) { return new WP_Error('alify_row', 'Row does not exist.'); } array_splice($rows, $index, 1); }
@@ -121,7 +123,7 @@ final class Alify_CF_API {
         if (!current_user_can('manage_options')) { return new WP_Error('alify_forbidden', 'Administrator permission required.'); }
         $registered = null; foreach (self::$groups as $group) { if ($group['id'] === $group_id) { $registered = $group; } }
         if ($registered) { $definition = array('key' => $registered['key'], 'title' => $registered['title'], 'location' => $registered['location'], 'fields' => $registered['fields']); }
-        else { $post = get_post($group_id); if (!$post || $post->post_type !== Alify_CF::GROUP) { return new WP_Error('alify_group', 'Unknown group.'); } $definition = array('key' => 'export_' . $group_id, 'title' => $post->post_title, 'location' => get_post_meta($group_id, Alify_CF::LOCATION, true), 'fields' => Alify_CF::schema($group_id)); }
+        else { $post = get_post($group_id); if (!$post || $post->post_type !== Alify_CF::GROUP) { return new WP_Error('alify_group', 'Unknown group.'); } $definition = array('key' => 'export_' . $group_id, 'title' => $post->post_title, 'location' => get_post_meta($group_id, Alify_CF::LOCATION, true), 'fields' => Alify_CF::schema($group_id), 'rules' => get_post_meta($group_id, '_alify_cf_location_rules', true) ?: array()); }
         foreach ($definition['fields'] as &$field) { self::portable($field); } unset($field);
         return "<?php\n// Register after post types, taxonomies and options pages exist. Configuration only.\nadd_action('init', function () {\n    alify_register_field_group(" . var_export($definition, true) . ");\n}, 30);\n";
     }
@@ -135,7 +137,7 @@ final class Alify_CF_API {
         $options = isset($request['page']); $object = $options ? $request['page'] : (int) $request['id']; $post = $options ? null : get_post($object);
         if (!$options && (!$post || $post->post_type === Alify_CF::GROUP || wp_is_post_revision($object))) { return new WP_Error('alify_object', 'Unsupported object.', array('status' => 400)); }
         $location = $options ? Alify_CF_Options::location($object) : $post->post_type; $read = array(); $writable = array(); $schema = array();
-        foreach (Alify_CF::groups($location) as $group) { foreach (Alify_CF::schema($group->ID) as $field) {
+        foreach (Alify_CF::groups($location, $object) as $group) { foreach (Alify_CF::schema($group->ID) as $field) {
             if (!empty($field['api_write'])) { $writable[$field['name']] = true; }
             if (!empty($field['api_read']) && !Alify_CF_Password::contains($field) && !self::contains_custom($field)) { $read[$field['name']] = $options ? alify_get_option($field['name'], $object) : alify_get_field($field['name'], $object); }
             if (!empty($field['api_read']) || !empty($field['api_write'])) { $schema[$field['name']] = array('type' => $field['type'], 'required' => $field['required'], 'read' => array_key_exists($field['name'], $read), 'write' => isset($writable[$field['name']])); }
@@ -146,7 +148,7 @@ final class Alify_CF_API {
     public static function public_value($name, $post_id) {
         if (!is_string($name) || !is_numeric($post_id)) { return null; } $post = get_post((int) $post_id);
         if (!$post || !is_post_publicly_viewable($post) || !empty($post->post_password)) { return null; }
-        $field = self::field($post->post_type, $name);
+        $field = self::field($post->post_type, $name, $post->ID);
         if (!$field || empty($field['public_output']) || Alify_CF_Password::contains($field) || self::custom($field['type']) || in_array($field['type'], array('user', 'wysiwyg'), true)) { return null; }
         $value = alify_get_field($name, $post->ID); return is_scalar($value) ? (string) $value : null;
     }

@@ -335,9 +335,9 @@ test('editor bridge serializes enabled controls and nested arrays into matching 
     assert.deepEqual(JSON.parse(JSON.stringify(sent.data.alify_fields)), {complete: '1', groups: {'7': {title: 'Hello', tags: ['a'], team: {rows: {'0': {name: 'Member'}}}, __group_complete: '1'}}});
     w.close();
 });
-test('editor bridge leaves reads, autosaves and unrelated posts unchanged', async () => {
+test('editor bridge leaves reads and unrelated posts unchanged', async () => {
     const w = editorBridge();
-    for (const options of [{path: '/wp/v2/posts/10'}, {path: '/wp/v2/posts/11', method: 'POST'}, {path: '/wp/v2/posts/10/autosaves', method: 'POST'}]) {
+    for (const options of [{path: '/wp/v2/posts/10'}, {path: '/wp/v2/posts/11', method: 'POST'}]) {
         await w.middleware(options, received => { assert.equal(received, options); return Promise.resolve(); });
     }
     w.close();
@@ -954,4 +954,12 @@ test('presentation tabs/accordions retain enabled values and reveal native inval
 test('rich editor presets and dynamic detach/restore preserve chosen editor state', () => {
     const dom = new JSDOM('<div class="alify-row alify-rich"><button data-rich-enable>Enable</button><textarea id="preset-editor" data-rich-editor data-rich-toolbar="basic" data-rich-mode="text" data-rich-media="1">Copy</textarea></div>', {runScripts: 'outside-only'}), w = dom.window, d = w.document; const calls = []; w.wp = {editor: {initialize(id, settings) { calls.push({id, settings}); }, remove(id) { calls.push({remove: id}); }}};
     w.eval(fs.readFileSync('assets/rich-text.js', 'utf8')); d.querySelector('button').click(); assert.equal(calls[0].settings.tinymce, false); assert.equal(calls[0].settings.quicktags, true); assert.equal(calls[0].settings.mediaButtons, true); w.AlifyRichText.detach(d.querySelector('.alify-row')); assert.equal(calls[1].remove, 'preset-editor'); w.AlifyRichText.restore(d.querySelector('.alify-row')); assert.equal(calls[2].id, 'preset-editor'); w.close();
+});
+
+test('pagination hides rows without disabling or dropping form values and expands on invalid', () => {
+    const dom = new JSDOM('<div class="alify-repeater" data-page-size="1"><div class="alify-rows"><div class="alify-row"><input name="rows[0]" value="First"></div><div class="alify-row"><input name="rows[1]" required value="Second"></div></div></div>', {runScripts: 'outside-only'}), w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/pagination.js', 'utf8')); const rows = d.querySelectorAll('.alify-row'); assert.equal(rows[0].hidden, false); assert.equal(rows[1].hidden, true); assert.equal(rows[1].querySelector('input').disabled, false); d.querySelector('[data-page-action="next"]').click(); assert.equal(rows[0].hidden, true); assert.equal(rows[1].hidden, false); rows[0].querySelector('input').dispatchEvent(new w.Event('invalid')); assert.equal(rows[0].hidden, false); assert.equal(rows[1].hidden, false); const form = d.createElement('form'); d.body.appendChild(form); form.appendChild(d.querySelector('.alify-repeater')); assert.deepEqual(Array.from(new w.FormData(form), entry => Array.from(entry)), [['rows[0]', 'First'], ['rows[1]', 'Second']]); w.close();
+});
+
+test('editor bridge includes field previews in autosaves without using another post path', async () => {
+    const dom = new JSDOM('<div class="alify-values"><input name="alify_values[-12][__group_complete]" value="1"><input name="alify_values[-12][title]" value="Pending"></div>', {runScripts: 'outside-only'}), w = dom.window; let middleware; w.wp = {apiFetch: {use(fn) { middleware = fn; }}}; w.AlifyEditor = {path: '/wp/v2/posts', postId: 10}; w.eval(fs.readFileSync('assets/editor.js', 'utf8')); let submitted; await middleware({path: '/wp/v2/posts/10/autosaves', method: 'POST', data: {}}, options => { submitted = options; return Promise.resolve({}); }); assert.equal(submitted.data.alify_fields.groups['-12'].title, 'Pending'); w.close();
 });

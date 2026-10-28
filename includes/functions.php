@@ -108,3 +108,22 @@ function alify_delete_row($name, $index, $post_id) { return Alify_CF_API::mutate
 function alify_each_row($name, $post_id = 0) { foreach (alify_get_rows($name, $post_id) as $index => $row) { yield $index => $row; } }
 function alify_get_sub_field($row, $name) { return is_array($row) && is_string($name) ? ($row['fields'][$name] ?? $row[$name] ?? null) : null; }
 function alify_export_group_php($group_id) { return Alify_CF_API::export_php($group_id); }
+
+/** Trusted raw native-metadata getter, like alify_get_field; not a public authorization boundary. */
+function alify_get_object_field($name, $context) { return Alify_CF_Objects::get($name, $context); }
+function alify_update_object_fields($values, $context) { return Alify_CF_Objects::write($values, $context); }
+
+function alify_form_head() { Alify_CF_Forms::prepare(); }
+function alify_form($post_id) { return Alify_CF_Forms::render($post_id); }
+function alify_get_revision_field($name, $revision_id) { return Alify_CF_Revisions::get($name, $revision_id); }
+function alify_restore_field_revision($post_id, $revision_id) { return Alify_CF_Revisions::restore($post_id, $revision_id); }
+
+function alify_register_location_rule($name, $matcher, $validator = null) { return Alify_CF_Location_Rules::register($name, $matcher, $validator); }
+
+/** Explicit rendering only; themes decide privacy/consent before contacting external providers. */
+function alify_get_oembed($name, $post_id = 0) { $value = alify_get_field($name, $post_id); return is_string($value) && $value !== '' ? Alify_CF_External::embed($value) : ''; }
+function alify_get_google_map_html($name, $post_id = 0) { return Alify_CF_External::map_html(alify_get_field($name, $post_id)); }
+
+function alify_get_widget_field($name, $widget_id) { return Alify_CF_Widgets::get($name, $widget_id); }
+
+function alify_get_autosave_field($name, $post_id) { return Alify_CF_Revisions::preview($name, $post_id); }

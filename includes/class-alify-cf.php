@@ -3,6 +3,13 @@ if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-selector.php';
 require_once __DIR__ . '/class-alify-cf-api.php';
+require_once __DIR__ . '/class-alify-cf-objects.php';
+require_once __DIR__ . '/class-alify-cf-widgets.php';
+require_once __DIR__ . '/class-alify-cf-external.php';
+require_once __DIR__ . '/class-alify-cf-location-rules.php';
+require_once __DIR__ . '/class-alify-cf-local-json.php';
+require_once __DIR__ . '/class-alify-cf-forms.php';
+require_once __DIR__ . '/class-alify-cf-revisions.php';
 require_once __DIR__ . '/class-alify-cf-models.php';
 require_once __DIR__ . '/class-alify-cf-editor-fields.php';
 require_once __DIR__ . '/class-alify-cf-reference-settings.php';
@@ -32,6 +39,11 @@ final class Alify_CF {
 
     public static function boot() {
         Alify_CF_API::boot();
+        Alify_CF_Objects::boot();
+        Alify_CF_Widgets::boot();
+        Alify_CF_Local_JSON::boot();
+        Alify_CF_Forms::boot();
+        Alify_CF_Revisions::boot();
         Alify_CF_Models::boot();
         Alify_CF_Options::boot();
         Alify_CF_Post_Object::boot();
@@ -49,7 +61,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array_merge(array('tab' => 'Tab', 'accordion' => 'Accordion', 'message' => 'Message', 'icon_picker' => 'Icon Picker', 'taxonomy' => 'Taxonomy', 'user' => 'User', 'page_link' => 'Page Link', 'text' => 'Text', 'password' => 'Password', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'range' => 'Range', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'button_group' => 'Button Group', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'date_time' => 'Date Time', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content'), Alify_CF_API::types());
+        return array_merge(array('oembed' => 'oEmbed (YouTube/Vimeo)', 'google_map' => 'Google Map coordinates', 'tab' => 'Tab', 'accordion' => 'Accordion', 'message' => 'Message', 'icon_picker' => 'Icon Picker', 'taxonomy' => 'Taxonomy', 'user' => 'User', 'page_link' => 'Page Link', 'text' => 'Text', 'password' => 'Password', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'range' => 'Range', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'button_group' => 'Button Group', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'date_time' => 'Date Time', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content'), Alify_CF_API::types());
     }
 
     public static function register() {
@@ -67,10 +79,10 @@ final class Alify_CF {
         return get_post_types(array('show_ui' => true), 'objects');
     }
 
-    public static function groups($post_type) {
+    public static function groups($post_type, $object = 0) {
         $groups = get_posts(array('post_type' => self::GROUP, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => self::LOCATION, 'meta_value' => $post_type));
         foreach (Alify_CF_API::groups($post_type) as $group) { $groups[] = (object) array('ID' => $group['id'], 'post_title' => $group['title']); }
-        return $groups;
+        return $object ? array_values(array_filter($groups, function($group) use ($post_type, $object) { return Alify_CF_Location_Rules::group($group->ID, $post_type, $object); })) : $groups;
     }
 
     public static function schema($id) {
@@ -108,7 +120,7 @@ final class Alify_CF {
         add_meta_box('alify-location', 'Location Rules', array(__CLASS__, 'location'), self::GROUP, 'normal');
         $screen = get_current_screen();
         if (!$screen || $screen->post_type === self::GROUP) { return; }
-        foreach (self::groups($screen->post_type) as $group) {
+        foreach (self::groups($screen->post_type, isset($GLOBALS['post']->ID) ? $GLOBALS['post']->ID : 0) as $group) {
             add_meta_box('alify-values-' . $group->ID, $group->post_title, function($post) use ($group) { self::values($post, $group); }, $screen->post_type, 'normal', 'default');
         }
     }
@@ -124,13 +136,14 @@ final class Alify_CF {
         $location = get_post_meta($post->ID, self::LOCATION, true) ?: 'post';
         echo '<div class="alify-location"><div><strong>Show this field group when</strong><p>Published groups appear on the selected post type or options page.</p></div><label>Location <select name="alify_location">';
         foreach (self::post_types() as $type) {
-            if (in_array($type->name, array(self::GROUP, 'attachment'), true)) { continue; }
+            if (in_array($type->name, array(self::GROUP), true)) { continue; }
             echo '<option value="' . esc_attr($type->name) . '" ' . selected($location, $type->name, false) . '>' . esc_html($type->labels->singular_name) . '</option>';
         }
+        foreach (Alify_CF_Objects::locations() as $key => $title) { echo '<option value="' . esc_attr($key) . '" ' . selected($location, $key, false) . '>' . esc_html($title) . '</option>'; }
         foreach (Alify_CF_Options::pages() as $slug => $title) {
             echo '<option value="' . esc_attr(Alify_CF_Options::location($slug)) . '" ' . selected($location, Alify_CF_Options::location($slug), false) . '>Options Page: ' . esc_html($title) . '</option>';
         }
-        echo '</select></label></div>';
+        echo '</select></label></div><p>Optional OR groups of AND predicates: post_id, status, template, term (taxonomy:ID), current_user_role or registered x_ rules. Operators == / !=. Maximum 50 rules.</p><textarea class="large-text code" rows="5" name="alify_location_rules">' . esc_textarea(wp_json_encode(get_post_meta($post->ID, '_alify_cf_location_rules', true) ?: array(), JSON_PRETTY_PRINT)) . '</textarea>';
     }
 
     public static function choices($field) {
@@ -184,6 +197,7 @@ final class Alify_CF {
 
     public static function control($field, $value, $id, $input, $error_id = '') {
         if (Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker') { Alify_CF_Editor_Fields::render($field, $value, $id, $input); return; }
+        if (in_array($field['type'], array('oembed', 'google_map'), true)) { Alify_CF_External::render($field, $value, $id, $input); return; }
         if (Alify_CF_API::custom($field['type'])) { Alify_CF_API::custom_render($field, $value, $id, $input, $error_id); return; }
         $required = !empty($field['required']) ? ' required' : '';
         $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '');
@@ -262,6 +276,8 @@ final class Alify_CF {
     public static function clean_value($field, $value) {
         if (Alify_CF_Editor_Fields::presentation($field['type'])) { return ''; }
         if ($field['type'] === 'icon_picker') { return Alify_CF_Editor_Fields::clean_icon($field, $value); }
+        if ($field['type'] === 'oembed') { return Alify_CF_External::video($value); }
+        if ($field['type'] === 'google_map') { return Alify_CF_External::map($value); }
         if (Alify_CF_API::custom($field['type'])) { return Alify_CF_API::custom_clean($field, $value); }
         if (Alify_CF_Selector::supported($field)) { return Alify_CF_Selector::clean($field, $value); }
         if (Alify_CF_Choice::multiple($field)) { return Alify_CF_Choice::clean($field, $value); }
@@ -309,7 +325,7 @@ final class Alify_CF {
     /** Shared editor/import validation. No writes occur here. */
     public static function validate_schema($raw, $location, $id, &$errors) {
         if (!is_string($location)) { $errors[] = 'Choose a valid location.'; return array(); }
-        if ((!isset(self::post_types()[$location]) && !Alify_CF_Options::is_location($location)) || in_array($location, array(self::GROUP, 'attachment'), true)) { $errors[] = 'Choose a valid post type or registered options page.'; }
+        if ((!isset(self::post_types()[$location]) && !Alify_CF_Options::is_location($location) && !isset(Alify_CF_Objects::locations()[$location])) || $location === self::GROUP) { $errors[] = 'Choose a valid post type or registered options page.'; }
         if (!is_array($raw) || array_values($raw) !== $raw || count($raw) > 200) { $errors[] = 'Invalid field schema. A maximum of 200 fields is supported.'; return array(); }
         $fields = array(); $names = array(); $keys = array();
         foreach ($raw as $field) {
@@ -333,8 +349,9 @@ final class Alify_CF {
                 if (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field)) { $clean = array_merge($clean, $limits); }
             }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
-            $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
+            $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship', 'google_map'), true) ? array() : self::clean_value($clean, $field['default'] ?? ''));
             if (Alify_CF_Selector::supported($clean)) { $clean['default'] = Alify_CF_Selector::multiple($clean) ? array() : ''; if (($field['default'] ?? '') !== '' && ($field['default'] ?? array()) !== array()) { $errors[] = 'Selector defaults are not supported.'; } }
+            if ($type === 'oembed' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Unsupported video default.'; }
             if ($type === 'link') { $clean['default'] = Alify_CF_Field_Settings::link_default($field['default'] ?? '', $errors); }
             if ($type === 'color' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Color default must be valid hex.'; }
             if ($type === 'checkbox' || Alify_CF_Choice::multiple($clean)) { $clean['default'] = Alify_CF_Choice::defaults($clean, $field['default'] ?? '', $errors); }
@@ -351,7 +368,7 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
                 }
-                if (!$source || Alify_CF_Editor_Fields::presentation($source['type']) || Alify_CF_API::custom($source['type']) || Alify_CF_Selector::supported($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'), true) || Alify_CF_Reference_Settings::multiple($source) || $source['key'] === $field['key'] || $source['condition']) {
+                if (!$source || Alify_CF_Editor_Fields::presentation($source['type']) || Alify_CF_API::custom($source['type']) || Alify_CF_Selector::supported($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'google_map'), true) || Alify_CF_Reference_Settings::multiple($source) || $source['key'] === $field['key'] || $source['condition']) {
                     $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
                 }
             }
@@ -375,16 +392,18 @@ final class Alify_CF {
             $raw = json_decode(wp_unslash($_POST['alify_schema']), true);
             $location_raw = $_POST['alify_location'] ?? 'post';
             $location_raw = is_string($location_raw) ? wp_unslash($location_raw) : '';
-            $location = strpos($location_raw, 'options:') === 0 ? $location_raw : sanitize_key($location_raw);
+            $location = (strpos($location_raw, 'options:') === 0 || strpos($location_raw, 'term:') === 0) ? $location_raw : sanitize_key($location_raw);
             $errors = array();
+            $rules = Alify_CF_Location_Rules::clean(isset($_POST['alify_location_rules']) ? wp_unslash($_POST['alify_location_rules']) : get_post_meta($id, '_alify_cf_location_rules', true), $errors);
             $fields = self::validate_schema($raw, $location, $id, $errors);
             if ($errors) { self::error($id, array_merge(array('Field configuration was not saved. Existing fields and location were retained.'), $errors)); return; }
             update_post_meta($id, self::SCHEMA, wp_slash($fields));
             update_post_meta($id, self::LOCATION, $location);
+            update_post_meta($id, '_alify_cf_location_rules', wp_slash($rules));
             return;
         }
         $errors = array(); $feedback = Alify_CF_Feedback::get('post_' . $id);
-        foreach (self::groups($post->post_type) as $group) {
+        foreach (self::groups($post->post_type, $id) as $group) {
             $nonce = $_POST['alify_values_nonce_' . $group->ID] ?? '';
             if (!is_string($nonce) || !wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'alify_values_' . $id . '_' . $group->ID)) { continue; }
             $values = isset($_POST['alify_values'][$group->ID]) && is_array($_POST['alify_values'][$group->ID]) ? wp_unslash($_POST['alify_values'][$group->ID]) : array();
@@ -437,12 +456,13 @@ final class Alify_CF {
             $submitted = $values[$field['name']] ?? '';
             $value = Alify_CF_Field_Settings::constrain($field, $value);
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
-            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
+            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship', 'google_map'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if ($field['type'] === 'range' && array_key_exists($field['name'], $values) && $values[$field['name']] !== '' && Alify_CF_Range::units($values[$field['name']]) === null) { $invalid = true; }
             if ($field['type'] === 'color' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if (Alify_CF_Choice::multiple($field) && $value === '') { $invalid = true; }
             if ($field['type'] === 'date_time' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
             if ($field['type'] === 'password' && array_key_exists($field['name'], $values) && !is_string($values[$field['name']])) { $invalid = true; }
+            if ($field['type'] === 'oembed' && !is_string($submitted)) { $invalid = true; }
             if ($field['type'] === 'wysiwyg') { $invalid = !is_string($submitted); }
             if (Alify_CF_Selector::supported($field) && !Alify_CF_Selector::multiple($field) && array_key_exists($field['name'], $values) && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
             if (Alify_CF_Selector::multiple($field) && $value === '') { $invalid = true; }

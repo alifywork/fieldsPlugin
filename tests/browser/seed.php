@@ -7,8 +7,9 @@ if (!defined('ALIFY_CF_TEST_SITE') || !ALIFY_CF_TEST_SITE) { throw new RuntimeEx
 $admin = get_user_by('login', 'alify-test-admin'); wp_set_current_user($admin->ID);
 if (is_file($file)) {
     $old = json_decode(file_get_contents($file), true);
+    if (!empty($old['native_menu'])) { wp_delete_nav_menu($old['native_menu']); }
     foreach ($old['selector_terms'] ?? array() as $term_id) { wp_delete_term($term_id, 'category'); }
-    foreach (array_merge(array($old['group'], $old['classic'], $old['block'], $old['rest'] ?? 0, $old['advanced_group'] ?? 0, $old['advanced_post'] ?? 0, $old['options_group'] ?? 0, $old['reference'] ?? 0, $old['reference_second'] ?? 0), $old['images'], $old['imports'] ?? array()) as $id) { if ($id) { wp_delete_post($id, true); } }
+    foreach (array_merge(array($old['group'], $old['classic'], $old['block'], $old['rest'] ?? 0, $old['profile_group'] ?? 0, $old['term_group'] ?? 0, $old['attachment_group'] ?? 0, $old['menu_group'] ?? 0, $old['item_group'] ?? 0, $old['advanced_group'] ?? 0, $old['advanced_post'] ?? 0, $old['options_group'] ?? 0, $old['reference'] ?? 0, $old['reference_second'] ?? 0), $old['images'], $old['imports'] ?? array()) as $id) { if ($id) { wp_delete_post($id, true); } }
 }
 
 $user = get_user_by('login', 'alify-browser');
@@ -69,8 +70,8 @@ $_POST = wp_slash(array('alify_schema_nonce' => wp_create_nonce('alify_schema_' 
 wp_update_post(array('ID' => $options_group, 'post_status' => 'publish')); $_POST = array();
 $advanced_group = wp_insert_post(array('post_type' => Alify_CF::GROUP, 'post_status' => 'draft', 'post_title' => 'Advanced editor fields'));
 $advanced_post = wp_insert_post(array('post_type' => 'page', 'post_status' => 'draft', 'post_title' => 'Advanced editor draft'));
-$advanced_rows = browser_field('advanced_rows', 'repeater'); $advanced_rows['sub_fields'] = array(browser_field('heading', 'text', true), browser_field('body', 'wysiwyg')); $advanced_rows['collapsed'] = true; $advanced_rows['row_label'] = 'heading';
-$advanced_flex = browser_field('advanced_flex', 'flexible'); $advanced_flex['layouts'] = array(array('key' => 'layout_section', 'name' => 'section', 'label' => 'Section', 'sub_fields' => array(browser_field('body', 'wysiwyg'))));
+$advanced_rows = browser_field('advanced_rows', 'repeater'); $advanced_rows['sub_fields'] = array(browser_field('heading', 'text', true), browser_field('body', 'wysiwyg')); $advanced_rows['page_size'] = 1; $advanced_rows['collapsed'] = true; $advanced_rows['row_label'] = 'heading';
+$advanced_flex = browser_field('advanced_flex', 'flexible'); $advanced_flex['layouts'] = array(array('key' => 'layout_section', 'name' => 'section', 'label' => 'Section', 'max_rows' => 2, 'sub_fields' => array(browser_field('body', 'wysiwyg'))));
 $advanced_message = browser_field('advanced_message', 'message'); $advanced_message['content'] = '<p><strong>Editor notice</strong></p>';
 $advanced_fields = array(browser_field('advanced_tab_one', 'tab'), $advanced_message, $advanced_rows, $advanced_flex, browser_field('advanced_icon', 'icon_picker'), browser_field('advanced_tab_two', 'tab'), browser_field('advanced_accordion', 'accordion'), browser_field('advanced_text'));
 $_POST = wp_slash(array('alify_schema_nonce' => wp_create_nonce('alify_schema_' . $advanced_group), 'alify_schema' => wp_json_encode($advanced_fields), 'alify_location' => 'page')); wp_update_post(array('ID' => $advanced_group, 'post_status' => 'publish')); $_POST = array();
@@ -80,10 +81,17 @@ foreach (array('One', 'Two') as $name) {
     $id = wp_insert_attachment(array('post_title' => 'Alify Browser Image ' . $name, 'post_mime_type' => 'image/png', 'post_status' => 'inherit'), $upload['file']);
     wp_update_attachment_metadata($id, array('width' => 1, 'height' => 1, 'file' => _wp_relative_upload_path($upload['file']))); $images[] = $id;
 }
+$native_groups = array();
+foreach (array('profile' => array('user', 'profile_note'), 'term' => array('term:category', 'term_note'), 'attachment' => array('attachment', 'media_note'), 'menu' => array('menu', 'menu_note'), 'item' => array('menu_item', 'item_note')) as $kind => $settings) {
+    $native_id = wp_insert_post(array('post_type' => Alify_CF::GROUP, 'post_status' => 'draft', 'post_title' => 'Browser ' . $kind . ' fields'));
+    $_POST = wp_slash(array('alify_schema_nonce' => wp_create_nonce('alify_schema_' . $native_id), 'alify_schema' => wp_json_encode(array(browser_field($settings[1]))), 'alify_location' => $settings[0])); wp_update_post(array('ID' => $native_id, 'post_status' => 'publish')); $_POST = array(); $native_groups[$kind . '_group'] = $native_id;
+}
+$native_menu = wp_create_nav_menu('Browser native menu ' . wp_generate_uuid4()); $native_item = wp_update_nav_menu_item($native_menu, 0, array('menu-item-title' => 'Browser native item', 'menu-item-type' => 'custom', 'menu-item-url' => home_url('/'), 'menu-item-status' => 'publish'));
 wp_mkdir_p(WP_CONTENT_DIR . '/mu-plugins');
 $mu = '<?php if (!defined("ALIFY_CF_TEST_SITE") || !ALIFY_CF_TEST_SITE) { return; } add_filter("use_block_editor_for_post", function($enabled, $post) { return $post->ID === ' . (int) $classic . ' || $post->ID === ' . (int) $advanced_post . ' || isset($_GET["alify_classic"]) ? false : $enabled; }, 10, 2); add_action("admin_init", function() { remove_action("admin_init", "_maybe_update_core"); remove_action("admin_init", "_maybe_update_plugins"); remove_action("admin_init", "_maybe_update_themes"); }, 0);';
 $mu .= ' add_action("init", function() { alify_add_options_page("browser-http", "Browser HTTP Settings"); });';
+$mu .= ' add_action("template_redirect", function() { if (!isset($_GET["alify_frontend_test"])) return; $id = absint($_GET["alify_frontend_test"]); if (!current_user_can("edit_post", $id)) { status_header(403); exit("Denied"); } alify_form_head(); echo "<!doctype html><html><head>"; wp_head(); echo "</head><body>"; alify_form($id); wp_footer(); echo "</body></html>"; exit; });';
 file_put_contents(WP_CONTENT_DIR . '/mu-plugins/alify-browser-test.php', $mu);
-file_put_contents($file, wp_json_encode(array('username' => 'alify-browser', 'password' => $password, 'classic' => $classic, 'block' => $block, 'rest' => $rest, 'group' => $group, 'images' => $images, 'advanced_group' => $advanced_group, 'advanced_post' => $advanced_post, 'options_group' => $options_group, 'reference' => $reference, 'reference_second' => $reference_second, 'selector_terms' => $selector_terms, 'user_id' => $uid, 'editor_username' => 'alify-browser-editor', 'editor_password' => $editor_password)));
+file_put_contents($file, wp_json_encode(array_merge($native_groups, array('native_menu' => $native_menu, 'native_item' => $native_item, 'username' => 'alify-browser', 'password' => $password, 'classic' => $classic, 'block' => $block, 'rest' => $rest, 'group' => $group, 'images' => $images, 'advanced_group' => $advanced_group, 'advanced_post' => $advanced_post, 'options_group' => $options_group, 'reference' => $reference, 'reference_second' => $reference_second, 'selector_terms' => $selector_terms, 'user_id' => $uid, 'editor_username' => 'alify-browser-editor', 'editor_password' => $editor_password))));
 chmod($file, 0600);
 echo "Browser fixtures seeded (credentials kept in private fixture file).\n";

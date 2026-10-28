@@ -19,6 +19,7 @@ final class Alify_CF_Editor_Fields {
             foreach (array('toolbar' => array('basic', 'full'), 'editor_mode' => array('both', 'visual', 'text')) as $key => $allowed) { if (array_key_exists($key, $field)) { if (!in_array($field[$key], $allowed, true)) { $errors[] = 'Choose a supported rich editor preset.'; } else { $out[$key] = $field[$key]; } } }
             if (array_key_exists('media_buttons', $field)) { if (!in_array($field['media_buttons'], array(true, false, 0, 1, '0', '1'), true)) { $errors[] = 'Media buttons must be boolean.'; } else { $out['media_buttons'] = (bool) $field['media_buttons']; } }
         }
+        if ($type === 'repeater' && array_key_exists('page_size', $field)) { $size = $field['page_size']; if ((!is_int($size) && !is_string($size)) || !preg_match('/^(?:0|[1-9]|[1-4][0-9]|50)$/D', (string) $size)) { $errors[] = 'Page size must be 0 (off) or 1–50.'; } else { $out['page_size'] = (int) $size; } }
         if (in_array($type, array('repeater', 'flexible'), true)) {
             if (array_key_exists('collapsed', $field)) { if (!in_array($field['collapsed'], array(true, false, 0, 1, '0', '1'), true)) { $errors[] = 'Collapsed must be boolean.'; } else { $out['collapsed'] = (bool) $field['collapsed']; } }
             if (array_key_exists('row_label', $field)) { if (!is_string($field['row_label']) || !preg_match('/^([a-z][a-z0-9_]*)?$/D', $field['row_label'])) { $errors[] = 'Use a subfield name for row labels.'; } else { $out['row_label'] = $field['row_label']; } }
@@ -33,5 +34,5 @@ final class Alify_CF_Editor_Fields {
         echo '</select><span data-icon-preview aria-hidden="true"></span>';
     }
     public static function clean_icon($field, $value) { return is_string($value) && strpos($value, 'dashicons-') === 0 && in_array(substr($value, 10), $field['icons'] ?? self::icons(), true) ? $value : ''; }
-    public static function attributes($field) { return ' data-row-label="' . esc_attr($field['row_label'] ?? '') . '" data-collapsed="' . (!empty($field['collapsed']) ? '1' : '0') . '"'; }
+    public static function attributes($field) { return (isset($field['page_size']) ? ' data-page-size="' . esc_attr($field['page_size']) . '"' : '') . ' data-row-label="' . esc_attr($field['row_label'] ?? '') . '" data-collapsed="' . (!empty($field['collapsed']) ? '1' : '0') . '"'; }
 }

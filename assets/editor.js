@@ -25,7 +25,7 @@
     wp.apiFetch.use((options, next) => {
         const method = (options.method || 'GET').toUpperCase();
         const path = (options.path || '').split('?')[0];
-        if (!['POST', 'PUT', 'PATCH'].includes(method) || path !== AlifyEditor.path + '/' + AlifyEditor.postId) return next(options);
+        if (!['POST', 'PUT', 'PATCH'].includes(method) || ![AlifyEditor.path + '/' + AlifyEditor.postId, AlifyEditor.path + '/' + AlifyEditor.postId + '/autosaves'].includes(path)) return next(options);
         const submitted = payload();
         return next({...options, data: {...(options.data || {}), alify_fields: submitted}}).catch(error => {
             let firstError = null;
@@ -33,12 +33,12 @@
             const groups = error.data && error.data.alify_errors;
             if (groups) document.querySelectorAll('.alify-values').forEach(group => {
                 const marker = group.querySelector('[name$="[__group_complete]"]');
-                const match = marker && marker.name.match(/^alify_values\[(\d+)\]/);
+                const match = marker && marker.name.match(/^alify_values\[(-?\d+)\]/);
                 const errors = match && groups[match[1]];
                 if (!errors) return;
                 group.querySelectorAll('.alify-value').forEach(field => {
                     const input = field.querySelector('[name]');
-                    const name = input && input.name.match(/^alify_values\[\d+\]\[([^\]]+)\]/);
+                    const name = input && input.name.match(/^alify_values\[-?\d+\]\[([^\]]+)\]/);
                     if (!name || !errors[name[1]]) return;
                     if (JSON.stringify((submitted.groups[match[1]] || {})[name[1]]) !== JSON.stringify((current.groups[match[1]] || {})[name[1]])) return;
                     let message = field.querySelector('.alify-field-error');

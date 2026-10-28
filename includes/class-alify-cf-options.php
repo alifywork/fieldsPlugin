@@ -64,7 +64,7 @@ final class Alify_CF_Options {
         if (!is_string($nonce) || !wp_verify_nonce($nonce, 'alify_options_' . $slug)) { $errors[] = 'Security check failed. Reload the page and try again.'; return false; }
         if (($request['alify_options_complete'] ?? '') !== '1' || !isset($request['alify_values']) || !is_array($request['alify_values'])) { $errors[] = 'Incomplete options form. No settings were changed.'; return false; }
         $previous = self::data($slug); $next = $previous; $names = array(); $feedback = array();
-        $groups = Alify_CF::groups(self::location($slug));
+        $groups = Alify_CF::groups(self::location($slug), $slug);
         if (!$groups) { $errors[] = 'No published field groups are assigned to this page.'; return false; }
         foreach ($groups as $group) {
             $values = $request['alify_values'][$group->ID] ?? null;
@@ -110,7 +110,7 @@ final class Alify_CF_Options {
             foreach (($notice['errors'] ?? array()) as $error) { echo '<p>' . esc_html($error) . '</p>'; }
             echo '</div>';
         }
-        $groups = Alify_CF::groups(self::location($slug));
+        $groups = Alify_CF::groups(self::location($slug), $slug);
         if (!$groups) {
             echo '<div class="alify-empty"><h2>No settings fields yet</h2><p>Create a field group, choose Options Page: ' . esc_html($title) . ' as its location, and publish it.</p><a class="button button-primary" href="' . esc_url(admin_url('post-new.php?post_type=' . Alify_CF::GROUP)) . '">Add Field Group</a></div></div>';
             return;
