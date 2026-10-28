@@ -6,7 +6,7 @@
 - Validate registered taxonomy/role/public-post-type filters, term assignment permissions, current-site user membership/list_users privacy, and public post/archive Page Link tokens. Never serialize WP_User objects or modify actual post terms/users.
 - Add opt-in term objects, safe user ID/display-name records and resolved Page Link URLs, while preserving raw IDs/tokens. Integrate REST, publication reconstruction, feedback, atomic retention and conditional targets; selectors cannot be condition sources.
 - Add schema JSON v7 for new selectors; accept imports v1–v7. Defaults and cross-site selected-ID migration are unsupported.
-- Local checks: 783 PHP assertions on PHP 7.4/8.3, 74 JS tests, 600 real WordPress backend assertions on both existing SQLite targets. Combined native/browser matrix pending.
+- Local checks: 783 PHP assertions on PHP 7.4/8.3, 74 JS tests, 600 real WordPress backend assertions on both existing SQLite targets. All four native-PHP targets pass: 600 backend / 187 browser / 24 HTTP persistence checks, verified in CI run 40711904295.
 
 ## 0.26.0
 
