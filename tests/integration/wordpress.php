@@ -210,11 +210,6 @@ try {
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $rest_post); $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($group => $gate_values)));
     expect_same(401, rest_do_request($request)->get_status(), 'REST bridge still requires core authentication');
     wp_set_current_user($admin->ID);
-    $autosave_post = fixture_post(); $_POST = array();
-    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
-    $response = rest_do_request($request);
-    expect_same(true, in_array($response->get_status(), array(200, 201), true), 'Autosaves remain available before required fields are completed');
-    expect_same(false, metadata_exists('post', $autosave_post, '_alify_cf_publish_text'), 'Autosave does not write missing custom field values');
     // Configuration-only JSON transfer uses the same validator as the editor.
     $_POST = array();
     $source = fixture_post(Alify_CF::GROUP);
@@ -225,6 +220,7 @@ try {
     configure_group($source, $transfer_fields, 'page'); $_POST = array();
     $export_nonce = wp_create_nonce('alify_cf_export'); $import_nonce = wp_create_nonce('alify_cf_import');
     $json = Alify_CF_Transfer::export_json($source, $export_nonce);
+    if (is_wp_error($json)) { throw new RuntimeException('Export failed: ' . $json->get_error_message()); }
     expect_same(true, is_string($json), 'Export returns JSON');
     $document = json_decode($json, true);
     expect_same(1, $document['version'], 'Versioned transfer format');
@@ -283,6 +279,12 @@ try {
     expect_same($before_import_count, (int) wp_count_posts(Alify_CF::GROUP)->draft, 'Rejected imports leave no partial draft groups');
     ob_start(); Alify_CF_Transfer::render(); $transfer_html = ob_get_clean();
     expect_same(true, strpos($transfer_html, 'multipart/form-data') !== false && strpos($transfer_html, 'alify_transfer_nonce') !== false, 'Transfer UI provides nonce-protected upload form');
+    // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
+    $autosave_post = fixture_post(); $_POST = array();
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
+    $response = rest_do_request($request);
+    expect_same(true, in_array($response->get_status(), array(200, 201), true), 'Autosaves remain available before required fields are completed');
+    expect_same(false, metadata_exists('post', $autosave_post, '_alify_cf_publish_text'), 'Autosave does not write missing custom field values');
     echo "PASS: $count real WordPress assertions; WordPress $wp_version; PHP " . PHP_VERSION . '; ' . get_class($wpdb) . "\n";
 } finally {
     wp_set_current_user($admin->ID); $_POST = array();
