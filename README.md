@@ -305,7 +305,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. Local sandbox checks do not substitute for the MySQL CI results.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 80 backend and 14 Chromium assertions in [CI run 40664387498](https://github.com/alifywork/fieldsPlugin/actions/runs/40664387498), with clean debug-log checks. These remote MySQL results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 

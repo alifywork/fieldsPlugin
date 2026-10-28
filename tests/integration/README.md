@@ -34,7 +34,18 @@ Coverage includes activation persistence, init registration, all 13 field schema
 
 ## Native MySQL 8 CI target
 
-The CI matrix also runs the same backend and Chromium suites against a disposable **MySQL 8.0** service, on both PHP/WordPress pairs. This is separate from the locally observed SQLite results above. No MySQL server/native PHP is installed in the Arena sandbox; MySQL results must come from the actual CI jobs.
+The CI matrix also runs the same backend and Chromium suites against a disposable **MySQL 8.0** service, on both PHP/WordPress pairs. This is separate from the locally observed SQLite results above. No MySQL server/native PHP is installed in the Arena sandbox; MySQL results come from the actual CI jobs.
+
+**Verified in native-PHP CI, 2026-10-28:** [run 40664387498](https://github.com/alifywork/fieldsPlugin/actions/runs/40664387498) passed all four targets:
+
+| WordPress | Native PHP | Database | Backend | Real Chromium |
+|---|---|---|---|---|
+| 6.2 | 7.4 | MySQL 8.0 | 80 assertions passed | 14 assertions passed |
+| 6.8.3 | 8.3 | MySQL 8.0 | 80 assertions passed | 14 assertions passed |
+| 6.2 | 7.4 | SQLite | 80 assertions passed | 14 assertions passed |
+| 6.8.3 | 8.3 | SQLite | 80 assertions passed | 14 assertions passed |
+
+All jobs also passed PHP syntax, 160 isolated PHP assertions, 23 jsdom tests and eight runner safety guards; backend and browser debug-log checks were clean. This verifies the named targets, not every MySQL/MariaDB release or plugin/theme combination.
 
 For a local native-PHP run, first create a dedicated empty database and least-privileged database user on a local MySQL instance, then export:
 

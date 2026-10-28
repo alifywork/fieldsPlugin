@@ -5,6 +5,7 @@
 - Add native MySQL 8.0 CI targets for both PHP/WordPress pairs, including backend assertions and real Chromium Classic/Gutenberg/media flows alongside SQLite.
 - Add an explicit MySQL runner opt-in, loopback/test-database-name guards, separate fixture directories and rejection of database drop-ins.
 - Assert the actual database driver during installation and print the database server version, preventing accidental SQLite substitution.
+- Verify all four native-PHP CI targets: 80 backend and 14 browser assertions per target, with clean debug-log checks.
 - Add eight database-runner refusal tests; database credentials are supplied through the environment rather than committed configuration.
 - MariaDB and wider database versions remain unverified; this increment does not add JSON import/export yet.
 
