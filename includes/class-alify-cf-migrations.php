@@ -1,0 +1,130 @@
+<?php
+if (!defined('ABSPATH')) { exit; }
+
+/** Explicit bounded, optimistic migrations. Backups are private options, never exports. */
+final class Alify_CF_Migrations {
+    const PREFIX = 'alify_cf_migration_';
+    const LOCK = 'alify_cf_migration_lock';
+    private static function authorize() { return current_user_can('manage_options'); }
+    private static function error($message) { return new WP_Error('alify_migration', $message); }
+    private static function names($name) { return is_string($name) && preg_match('/^[a-z][a-z0-9_]{0,79}$/D', $name); }
+    private static function ids() { $ids = get_user_meta(get_current_user_id(), '_alify_cf_migrations', true); return is_array($ids) ? array_values(array_filter($ids, function($id) { return is_string($id) && get_option(self::PREFIX . $id, false) !== false; })) : array(); }
+    private static function load($id) {
+        if (!self::authorize() || !is_string($id) || !preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $id)) { return self::error('Authorized migration ID required.'); }
+        $record = get_option(self::PREFIX . $id, false); if (!is_array($record) || ($record['version'] ?? null) !== 1 || ($record['id'] ?? '') !== $id || ($record['owner'] ?? 0) !== get_current_user_id() || !is_array($record['rows'] ?? null) || !$record['rows'] || count($record['rows']) > 100 || !is_array($record['mappings'] ?? null) || !$record['mappings'] || count($record['mappings']) > 20 || !is_int($record['expires'] ?? null) || !in_array($record['status'] ?? '', array('planned', 'applying', 'applied', 'failed', 'rollback_failed', 'rolled_back'), true)) { return self::error('Migration unavailable to this administrator.'); } return $record;
+    }
+    private static function save($record) { $json = wp_json_encode($record); if (!is_string($json) || strlen($json) > 1048576) { return false; } update_option(self::PREFIX . $record['id'], $record, false); return get_option(self::PREFIX . $record['id']) === $record; }
+    private static function schema($post) {
+        $out = array(); foreach (Alify_CF::groups($post->post_type, $post->ID) as $group) { $fields = Alify_CF::schema($group->ID); foreach ($fields as $field) { if (Alify_CF_API::contains_custom($field)) { return self::error('Migration groups cannot contain custom callback field types.'); } } $out[] = array($group->ID, get_post_meta($group->ID, '_alify_cf_location_rules', true), $fields); } return hash('sha256', wp_json_encode($out));
+    }
+    private static function snapshot($post_id, $names) { $out = array(); foreach ($names as $name) { $values = get_post_meta($post_id, '_alify_cf_' . $name, false); if (count($values) > 1) { return self::error('Duplicate metadata rows require manual repair before migration.'); } $out[$name] = $values; } return $out; }
+    private static function field($post, $name) { $field = Alify_CF_API::field($post->post_type, $name, $post->ID); return $field && !Alify_CF_Editor_Fields::presentation($field['type']) && !Alify_CF_Password::contains($field) && !Alify_CF_API::contains_custom($field) ? $field : null; }
+    private static function shape($field) {
+        $out = array('type' => $field['type'], 'multiple' => !empty($field['multiple'])); foreach ($field['sub_fields'] ?? array() as $sub) { $out['sub_fields'][$sub['name']] = self::shape($sub); } foreach ($field['layouts'] ?? array() as $layout) { foreach ($layout['sub_fields'] as $sub) { $out['layouts'][$layout['name']][$sub['name']] = self::shape($sub); } } return $out;
+    }
+    private static function convert($value, $source, $target, $mapping, $post_id, $transform) {
+        $mode = $mapping['mode'] ?? 'copy';
+        if ($mode === 'custom') { if (!is_callable($transform)) { return self::error('Custom mode needs a trusted PHP callable, never JSON code.'); } try { return call_user_func($transform, $value, $source, $target, $post_id, $mapping); } catch (Throwable $failure) { return self::error('Trusted migration transformer failed.'); } }
+        if ($mode === 'copy') { return self::shape($source) === self::shape($target) ? $value : self::error('Copy requires matching structural shapes; choose an explicit conversion.'); }
+        if ($mode === 'text') { return is_scalar($value) && in_array($target['type'], array('text', 'textarea'), true) ? (string) $value : self::error('Text conversion needs a scalar and Text/Textarea destination.'); }
+        if ($mode === 'number') { return is_scalar($value) && is_numeric($value) && is_finite((float) $value) && in_array($target['type'], array('number', 'range'), true) ? (string) $value : self::error('Number conversion needs a finite numeric scalar and Number/Range destination.'); }
+        $list = in_array($target['type'], array('checkbox', 'gallery', 'relationship'), true) || Alify_CF_Selector::multiple($target) || Alify_CF_Choice::multiple($target) || Alify_CF_Reference_Settings::multiple($target);
+        if ($mode === 'wrap') { return $list && is_scalar($value) ? ($value === '' ? array() : array($value)) : self::error('Wrap needs a scalar source and list destination.'); }
+        if ($mode === 'unwrap') { return !$list && !in_array($target['type'], array('group', 'repeater', 'flexible', 'link', 'google_map'), true) && is_array($value) && array_values($value) === $value && count($value) <= 1 && (!$value || is_scalar($value[0])) ? ($value ? $value[0] : '') : self::error('Unwrap refuses to discard multiple elements or structured values.'); }
+        if ($mode === 'layouts') {
+            if ($source['type'] !== 'flexible' || $target['type'] !== 'flexible' || !is_array($value) || !is_array($mapping['layouts'] ?? null) || !$mapping['layouts'] || count($mapping['layouts']) > 10) { return self::error('Layouts mode needs Flexible fields and an explicit old:new layout map.'); }
+            foreach ($mapping['layouts'] as $from => $to) { if (!self::names($from) || !self::names($to) || !Alify_CF_Flexible::layout($source, $from) || !Alify_CF_Flexible::layout($target, $to)) { return self::error('Both old and new layouts must still be defined.'); } }
+            $out = array(); foreach ($value as $row) { $old = is_array($row) ? ($row['layout'] ?? '') : ''; $name = $mapping['layouts'][$old] ?? null; $layout = is_string($name) ? Alify_CF_Flexible::layout($target, $name) : null; if (!$layout || !is_array($row['fields'] ?? null) || array_diff(array_keys($row['fields']), array_column($layout['sub_fields'], 'name'))) { return self::error('Every row needs an explicit layout mapping; unknown subfields cannot be dropped.'); } $out[] = array('layout' => $name, 'fields' => $row['fields']); } return $out;
+        }
+        return self::error('Unsupported migration mode.');
+    }
+    private static function locked($callback) {
+        $lock = array('id' => wp_generate_uuid4(), 'owner' => get_current_user_id()); if (!add_option(self::LOCK, $lock, '', false)) { return self::error('Another migration operation holds the global lock.'); }
+        try { return $callback(); } finally { if (get_option(self::LOCK) === $lock) { delete_option(self::LOCK); } }
+    }
+    public static function plan($post_ids, $mappings, $overwrite = false, $transform = null) { if (!self::authorize()) { return self::error('Administrator permission required.'); } return self::locked(function() use ($post_ids, $mappings, $overwrite, $transform) { return self::build($post_ids, $mappings, $overwrite, $transform); }); }
+    private static function fits($field, $value) {
+        if (in_array($field['type'], array('group', 'repeater', 'flexible'), true)) {
+            if (!is_array($value)) { return false; } if ($field['type'] !== 'group' && array_values($value) !== $value) { return false; }
+            $rows = $field['type'] === 'group' ? array($value) : $value;
+            foreach ($rows as $row) { if (!is_array($row)) { return false; } $fields = $field['sub_fields'] ?? array(); if ($field['type'] === 'flexible') { if (array_diff(array_keys($row), array('layout', 'fields')) || !is_string($row['layout'] ?? null) || !is_array($row['fields'] ?? null)) { return false; } $layout = Alify_CF_Flexible::layout($field, $row['layout']); if (!$layout) { return false; } $fields = $layout['sub_fields']; $row = $row['fields']; } if (array_diff(array_keys($row), array_column($fields, 'name'))) { return false; } foreach ($fields as $sub) { if (array_key_exists($sub['name'], $row) && !self::fits($sub, $row[$sub['name']])) { return false; } } } return true;
+        }
+        if ($field['type'] === 'link' || $field['type'] === 'google_map') { return is_array($value) && !array_diff(array_keys($value), $field['type'] === 'link' ? array('url', 'title', 'target') : array('lat', 'lng', 'zoom', 'address')); }
+        if (in_array($field['type'], array('checkbox', 'gallery', 'relationship'), true) || Alify_CF_Selector::multiple($field) || Alify_CF_Choice::multiple($field) || Alify_CF_Reference_Settings::multiple($field)) { return is_array($value) && array_values($value) === $value && count(array_filter($value, 'is_scalar')) === count($value); } return is_scalar($value);
+    }
+    private static function build($post_ids, $mappings, $overwrite = false, $transform = null) {
+        if (!self::authorize()) { return self::error('Administrator permission required.'); }
+        if (!is_array($post_ids) || !$post_ids || array_values($post_ids) !== $post_ids || count($post_ids) > 100 || !is_array($mappings) || !$mappings || array_values($mappings) !== $mappings || count($mappings) > 20 || !is_bool($overwrite) || ($transform !== null && !is_callable($transform))) { return self::error('Use 1–100 explicit post IDs, 1–20 mappings and a boolean overwrite decision.'); }
+        if (count(self::ids()) >= 10) { return self::error('Keep at most ten plans/backups; explicitly forget an old record first.'); }
+        $targets = array(); $names = array(); foreach ($mappings as $mapping) { if (!is_array($mapping) || array_diff(array_keys($mapping), array('from', 'to', 'mode', 'layouts')) || !self::names($mapping['from'] ?? null) || !self::names($mapping['to'] ?? null) || isset($targets[$mapping['to']]) || !in_array($mapping['mode'] ?? 'copy', array('copy', 'text', 'number', 'wrap', 'unwrap', 'layouts', 'custom'), true) || (isset($mapping['layouts']) && ($mapping['mode'] ?? '') !== 'layouts')) { return self::error('Mappings require valid from/to names, unique destinations and an explicit supported mode.'); } $targets[$mapping['to']] = true; $names[$mapping['from']] = true; $names[$mapping['to']] = true; }
+        $record = array('version' => 1, 'id' => wp_generate_uuid4(), 'owner' => get_current_user_id(), 'created' => time(), 'expires' => time() + 1800, 'status' => 'planned', 'mappings' => $mappings, 'rows' => array()); $seen = array();
+        foreach ($post_ids as $id) {
+            if ((!is_int($id) && !is_string($id)) || !preg_match('/^[1-9][0-9]*$/D', (string) $id) || (string) (int) $id !== (string) $id || isset($seen[(int) $id])) { return self::error('Use unique canonical positive post IDs.'); } $id = (int) $id; $seen[$id] = true; $post = get_post($id);
+            if (!$post || $post->post_type === Alify_CF::GROUP || wp_is_post_revision($id) || !current_user_can('edit_post', $id) || !current_user_can('read_post', $id)) { return self::error('An explicit post is unavailable or unauthorized.'); }
+            $schema = self::schema($post); if (is_wp_error($schema)) { return $schema; } $before = self::snapshot($id, array_keys($names)); if (is_wp_error($before)) { return $before; } $payload = array();
+            foreach ($mappings as $mapping) {
+                $source = self::field($post, $mapping['from']); $target = self::field($post, $mapping['to']); if (!$source || !$target || !$before[$mapping['from']]) { return self::error('Source/destination must be active, non-secret registered fields, with an existing source value.'); }
+                if (!$overwrite && $before[$mapping['to']]) { return self::error('Destination metadata already exists; explicit overwrite is required.'); }
+                $source_value = $before[$mapping['from']][0]; if (!self::fits($source, $source_value)) { return self::error('Source metadata has unknown or malformed structure; no implicit dropping.'); }
+                if (($mapping['mode'] ?? 'copy') === 'copy') { $canonical = Alify_CF::clean_value($source, Alify_CF_Publication::stored_payload($source, $source_value)); if (is_array($canonical) ? $canonical !== $source_value : (string) $canonical !== (string) $source_value) { return self::error('Copy requires canonical source data; use an explicit conversion for sanitization.'); } }
+                $value = self::convert($source_value, $source, $target, $mapping, $id, $transform); if (is_wp_error($value)) { return $value; } if (!self::fits($target, $value)) { return self::error('Converted value has unknown or malformed destination structure.'); } $payload[$mapping['to']] = Alify_CF_Publication::stored_payload($target, $value);
+            }
+            $updates = Alify_CF_API::write($payload, $id, false, true); if (is_wp_error($updates)) { return self::error('Destination validation failed; no migration written. ' . $updates->get_error_code()); }
+            $after = $before; foreach ($updates as $name => $value) { $after[$name] = array(is_array($value) ? $value : (string) $value); }
+            $record['rows'][] = array('post_id' => $id, 'schema' => $schema, 'before' => $before, 'after' => $after, 'updates' => $updates);
+            $encoded = wp_json_encode($record); if (!is_string($encoded) || strlen($encoded) > 1048576) { return self::error('Plan and rollback backup exceed the 1 MiB budget; use a smaller batch.'); }
+        }
+        if (!add_option(self::PREFIX . $record['id'], $record, '', false)) { return self::error('Could not persist the private plan.'); } if (get_option(self::PREFIX . $record['id']) !== $record) { delete_option(self::PREFIX . $record['id']); return self::error('Private plan storage verification failed.'); } $ids = self::ids(); $ids[] = $record['id']; update_user_meta(get_current_user_id(), '_alify_cf_migrations', array_values(array_unique($ids))); if (!in_array($record['id'], self::ids(), true)) { delete_option(self::PREFIX . $record['id']); return self::error('Could not index the private recovery record.'); } return self::summary($record['id']);
+    }
+    public static function summary($id) { $record = self::load($id); return is_wp_error($record) ? $record : array('id' => $record['id'], 'status' => $record['status'], 'posts' => count($record['rows']), 'mappings' => count($record['mappings']), 'expires' => $record['expires']); }
+    private static function check($row, $rollback = false) {
+        $post = get_post($row['post_id']); if (!$post || !current_user_can('edit_post', $post->ID) || !current_user_can('read_post', $post->ID) || self::schema($post) !== $row['schema']) { return false; } $current = self::snapshot($post->ID, array_keys($row['before'])); if (is_wp_error($current)) { return false; }
+        foreach ($current as $name => $value) { if ($value !== $row['before'][$name] && (!$rollback || $value !== $row['after'][$name])) { return false; } } return true;
+    }
+    private static function restore($record) {
+        foreach ($record['rows'] as $row) { if (!self::check($row, true)) { return false; } }
+        foreach ($record['rows'] as $row) {
+            if (!self::check($row, true)) { return false; }
+            foreach ($row['before'] as $name => $values) { if (get_post_meta($row['post_id'], '_alify_cf_' . $name, false) === $values) { continue; } if ($values) { update_post_meta($row['post_id'], '_alify_cf_' . $name, wp_slash($values[0])); } else { delete_post_meta($row['post_id'], '_alify_cf_' . $name); } }
+            if (self::snapshot($row['post_id'], array_keys($row['before'])) !== $row['before']) { return false; }
+        } return true;
+    }
+    public static function execute($id, $rollback = false) {
+        $record = self::load($id); if (is_wp_error($record)) { return $record; }
+        if (!is_bool($rollback) || (!$rollback && ($record['status'] !== 'planned' || $record['expires'] < time())) || ($rollback && !in_array($record['status'], array('applied', 'applying', 'failed', 'rollback_failed'), true))) { return self::error('Plan expired or this action is not allowed in the current state.'); }
+        if (!add_option(self::LOCK, array('id' => $id, 'owner' => get_current_user_id()), '', false)) { return self::error('Another migration holds the write lock. Interrupted locks need administrator recovery, not automatic expiry.'); }
+        try {
+            foreach ($record['rows'] as $row) { if (!self::check($row, $rollback)) { return self::error('Schema, capabilities or source/destination metadata changed; no migration started.'); } }
+            if ($rollback) { $ok = self::restore($record); $record['status'] = $ok ? 'rolled_back' : 'rollback_failed'; $saved = self::save($record); return $ok && $saved ? true : self::error('Rollback incomplete; backup retained for manual recovery.'); }
+            $record['status'] = 'applying'; if (!self::save($record)) { return self::error('Could not persist write-ahead recovery state.'); }
+            foreach ($record['rows'] as $row) {
+                $result = self::error('Concurrent change detected.');
+                if (self::check($row)) { $post = get_post($row['post_id']); $payload = array(); foreach ($row['updates'] as $name => $value) { $field = self::field($post, $name); if (!$field) { break; } $payload[$name] = Alify_CF_Publication::stored_payload($field, $value); } $result = Alify_CF_API::write($payload, $post->ID); }
+                if (is_wp_error($result) || self::snapshot($row['post_id'], array_keys($row['after'])) !== $row['after']) { $restored = self::restore($record); $record['status'] = $restored ? 'failed' : 'rollback_failed'; self::save($record); return self::error($restored ? 'Migration failed; original metadata restored.' : 'Migration failed; rollback could not safely finish. Backup retained.'); }
+            }
+            $record['status'] = 'applied'; if (!self::save($record)) { self::restore($record); return self::error('Could not store completion state; restoration attempted; write-ahead backup retained.'); } return true;
+        } finally { $lock = get_option(self::LOCK); if (is_array($lock) && ($lock['id'] ?? null) === $id && ($lock['owner'] ?? 0) === get_current_user_id()) { delete_option(self::LOCK); } }
+    }
+    public static function forget($id) { if (!self::authorize()) { return self::error('Administrator permission required.'); } return self::locked(function() use ($id) { return self::delete_record($id); }); }
+    private static function delete_record($id) { $record = self::load($id); if (is_wp_error($record)) { return $record; } $lock = get_option(self::LOCK); if (is_array($lock) && ($lock['id'] ?? '') === $id) { return self::error('Cannot forget a locked recovery record.'); } delete_option(self::PREFIX . $id); if (get_option(self::PREFIX . $id, false) !== false) { return self::error('Could not remove the private record.'); } update_user_meta(get_current_user_id(), '_alify_cf_migrations', array_values(array_diff(self::ids(), array($id)))); return true; }
+    public static function boot() {
+        add_action('admin_menu', function() { add_submenu_page('edit.php?post_type=' . Alify_CF::GROUP, 'Migrations & ACF Import', 'Migrations & ACF Import', 'manage_options', 'alify-migrations', array(__CLASS__, 'page')); }); add_action('admin_post_alify_migration', array(__CLASS__, 'handle'));
+    }
+    public static function page() {
+        if (!self::authorize()) { wp_die('Administrator permission required.'); }
+        echo '<div class="wrap"><h1>Migrations &amp; ACF Schema Import</h1><p>Explicit existing-post migrations only. Define source and destination fields first. No schema rename, source deletion, automatic whole-site scan or ACF content migration. Back up the database before applying. At most 100 posts / 20 mappings / 1 MiB per plan; ten private records per administrator.</p><h2>Dry-run migration</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="alify_migration"><input type="hidden" name="operation" value="plan">'; wp_nonce_field('alify_migration_plan'); echo '<textarea class="large-text code" rows="8" name="json" aria-label="Migration specification">' . esc_textarea('{"posts":[123],"mappings":[{"from":"old_name","to":"new_name","mode":"copy"}],"overwrite":false}') . '</textarea><button class="button button-primary">Create validated plan (no content writes)</button></form><h2>Your private plans/backups</h2>';
+        foreach (self::ids() as $id) { $summary = self::summary($id); if (is_wp_error($summary)) { continue; } echo '<p>' . esc_html($id . ' — ' . $summary['status'] . ' — ' . $summary['posts'] . ' posts / ' . $summary['mappings'] . ' mappings') . '</p>'; foreach (array('apply' => 'Apply', 'rollback' => 'Rollback', 'forget' => 'Forget backup') as $operation => $label) { echo '<form style="display:inline-block;margin-right:8px" method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="alify_migration"><input type="hidden" name="operation" value="' . esc_attr($operation) . '"><input type="hidden" name="id" value="' . esc_attr($id) . '">'; wp_nonce_field('alify_migration_' . $operation . '_' . $id); echo '<button class="button">' . esc_html($label) . '</button></form>'; } }
+        echo '<h2>ACF schema-only import</h2><p>One group at a time. Supported basic/choice fields and single-level Group/Repeater; unsupported types/settings/conditions reject the entire import. Source content, references, credentials and callbacks are never read. Inspect first; warnings describe intentional differences.</p><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="alify_migration">'; wp_nonce_field('alify_migration_acf'); echo '<textarea class="large-text code" rows="10" name="json" aria-label="ACF schema JSON"></textarea><button name="operation" value="inspect_acf" class="button">Inspect schema</button> <button name="operation" value="import_acf" class="button button-primary">Import as new draft</button></form></div>';
+    }
+    public static function handle() {
+        if (!self::authorize()) { wp_die('Administrator permission required.', '', array('response' => 403)); } $request = wp_unslash($_POST); $operation = $request['operation'] ?? ''; $id = $request['id'] ?? '';
+        if (!is_string($operation) || !is_string($id) || !in_array($operation, array('plan', 'apply', 'rollback', 'forget', 'inspect_acf', 'import_acf'), true)) { wp_die('Invalid operation.', '', array('response' => 400)); }
+        check_admin_referer(strpos($operation, '_acf') !== false ? 'alify_migration_acf' : ('alify_migration_' . $operation . (in_array($operation, array('apply', 'rollback', 'forget'), true) ? '_' . $id : '')));
+        if ($operation === 'plan') { $raw = is_string($request['json'] ?? null) && strlen($request['json']) <= 1048576 ? json_decode($request['json'], true, 16) : null; $result = is_array($raw) && !array_diff(array_keys($raw), array('posts', 'mappings', 'overwrite')) ? self::plan($raw['posts'] ?? null, $raw['mappings'] ?? null, $raw['overwrite'] ?? false) : self::error('Invalid bounded migration JSON.'); }
+        elseif ($operation === 'inspect_acf' || $operation === 'import_acf') {
+            $result = $operation === 'inspect_acf' ? Alify_CF_ACF_Import::inspect($request['json'] ?? null) : Alify_CF_ACF_Import::import($request['json'] ?? null);
+            if (!is_wp_error($result)) { $report = $operation === 'inspect_acf' ? array('valid' => $result['valid'], 'errors' => $result['errors'], 'warnings' => $result['warnings']) : $result; wp_die('<pre>' . esc_html(wp_json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) . '</pre>', 'Schema report', array('response' => 200, 'back_link' => true)); }
+        } elseif ($operation === 'forget') { $result = self::forget($id); } else { $result = self::execute($id, $operation === 'rollback'); }
+        if (is_wp_error($result)) { wp_die(esc_html($result->get_error_message()), 'Migration not completed', array('response' => 400, 'back_link' => true)); } wp_safe_redirect(admin_url('edit.php?post_type=' . Alify_CF::GROUP . '&page=alify-migrations')); exit;
+    }
+}

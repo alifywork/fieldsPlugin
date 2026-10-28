@@ -64,7 +64,7 @@ final class Alify_CF_API {
     public static function field($location, $name, $object = 0) {
         $matches = array(); foreach (Alify_CF::groups($location, $object) as $group) { foreach (Alify_CF::schema($group->ID) as $field) { if ($field['name'] === $name) { $matches[] = $field; } } } return count($matches) === 1 ? $matches[0] : null;
     }
-    public static function write($values, $object, $options = false) {
+    public static function write($values, $object, $options = false, $dry_run = false) {
         if (self::$writing) { return new WP_Error('alify_reentrant', 'Recursive Alify API writes are not permitted.'); }
         if ($options) {
             if (!is_string($object) || !isset(Alify_CF_Options::pages()[$object]) || !current_user_can('manage_options')) { return new WP_Error('alify_forbidden', 'Options update not permitted.', array('status' => 403)); }
@@ -91,6 +91,7 @@ final class Alify_CF_API {
         }
         if (array_diff_key($values, $known)) { $errors[] = 'Unknown field names are not writable.'; }
         if ($errors || !$updates) { return new WP_Error('alify_validation', implode(' ', $errors) ?: 'No writable fields.', array('status' => 400)); }
+        if ($dry_run === true) { return $updates; }
         self::$writing = true;
         try {
             do_action('alify_cf/before_api_write', $updates, $object, $options);

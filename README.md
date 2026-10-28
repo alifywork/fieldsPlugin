@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.30.0 — conditional dependencies and native blocks**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.31.0 — guarded migrations and ACF schema import**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -31,7 +31,33 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.30.0 adds acyclic conditional chains, reference-selection sources and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.31.0 adds explicit guarded post-field migrations and a declared-subset ACF schema importer; 0.30.0 added conditional dependencies and a scoped native dynamic-block API; 0.29.0 added native contexts/deployment/editing. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+
+## Guarded migrations and ACF schema import (0.31.0)
+
+Open **Field Groups → Migrations & ACF Import** as an administrator. These are explicit tools, not an automatic compatibility upgrade. Pause editing and take a database backup first.
+
+### Existing-post field migrations
+
+- Define both source and destination Alify fields before planning. A name change is a **staged copy**: migrate explicit posts to the new field, verify, then manually retire the old schema. Source metadata is never deleted automatically. Containers use the same staged approach; keep old and new Flexible layouts defined until finished.
+- Supply **1–100 unique post IDs** and **1–20 mappings**. Modes: `copy` (matching structural shapes and canonical source data), `text`, `number`, `wrap`, `unwrap` (at most one element; never truncate), and `layouts` (explicit old→new names with no unknown/dropped subfields). Destination validation and permissions remain authoritative. Existing destinations/in-place conversions need `"overwrite":true`.
+- Example: `{"posts":[123,456],"mappings":[{"from":"old_name","to":"new_name","mode":"copy"}],"overwrite":false}`. Layout mode adds `"layouts":{"old_layout":"new_layout"}` to a Flexible-field mapping.
+- **Create validated plan** runs the real shared write validation without plugin content writes. Plans expire after 30 minutes, are creator-bound, and capture applicable schema fingerprints and exact source/destination presence/values. Apply rejects schema/value/capability changes and duplicate metadata rows. Password-containing source/target fields and groups containing custom callback types are excluded.
+- Plans/backups use private nonautoload options, not exports: **1 MiB per record, ten records per administrator**. Applied backups persist until **Forget backup**. Summaries show IDs/counts/status, never values. Backups can contain other private field data: restrict database access and explicitly forget records when no longer needed.
+- Apply/rollback use a global `add_option` lock and durable write-ahead backups. Later editorial changes are not overwritten by rollback. Failures attempt guarded restoration and retain recovery state; this is **best effort, not a database transaction or whole-post/content/revision rollback**. External hooks/editor races remain possible. A crash-held `alify_cf_migration_lock` is not automatically stolen: a qualified administrator must verify no migration request is running, preserve the matching private record, remove the stale lock, and use the owning account's rollback/manual database recovery. Never clear a live lock.
+- Existing posts only; no automatic whole-site scans, schema mutation, source deletion, users/terms/options/widget migration or ACF content/reference-ID transfer.
+
+PHP: `alify_validate_fields($values,$post_id)` returns canonical proposed updates or `WP_Error`; `alify_plan_migration($post_ids,$mappings,$overwrite=false,$transform=null)` returns a safe summary. Apply/rollback with `alify_apply_migration($id)` / `alify_rollback_migration($id)`; inspect/forget with `Alify_CF_Migrations::summary($id)` / `::forget($id)`. PHP-only `mode=custom` requires a trusted callable passed as `$transform`; it runs during planning, and only its validated output is staged. No callable/code is accepted from JSON. Callbacks/third-party validation filters themselves are trusted code, not sandboxed.
+
+### ACF configuration adapter — not content migration
+
+Paste **one ACF group object or one-element JSON export array**, up to **1 MiB / depth 24**. **Inspect schema** reports all recognized incompatibilities and warnings; **Import as new draft** repeats validation and uses the existing conflict-checked Alify transfer pipeline. Existing groups are never updated; failed/unsupported imports do not create partial groups. Review the draft before publishing.
+
+Supported types: **Text, Textarea, Email, URL, Number, True/False, Select, Checkbox, Radio, Button Group, Color Picker (hex string), Group and Repeater**. Basic names/keys/labels/instructions/required/defaults, static choices/multiple Select/choice return settings, and single-level container subfields are mapped. Root maximum 200 fields; containers at most 20 basic children; Repeater maximum 50 rows. Pagination is DOM paging, not ACF lazy loading. Optional-choice clearing, presentation and formatted-getter behavior differences are reported as warnings; raw getters remain canonical.
+
+Locations require 1–10 OR branches with the **same explicit `post_type == value` base**; each branch can also use supported `post`, `post_status`, `page_template`, `current_user_role` equality/inequality predicates. Destination post types/roles/templates must validate on this site. Unconditional source branches retain their unconditional meaning; unsupported predicates or mixed base types reject, never silently broaden.
+
+Unknown settings/types, active field conditionals, nested containers, numeric min/max/step, textarea formatting, nondefault max length, AJAX/custom choices/toggles, color opacity/non-string returns, binding opt-ins and REST exposure reject. Presentation-only settings produce warnings rather than pretending to reproduce ACF UI. ACF field keys are schema identifiers only: **no source values, `_field_name` references, site-local IDs, credentials or PHP callbacks are read/migrated**. This is neither ACF Local JSON synchronization nor ACF API/drop-in parity. PHP wrappers: `alify_inspect_acf_schema($json)` and `alify_import_acf_schema($json)`; both require administrator permission.
 
 ## Conditional dependencies and native custom blocks (0.30.0)
 
@@ -725,7 +751,7 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle (0.30.0):** 805 PHP contracts on PHP 7.4/8.3, 84 JavaScript tests, and clean-debug-log SQLite runs with 886 assertions on WordPress 6.2/PHP 7.4 and 889 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets pass in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779), including real Chromium chain/User-source frontend flows and custom-block Inspector, refreshed PHP preview, save/reload and public rendering, with clean WordPress debug logs. The declared matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8, not a latest-version certification.
+**Previous bundle (0.30.0):** 805 PHP contracts on PHP 7.4/8.3, 84 JavaScript tests, and clean-debug-log SQLite runs with 886 assertions on WordPress 6.2/PHP 7.4 and 889 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets pass in [CI run 40759192779](https://github.com/alifywork/fieldsPlugin/actions/runs/40759192779), including real Chromium chain/User-source frontend flows and custom-block Inspector, refreshed PHP preview, save/reload and public rendering, with clean WordPress debug logs. The declared matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8, not a latest-version certification.
 
 Historical selector-batch baseline follows for comparison, not the current test count.
 

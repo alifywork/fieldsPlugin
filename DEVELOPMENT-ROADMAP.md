@@ -92,8 +92,8 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 59. [x] Documented lifecycle hooks, filters and custom field-type extension API. — **v0.28.0: validated registration filter, registration/API-write actions and trusted scalar custom-type callbacks.**
 60. [x] Automatic Local JSON save/load and synchronization UI. — **v0.29.0:** opt-in trusted directory, automatic atomic file exports/runtime definitions, deployment ownership/hash guards, database sync with attempted snapshot rollback, draft/trash precedence and tombstones. Up to 100 files/1 MiB each; not ACF JSON.
 61. [x] PHP configuration export and version-controlled deployment workflow. — **v0.28.0: administrator PHP configuration export, reviewed manual version-controlled deployment; no automatic sync.**
-62. [ ] Explicit rename/type-change/container-layout migration tools; schema transfer is not content migration.
-63. [ ] ACF schema importer with declared supported types/settings and rejection reporting.
+62. [x] Explicit rename/type-change/container-layout migration tools — **v0.31.0:** bounded existing-post plans, staged name-copy/explicit scalar/list conversion/Flexible layout maps, schema/value guards, overwrite opt-in, private write-ahead backups and optimistic rollback. Source/schema retirement is manual; no whole-site/other-object migration or transactional guarantee.
+63. [x] ACF schema importer with declared supported types/settings and rejection reporting — **v0.31.0:** 13 basic/choice/single-level container types, one group, supported same-post-type locations, unsupported-setting errors and difference warnings, conflict-checked new drafts only. No ACF content/reference migration, Local JSON sync or API parity.
 64. [ ] Separate ACF content migration, including reference/media remapping and rollback planning; not automatic drop-in compatibility.
 
 ## H. REST, revisions and frontend editing
@@ -150,3 +150,5 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 ### Remaining development, not hidden completion claims
 
 The 16 open items are **20, 22, 42–43, 49–50, 53, 62–64, 71 and 73–77**: bidirectional relationships, interactive maps, recursive containers, Clone/reuse, a post-scalability bound review, row-scoped conditions, explicit migrations/ACF import, native sidebar/datastore, and declared ecosystem/distribution integrations. Manual coordinates are not an interactive picker; classic widgets are not block widgets; public scalar custom blocks are not private field-group/container blocks. Provider credentials, integration environments and product decisions need explicit contracts, but do not make all remaining work externally blocked. Continue combined development batches without per-item approval requests.
+
+- **v0.31.0 — Migration/import bundle:** items 62 and 63 implemented within the explicit scopes above. Local PHP/SQLite feature checks pass; four-target native CI verification pending at this commit. Roadmap: **63 complete within declared scopes / 14 pending**. ACF content migration (64) and the remaining broader capabilities stay pending.

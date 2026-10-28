@@ -3,6 +3,8 @@ if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-selector.php';
 require_once __DIR__ . '/class-alify-cf-api.php';
+require_once __DIR__ . '/class-alify-cf-acf-import.php';
+require_once __DIR__ . '/class-alify-cf-migrations.php';
 require_once __DIR__ . '/class-alify-cf-blocks.php';
 require_once __DIR__ . '/class-alify-cf-objects.php';
 require_once __DIR__ . '/class-alify-cf-widgets.php';
@@ -40,6 +42,7 @@ final class Alify_CF {
 
     public static function boot() {
         Alify_CF_API::boot();
+        Alify_CF_Migrations::boot();
         Alify_CF_Blocks::boot();
         Alify_CF_Objects::boot();
         Alify_CF_Widgets::boot();

@@ -130,3 +130,11 @@ function alify_get_autosave_field($name, $post_id) { return Alify_CF_Revisions::
 
 /** Trusted dynamic blocks with public scalar attributes; register on init. */
 function alify_register_block_type($name, $settings) { return Alify_CF_Blocks::register($name, $settings); }
+
+/** Validated dry-run; no plugin metadata writes or write lifecycle actions. */
+function alify_validate_fields($values, $post_id) { return Alify_CF_API::write($values, $post_id, false, true); }
+function alify_plan_migration($post_ids, $mappings, $overwrite = false, $transform = null) { return Alify_CF_Migrations::plan($post_ids, $mappings, $overwrite, $transform); }
+function alify_apply_migration($id) { return Alify_CF_Migrations::execute($id); }
+function alify_rollback_migration($id) { return Alify_CF_Migrations::execute($id, true); }
+function alify_inspect_acf_schema($json) { return Alify_CF_ACF_Import::inspect($json); }
+function alify_import_acf_schema($json) { return Alify_CF_ACF_Import::import($json); }

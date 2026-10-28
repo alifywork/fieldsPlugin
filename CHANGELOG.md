@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.31.0
+
+- Add shared PHP write dry-run and administrator-only bounded explicit-post migrations: staged name copies, deliberate text/number/list conversions and Flexible layout maps. Canonical source/shape checks prevent implicit truncation or unknown-subfield loss; destination schemas and permissions validate through the existing write API.
+- Add creator-bound expiring previews, schema/value fingerprints, explicit overwrite, duplicate-row rejection, private bounded nonautoload write-ahead backups, serialized operations, guarded failure recovery and rollback/forget controls. No database transaction, automatic schema/source deletion, whole-site scan or migration of non-post objects is claimed. Crash locks need verified administrative recovery.
+- Add ACF schema-only import/inspection for 13 declared basic/choice/container types and a supported post-location subset. Unsupported behavior rejects the entire group; intentional editor/return/bounds differences produce reports. Imports create new drafts only, never update existing groups or transfer ACF content/reference IDs/callbacks.
+- Add native backend and Chromium flows for migration plan/apply/rollback and ACF inspection/new-draft import. Local PHP/SQLite feature checks pass; four-target native CI verification pending at this commit.
+
 ## 0.30.0
 
 - Add root sibling conditional chains with PHP/JS dependency graphs, order-independent evaluation, whole-graph cycle detection and a 16-link ceiling. Hidden sources never satisfy any dependent leaf, even empty/not-equals; existing hidden-value retention and explicit API rejection remain.
