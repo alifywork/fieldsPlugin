@@ -70,8 +70,16 @@
         });
         document.dispatchEvent(new Event('alify:visibility'));
     }
-    document.addEventListener('input', refreshConditions);
-    document.addEventListener('change', refreshConditions);
+    function edited(event) {
+        const field = event.target.closest('.alify-value');
+        if (field) {
+            field.querySelectorAll('.alify-field-error').forEach(error => { error.hidden = true; });
+            field.querySelectorAll('[aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
+        }
+        refreshConditions();
+    }
+    document.addEventListener('input', edited);
+    document.addEventListener('change', edited);
     refreshConditions();
     document.addEventListener('click', function (event) {
         const button = event.target.closest('[data-media]');

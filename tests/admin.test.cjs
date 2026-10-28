@@ -305,3 +305,17 @@ test('gallery conditional targets disable submitted IDs while hidden and restore
     assert.equal(photos.hidden, false); assert.equal(photos.querySelector('.alify-gallery-items input').disabled, false);
     assert.equal(photos.querySelector('[data-gallery="up"]').disabled, true); w.close();
 });
+
+test('editing a field clears stale inline feedback for inputs and media change events', () => {
+    const w = conditionalEditor('text', 'equals', 'yes', '<input value="yes">'), d = w.document;
+    const field = d.querySelector('[data-field-key="target"]');
+    field.insertAdjacentHTML('beforeend', '<p class="alify-field-error">Invalid</p>');
+    const input = field.querySelector('input'); input.setAttribute('aria-invalid', 'true');
+    input.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(field.querySelector('.alify-field-error').hidden, true);
+    assert.equal(input.hasAttribute('aria-invalid'), false);
+    field.querySelector('.alify-field-error').hidden = false; input.setAttribute('aria-invalid', 'true');
+    input.dispatchEvent(new w.Event('change', {bubbles: true}));
+    assert.equal(field.querySelector('.alify-field-error').hidden, true);
+    assert.equal(input.hasAttribute('aria-invalid'), false); w.close();
+});

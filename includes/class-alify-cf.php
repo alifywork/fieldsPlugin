@@ -3,6 +3,7 @@ if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-repeater.php';
 require_once __DIR__ . '/class-alify-cf-gallery.php';
 require_once __DIR__ . '/class-alify-cf-options.php';
+require_once __DIR__ . '/class-alify-cf-feedback.php';
 
 final class Alify_CF {
     const GROUP = 'alify_field_group';
@@ -127,14 +128,23 @@ final class Alify_CF {
         }
     }
 
-    public static function values($post, $group, $option_values = null) {
+    public static function values($post, $group, $option_values = null, $feedback = null) {
         if ($option_values === null) { wp_nonce_field('alify_values_' . $post->ID . '_' . $group->ID, 'alify_values_nonce_' . $group->ID); }
         $schema = self::schema($group->ID);
+        if ($feedback === null) {
+            $all_feedback = $option_values === null && current_user_can('edit_post', $post->ID) ? Alify_CF_Feedback::get('post_' . $post->ID) : array();
+            $feedback = $all_feedback[$group->ID] ?? array();
+        }
+        if (isset($feedback['schema']) && $feedback['schema'] !== hash('sha256', wp_json_encode($schema))) { $feedback = array(); }
         $current = array();
         foreach ($schema as $field) {
             $current[$field['key']] = $option_values !== null ? ($option_values[$field['name']] ?? $field['default']) : (metadata_exists('post', $post->ID, '_alify_cf_' . $field['name']) ? alify_get_field($field['name'], $post->ID) : $field['default']);
         }
+        foreach (($feedback['values'] ?? array()) as $name => $attempt) {
+            foreach ($schema as $field) { if ($field['name'] === $name) { $current[$field['key']] = $attempt; } }
+        }
         echo '<div class="alify-values">';
+        if ($feedback) { echo '<p class="alify-recovery-note" role="status">' . (!empty($feedback['omitted']) ? 'The attempted form was too large to recover. Review the field errors and enter corrections again.' : 'Unsaved input is shown below for correction. Saved values have not been replaced by rejected input.') . '</p>'; }
         foreach ($schema as $field) {
             $name = $field['name'];
             $value = $current[$field['key']];
@@ -143,15 +153,17 @@ final class Alify_CF {
             $required = $field['required'] ? ' required' : '';
             echo '<div class="alify-value" data-field-key="' . esc_attr($field['key']) . '" data-field-type="' . esc_attr($field['type']) . '" data-condition="' . esc_attr(wp_json_encode($field['condition'] ?? null)) . '"' . (self::visible($field, $schema, $current) ? '' : ' hidden') . '><label class="alify-label" for="' . esc_attr($id) . '">' . esc_html($field['label']) . ($field['required'] ? ' <span class="alify-required">*</span>' : '') . '</label>';
             if ($field['instructions']) { echo '<p id="' . esc_attr($id . '-help') . '" class="description">' . esc_html($field['instructions']) . '</p>'; }
-            self::control($field, $value, $id, $input);
+            $field_error = $feedback['errors'][$name] ?? '';
+            self::control($field, $value, $id, $input, $field_error ? $id . '-error' : '');
+            if ($field_error) { echo '<p class="alify-field-error" id="' . esc_attr($id . '-error') . '" role="alert">' . esc_html($field_error) . '</p>'; }
             echo '</div>';
         }
         echo '</div>';
     }
 
-    public static function control($field, $value, $id, $input) {
+    public static function control($field, $value, $id, $input, $error_id = '') {
         $required = !empty($field['required']) ? ' required' : '';
-        $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help') . '"';
+        $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '');
         switch ($field['type']) {
             case 'gallery':
                 Alify_CF_Gallery::render($field, $value, $id, $input); break;
@@ -265,7 +277,7 @@ final class Alify_CF {
             update_post_meta($id, self::LOCATION, $location);
             return;
         }
-        $errors = array();
+        $errors = array(); $feedback = Alify_CF_Feedback::get('post_' . $id);
         foreach (self::groups($post->post_type) as $group) {
             $nonce = $_POST['alify_values_nonce_' . $group->ID] ?? '';
             if (!is_string($nonce) || !wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'alify_values_' . $id . '_' . $group->ID)) { continue; }
@@ -273,13 +285,18 @@ final class Alify_CF {
             $schema = self::schema($group->ID);
             $previous = array();
             foreach ($schema as $field) { $previous[$field['name']] = alify_get_field($field['name'], $id); }
-            $updates = self::validate_values($schema, $values, $previous, $errors);
+            $field_errors = array();
+            $updates = self::validate_values($schema, $values, $previous, $errors, $field_errors);
+            if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors); }
+            else { unset($feedback[$group->ID]); }
             foreach ($updates as $name => $value) { update_post_meta($id, '_alify_cf_' . $name, wp_slash($value)); }
         }
+        Alify_CF_Feedback::put('post_' . $id, $feedback);
         if ($errors) { self::error($id, $errors); }
     }
 
-    public static function validate_values($schema, $values, $previous, &$errors) {
+    public static function validate_values($schema, $values, $previous, &$errors, &$field_errors = null) {
+        $field_errors = array();
         $updates = array();
         $submitted_values = array();
         foreach ($schema as $field) {
@@ -299,11 +316,15 @@ final class Alify_CF {
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1');
             $invalid = (in_array($field['type'], array('repeater', 'gallery'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if (($field['required'] && $empty) || $invalid) {
-                $errors[] = $field['label'] . ': ' . ($field['required'] && $empty ? 'a valid value is required.' : 'invalid value.') . ' Previous value retained.';
+                $message = ($field['required'] && $empty ? 'A valid value is required.' : 'Invalid value.') . ' Previous saved value retained.';
+                $field_errors[$field['name']] = $message;
+                $errors[] = $field['label'] . ': ' . $message;
                 continue;
             }
             if (in_array($field['type'], array('image', 'file'), true) && $value !== '' && (string) ($previous[$field['name']] ?? null) !== (string) $value && !current_user_can('edit_post', $value)) {
-                $errors[] = $field['label'] . ': you cannot select this attachment. Previous value retained.';
+                $message = 'You cannot select this attachment. Previous saved value retained.';
+                $field_errors[$field['name']] = $message;
+                $errors[] = $field['label'] . ': ' . $message;
                 continue;
             }
             $updates[$field['name']] = $value;

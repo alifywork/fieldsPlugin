@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.0 — gallery release**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.1 — backend integration and validation recovery**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -19,7 +19,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
 - Attachment IDs validated by type and attachment edit permissions on selection.
 - Atomic schema validation and duplicate-name protection across active/draft groups on the same post type.
-- Per-user, per-post save-error notices that name rejected fields and preserve prior values.
+- Per-user save-error notices, inline field errors and short-lived unsaved-input recovery, separate from saved field values.
 - Labels, stable field keys, field names, instructions, defaults, and required settings.
 - Conditional show/hide rules with live editor updates and server-side enforcement.
 - Expandable cards, drag sorting, keyboard-accessible move buttons, duplication and deletion confirmation.
@@ -61,7 +61,7 @@ large : Large
 
 ## Image and File fields
 
-Both types return an **attachment ID** (integer), not a URL or an ACF-style array. An empty saved selection is `''`. Media defaults can be supplied as an existing attachment ID. The WordPress media picker is available to users with `upload_files`; selecting a different attachment additionally requires permission to edit that attachment. Removing an optional selection does not delete the attachment.
+Both types return an **attachment ID**, not a URL or an ACF-style array. WordPress scalar post metadata normally reads as a **numeric string**; options-page values retain an integer ID. Cast to `(int)` when an integer is needed. An empty saved selection is `''`. Media defaults can be supplied as an existing attachment ID. The WordPress media picker is available to users with `upload_files`; selecting a different attachment additionally requires permission to edit that attachment. Removing an optional selection does not delete the attachment.
 
 ```php
 $hero_id = alify_get_field('hero_image');
@@ -208,7 +208,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 - **Single level only**, maximum **20 subfields** and **50 rows** per repeater. No pagination, row duplication, drag sorting, nested repeaters or subfield conditional rules yet; row ordering uses accessible move buttons.
 - A whole repeater can be a conditional target. It cannot be a condition source. Hidden repeaters preserve all saved rows and skip validation.
 - Each row is sanitized against its schema, including required and media checks. A newly selected media ID requires attachment edit permission; existing repeater attachment IDs may survive reordering without that permission.
-- If any row is invalid, **all previous rows for that repeater are retained** and the existing save-error notice identifies the repeater. Other valid fields may still save. Row-level error highlighting and rejected-input repopulation are not implemented.
+- If any row is invalid, **all previous rows for that repeater are retained** and the existing save-error notice identifies the repeater. Other valid fields may still save. Errors are displayed at repeater level, not against individual subfields. Best-effort rejected-input recovery is available as described below.
 - Completion markers detect missing/truncated repeater submissions (including common PHP `max_input_vars` truncation) and preserve previous rows. Your host's input limits may be reached before the plugin's row cap; test realistic forms and adjust limits or reduce fields/rows. Explicitly removing every optional row and saving clears its value to `[]`.
 - Subfield names need only be unique within their repeater. Renaming/removing subfields does **not** migrate content. On the next post save, unknown/removed subfield values are dropped and renamed fields receive the currently submitted value. Back up content before structural changes. Changing an existing scalar field to Repeater is not a data migration.
 
@@ -247,23 +247,53 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 
 - Field names must start with a lowercase letter and contain only lowercase letters, numbers and underscores. Names are reserved across published, draft, pending, private and scheduled groups matching the same post type. Conflicts reject the entire configuration change, preserving its previous fields and location. Trashed groups do not reserve names; avoid restoring legacy conflicting groups without reviewing them.
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
-- Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Rejected input is not repopulated.
+- Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
 - No nested repeaters, Flexible Content, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
 - UI strings are English in this initial release; full localization is pending.
 
+## Validation feedback and input recovery
+
+Rejected fields now show an error underneath the field; scalar text-like controls also receive `aria-invalid` and error-description references. Editing the field clears stale client-side error highlighting, while the server validates again on save. Repeater errors remain at the repeater boundary rather than individual rows/subfields.
+
+After a rejected save, a highlighted note distinguishes **attempted unsaved input** from persisted values. Recovery is private to the current WordPress user and the specific post/options page. It expires after **10 minutes** and clears after successful correction. Frontend helpers always read saved data, never recovery data.
+
+- Recovery is best-effort: text is sanitized and limited to 10,000 bytes per value; unsupported/malformed values are not preserved verbatim. Native number/date controls may not be able to display invalid formats.
+- Gallery/repeater completion markers must be valid to recover their submitted structure; incomplete structures fall back to previously saved values. Hidden fields also retain saved values.
+- Unauthorized new media selections are not exposed through recovered media previews. Existing allowed IDs can survive row reordering.
+- Recovery values larger than 256 KiB in aggregate are omitted; errors remain and the form explains that values must be entered again.
+- Recovery is ignored after the group's schema changes, avoiding stale values being rendered with a different field type.
+- Options-page validation remains atomic; post saves can still save other valid fields. **Post publication is not gated by field validation yet**, especially across Gutenberg's separate REST/metabox requests.
+
 ## Verification
 
-Automated checks for 0.6.0:
+Automated checks for 0.6.1:
 
 ```sh
 npm ci
-npm test       # 19 jsdom tests for builder, media, galleries, conditions and repeaters
+npm test       # 20 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 145 assertions with isolated WordPress stubs
+php tests/php-unit.php # 159 assertions with isolated WordPress stubs
 ```
 
-PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP files were also parsed against PHP 7.4 grammar. Tests use stubs for WordPress and the media frame, not a live WordPress database or browser. Activation, real media uploads, native sorting and editor integration still require staging checks below.
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 57 assertions per target:
+
+| WordPress | PHP | Database |
+|---|---|---|
+| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
+| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
+
+Both integration runs had clean WordPress debug logs. These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering and feedback; it does **not** automate a real browser.
+
+```sh
+# Requires Git/Bash and a native PHP executable with SQLite extensions.
+bash tests/integration/run.sh
+WP_VERSION=6.2 bash tests/integration/run.sh
+```
+
+See [integration setup, coverage and limitations](tests/integration/README.md). The runner creates an explicitly marked disposable database under `$HOME/.cache`, never a production database. A GitHub Actions matrix is included; its remote execution is separate from these local results.
+
+**Still pending:** MySQL/MariaDB, browser-driven classic/Gutenberg and media-modal testing, real HTTP redirects, and publication-blocking validation. The existing validation preserves rejected field values but does not prevent WordPress publication.
 
 ### Manual staging checklist
 

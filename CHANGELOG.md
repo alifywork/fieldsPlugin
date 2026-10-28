@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.1
+
+- Add real WordPress integration tests with disposable SQLite-backed installations and native-PHP GitHub Actions matrix configuration.
+- Verify 57 backend assertions each on WordPress 6.2 / PHP.wasm 7.4.33 and WordPress 6.8.3 / PHP.wasm 8.3.33, with clean debug logs.
+- Add field-level validation messages and accessible scalar error attributes.
+- Recover bounded, sanitized unsaved input using 10-minute user/context-scoped transients; never expose rejected values through frontend helpers.
+- Preserve hidden values and restricted existing media; reject stale-schema recovery and clear feedback after correction.
+- Clear stale inline highlighting on input/media changes.
+- Correct the documented scalar Image/File post-meta return type to numeric strings, while options and gallery arrays retain integers.
+- Expand isolated coverage to 159 PHP assertions and 20 admin interaction tests.
+- Browser E2E, MySQL/MariaDB and a publication gate remain pending; this is a stabilization increment, not a full compatibility certification.
+
 ## 0.6.0
 
 - Add Gallery fields to posts, options pages and single-level repeater subfields.

@@ -1,0 +1,36 @@
+name: Plugin tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  wordpress:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '7.4'
+            wordpress: '6.2'
+          - php: '8.3'
+            wordpress: '6.8.3'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, sqlite3, mysqli, mbstring, fileinfo, gd
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check && npm test
+      - name: PHP syntax and isolated contracts
+        run: |
+          find . -path ./node_modules -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l
+          php tests/php-unit.php
+      - name: Real WordPress integration (SQLite)
+        env:
+          WP_VERSION: ${{ matrix.wordpress }}
+        run: bash tests/integration/run.sh

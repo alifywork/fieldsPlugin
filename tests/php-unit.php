@@ -31,7 +31,7 @@ function get_posts($args) {
     }
     return $result;
 }
-function get_current_user_id() { return 1; }
+function get_current_user_id() { return $GLOBALS['test_user_id'] ?? 1; }
 function set_transient($key, $value, $ttl) { global $transients; $transients[$key] = $value; }
 require __DIR__ . '/../includes/class-alify-cf.php';
 require __DIR__ . '/../includes/functions.php';
@@ -385,4 +385,37 @@ ob_start(); Alify_CF_Gallery::render($gallery, array(52), 'photos', 'values[phot
 same(false, strpos($html, '<b>Second</b>') !== false, 'Gallery attachment title escaped');
 same(true, strpos($html, 'values[photos][ids][]') !== false, 'Gallery ID inputs rendered');
 same(true, strpos($html, 'values[photos][__complete]') !== false, 'Gallery completion marker rendered');
+// Feedback recovery is separate from saved values, bounded, and per user/context.
+$feedback_schema = array(field('email', 'email', true), field('note', 'textarea'));
+$feedback = Alify_CF_Feedback::group($feedback_schema, array('email' => 'bad-email', 'note' => "Line 1\nLine 2"), array('email' => 'saved@example.com'), array('email' => 'Invalid email'));
+same('bad-email', $feedback['values']['email'], 'Invalid scalar recovery');
+same("Line 1\nLine 2", $feedback['values']['note'], 'Multiline recovery');
+Alify_CF_Feedback::put('post_10', array(1 => $feedback));
+same('bad-email', Alify_CF_Feedback::get('post_10')[1]['values']['email'], 'Feedback stored');
+$test_user_id = 2;
+same(array(), Alify_CF_Feedback::get('post_10'), 'Feedback not shared across users');
+$test_user_id = 1;
+same(array(), Alify_CF_Feedback::get('options_site_unrelated'), 'Feedback not shared across contexts');
+Alify_CF_Feedback::put('post_10', array());
+same(array(), Alify_CF_Feedback::get('post_10'), 'Feedback cleared');
+$large = Alify_CF_Feedback::group(array(field('note', 'textarea')), array('note' => str_repeat('x', 20000)), array(), array());
+same(10000, strlen($large['values']['note']), 'Scalar recovery bounded');
+Alify_CF_Feedback::put('post_10', array(1 => array('values' => array('note' => str_repeat('x', 262145)), 'errors' => array('note' => 'Invalid'))));
+same(array(), Alify_CF_Feedback::get('post_10')[1]['values'], 'Oversized recovery omits values');
+same(true, Alify_CF_Feedback::get('post_10')[1]['omitted'], 'Oversized recovery annotated');
+$hidden = field('detail'); $hidden['condition'] = array('field' => 'field_enabled', 'operator' => 'equals', 'value' => '1');
+$group_feedback = Alify_CF_Feedback::group(array(field('enabled', 'true_false'), $hidden), array('detail' => 'forged'), array('detail' => 'saved hidden'), array());
+same('saved hidden', $group_feedback['values']['detail'], 'Hidden recovery preserves saved value');
+$denied = array(52);
+$group_feedback = Alify_CF_Feedback::group(array(field('photo', 'image'), field('photos', 'gallery')), array('photo' => '52', 'photos' => array('__complete' => '1', 'ids' => array(52))), array('photo' => '50', 'photos' => array(50)), array());
+same('50', $group_feedback['values']['photo'], 'Recovery does not expose unauthorized media');
+same(array(), $group_feedback['values']['photos'], 'Recovery excludes unauthorized new gallery IDs');
+$denied = array();
+Alify_CF_Feedback::put('post_10', array());
+$rows_field = field('team', 'repeater'); $rows_field['sub_fields'] = array(field('photos', 'gallery'));
+$denied = array(52);
+$recovered = Alify_CF_Feedback::group(array($rows_field), array('team' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'photos' => array('__complete' => '1', 'ids' => array(52)))))), array('team' => array(array('photos' => array(52)))), array('team' => 'Invalid'));
+same(array(52), $recovered['values']['team'][0]['photos'], 'Recovery preserves existing restricted media in rows');
+same(hash('sha256', wp_json_encode(array($rows_field))), $recovered['schema'], 'Recovery records schema identity');
+$denied = array();
 echo "PASS: $count PHP contract assertions\n";

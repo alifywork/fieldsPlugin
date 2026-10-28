@@ -60,7 +60,7 @@ final class Alify_CF_Options {
         $nonce = $request['alify_options_nonce'] ?? '';
         if (!is_string($nonce) || !wp_verify_nonce($nonce, 'alify_options_' . $slug)) { $errors[] = 'Security check failed. Reload the page and try again.'; return false; }
         if (($request['alify_options_complete'] ?? '') !== '1' || !isset($request['alify_values']) || !is_array($request['alify_values'])) { $errors[] = 'Incomplete options form. No settings were changed.'; return false; }
-        $previous = self::data($slug); $next = $previous; $names = array();
+        $previous = self::data($slug); $next = $previous; $names = array(); $feedback = array();
         $groups = Alify_CF::groups(self::location($slug));
         if (!$groups) { $errors[] = 'No published field groups are assigned to this page.'; return false; }
         foreach ($groups as $group) {
@@ -71,10 +71,13 @@ final class Alify_CF_Options {
                 if (isset($names[$field['name']])) { $errors[] = 'Conflicting field names on this options page: ' . $field['name']; }
                 $names[$field['name']] = true;
             }
-            $updates = Alify_CF::validate_values($schema, $values, $previous, $errors);
+            $field_errors = array();
+            $updates = Alify_CF::validate_values($schema, $values, $previous, $errors, $field_errors);
+            $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors);
             foreach ($updates as $name => $value) { $next[$name] = $value; }
         }
-        if ($errors) { return false; }
+        if ($errors) { Alify_CF_Feedback::put('options_' . $slug, $feedback); return false; }
+        Alify_CF_Feedback::put('options_' . $slug, array());
         // Unlike post meta, update_option() does not strip slashes. Do not wp_slash().
         update_option('alify_cf_options_' . $slug, $next, false);
         return true;
@@ -112,9 +115,10 @@ final class Alify_CF_Options {
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="alify_cf_save_options"><input type="hidden" name="alify_options_page" value="' . esc_attr($slug) . '">';
         wp_nonce_field('alify_options_' . $slug, 'alify_options_nonce');
         $data = self::data($slug);
+        $feedback = Alify_CF_Feedback::get('options_' . $slug);
         foreach ($groups as $group) {
             echo '<section class="alify-options-group"><h2>' . esc_html($group->post_title) . '</h2>';
-            Alify_CF::values(null, $group, $data);
+            Alify_CF::values(null, $group, $data, $feedback[$group->ID] ?? array());
             echo '<input type="hidden" name="alify_values[' . esc_attr($group->ID) . '][__group_complete]" value="1"></section>';
         }
         echo '<input type="hidden" name="alify_options_complete" value="1">';
