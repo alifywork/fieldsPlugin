@@ -70,4 +70,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(errors, [], 'No uncaught browser JS errors');
         console.log(`PASS: ${checks} real browser assertions (Classic, Gutenberg, media modal, repeater, gallery, raw REST).`);
     } finally { await context.close(); await browser.close(); }
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => {
+    console.error(error);
+    if (process.env.GITHUB_ACTIONS) console.log('::error title=Browser regression::' + String(error.stack || error).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'));
+    process.exitCode = 1;
+});

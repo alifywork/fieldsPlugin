@@ -45,6 +45,6 @@ jobs:
           php -S 0.0.0.0:8080 -t "$ALIFY_WP_ROOT" tests/browser/router.php > /tmp/alify-browser-server.log 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true; php tests/browser/cleanup.php' EXIT
-          node -e 'const http=require("http"); let tries=0; function ready(){http.get("http://127.0.0.1:8080/wp-login.php", r=>{r.resume(); if(r.statusCode!==200)process.exit(1)}).on("error",()=>{if(++tries>30)process.exit(1);setTimeout(ready,1000)})} ready()'
+          node -e 'const http=require("http"); let tries=0; function ready(){http.get("http://127.0.0.1:8080/wp-login.php", r=>{r.resume(); if(r.statusCode!==200){console.log("::error::Browser server returned HTTP "+r.statusCode);process.exit(1)}}).on("error",()=>{if(++tries>30)process.exit(1);setTimeout(ready,1000)})} ready()'
           npm run test:browser
-          test ! -s "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log" || { cat "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log"; exit 1; }
+          test ! -s "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log" || { while IFS= read -r line; do printf '::error title=WordPress browser debug::%s\n' "$line"; done < "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log"; exit 1; }
