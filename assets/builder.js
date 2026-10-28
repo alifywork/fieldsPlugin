@@ -79,7 +79,7 @@
             const subCard = event.target.closest('.alify-sub-card');
             const field = subCard ? containerFor(event.target).sub_fields[Number(subCard.dataset.subIndex)] : fields.find(item => item.key === event.target.closest('.alify-card').dataset.key);
             if (!field.default || typeof field.default !== 'object' || Array.isArray(field.default)) field.default = {url: '', title: '', target: ''};
-            field.default[event.target.dataset.defaultPart] = event.target.value; sync(); return;
+            field.default = {...field.default, [event.target.dataset.defaultPart]: event.target.value}; sync(); return;
         }
         const subProp = event.target.dataset.subProp;
         if (subProp) {

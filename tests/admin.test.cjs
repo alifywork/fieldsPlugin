@@ -869,6 +869,7 @@ test('Configuration builder supports color palettes, media bounds and structured
     set(w, 'type', 'link');
     for (const [part, value] of Object.entries({url: 'https://example.com', title: 'Example', target: '_blank'})) { const node = d.querySelector(`[data-default-part="${part}"]`); node.value = value; node.dispatchEvent(new w.Event('input', {bubbles: true})); }
     assert.equal(schema(w)[0].default.url, 'https://example.com'); assert.equal(schema(w)[0].default.target, '_blank');
+    d.querySelector('[data-action="duplicate"]').click(); const copiedURL = d.querySelectorAll('[data-default-part="url"]')[1]; copiedURL.value = 'https://copy.example.com'; copiedURL.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].default.url, 'https://example.com'); assert.equal(schema(w)[1].default.url, 'https://copy.example.com');
     set(w, 'type', 'group'); d.querySelector('[data-sub-action="add"]').click(); const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'link'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
     const url = d.querySelector('[data-default-part="url"]'); url.value = 'https://example.org'; url.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].sub_fields[0].default.url, 'https://example.org'); w.close();
 });
