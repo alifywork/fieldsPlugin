@@ -466,4 +466,12 @@ foreach (array('repeater', 'group') as $nested) {
 }
 ob_start(); Alify_CF_Group::render($profile, $clean_profile, 'profile-id', 'alify_values[1][profile]'); $html = ob_get_clean();
 same(true, strpos($html, '[fields][name]') !== false && strpos($html, '[__complete]') !== false, 'Group renders namespaced controls and completion marker');
+$flags = field('flags', 'group'); $flags['sub_fields'] = array(field('enabled', 'true_false'), field('tags', 'checkbox'));
+same(array('enabled' => '0', 'tags' => array()), Alify_CF_Group::clean($flags, array('__complete' => '1', 'fields' => array('__fields_complete' => '1'))), 'Checkbox/toggle-only Group clears all unchecked values');
+same('', Alify_CF_Group::clean($flags, array('__complete' => '1')), 'Missing Group field structure retains previous object');
+ob_start(); Alify_CF_Group::render($flags, array(), 'flags', 'flags'); $flags_html = ob_get_clean();
+same(true, strpos($flags_html, '[fields][__fields_complete]') !== false, 'Group renders structure marker even when no checkbox is checked');
+$conditional = field('dependent'); $conditional['condition'] = array('field' => $profile['key'], 'operator' => 'not_empty', 'value' => ''); $errors = array();
+Alify_CF::validate_schema(array($profile, $conditional), 'page', 0, $errors);
+same(true, (bool) $errors, 'Group cannot be used as a condition source');
 echo "PASS: $count PHP contract assertions\n";

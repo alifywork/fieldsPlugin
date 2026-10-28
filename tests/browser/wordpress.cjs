@@ -37,10 +37,10 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-gallery-item').count(), 2, 'Native gallery modal adds images');
         await page.locator('.alify-gallery [data-gallery="down"]').first().click();
         await page.locator('.alify-group [data-media="choose"]').click();
-        await modal.waitFor();
-        const groupLibrary = modal.getByRole('tab', {name: 'Media Library'}); if (await groupLibrary.count()) await groupLibrary.click();
-        await modal.locator(`.attachment[data-id="${fixture.images[0]}"]`).click();
-        await modal.locator('.media-button-select').click(); await modal.waitFor({state: 'hidden'});
+        const groupModal = page.locator('.media-modal:visible'); await groupModal.waitFor();
+        const groupLibrary = groupModal.getByRole('tab', {name: 'Media Library'}); if (await groupLibrary.count()) await groupLibrary.click();
+        await groupModal.locator(`.attachment[data-id="${fixture.images[0]}"]`).click();
+        await groupModal.locator('.media-button-select').click(); await groupModal.waitFor({state: 'hidden'});
         await page.locator('[data-row-action="add"]').click();
         await page.locator('.alify-row [type="text"]').fill('First member');
         await page.locator('[data-row-action="add"]').click();
