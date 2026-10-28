@@ -1,0 +1,32 @@
+name: Prepare draft release assets
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release tag
+        required: true
+        default: v0.34.0
+  push:
+    branches: [arena/325786d3-fieldsplugin]
+    paths:
+      - .github/workflows/release-assets.yml
+      - tools/upload-draft-release.sh
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: draft-release-assets
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || 'v0.34.0' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build and verify assets from the already-tested draft commit
+        run: bash tools/upload-draft-release.sh
