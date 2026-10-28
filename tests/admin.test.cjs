@@ -492,6 +492,10 @@ test('structured inline targeting uses row order and schema names, expands panel
     assert.equal(invalid.getAttribute('aria-describedby'), 'help');
     assert.equal(d.querySelector('.alify-subfield-error').hidden, true);
     assert.equal(d.querySelector('.alify-error-jump'), null);
+    w.AlifyValidation.show(d.querySelector('.alify-value'), d.getElementById('problem'), {row: 0, subfield: 'email'});
+    assert.equal(d.querySelectorAll('#problem-inline').length, 1);
+    assert.equal(d.getElementById('valid').getAttribute('aria-describedby'), 'problem-inline');
+    assert.equal(invalid.getAttribute('aria-describedby'), 'help');
     w.close();
 });
 

@@ -28,7 +28,9 @@
     }
     function showError(field, message, location) {
         const text = message.textContent;
-        clearError(field); message.hidden = false;
+        clearError(field);
+        field.querySelectorAll('.alify-subfield-error').forEach(error => error.remove());
+        message.hidden = false;
         let scope = field;
         if (location && typeof location.subfield === 'string') {
             let container = field;
