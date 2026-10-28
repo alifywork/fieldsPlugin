@@ -2,8 +2,10 @@
 
 ## 0.13.0
 
+- Verify feature development on all four existing native-PHP targets: 230 backend, 76 browser and 18 HTTP persistence assertions; 287 isolated PHP assertions and 35 JS tests also pass.
+
 - Add Color Picker and Time to the shared field registry, builder and all basic subfield builders.
-- Color uses a native nameless swatch, submitted editable hex text and explicit Clear action; empty is distinct from black. Store only lowercase six-digit hex, rejecting unsupported color syntaxes.
+- Color uses a native nameless swatch, submitted editable hex text, explicit Apply swatch (including unchanged black) and Clear actions; empty is distinct from black. Store only lowercase six-digit hex, rejecting unsupported color syntaxes.
 - Time uses a native minute-resolution input with strict `HH:MM` storage, without seconds or timezone conversion.
 - Support shared defaults/required rules/conditions, Classic/core REST and Options validation, atomic container retention and JSON schema transfer.
 - Add focused development checks for formats, clearing, nested basic values, post/Options/REST saves, JSON round trips and actual browser save/reload behavior.
