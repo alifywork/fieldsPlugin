@@ -7,7 +7,7 @@
 - Support Group rendering, builder subfield controls, user-scoped recovery, whole-Group conditions, Classic/core REST publication checks and versioned JSON configuration transfer.
 - Add `alify_get_group()` and preserve the existing frontend helpers and options APIs.
 - Reject nested Group/Repeater containers and Group condition sources. Required Groups need a nonempty subfield; subfield requirements remain enforced.
-- Add isolated PHP, jsdom, real WordPress and Chromium Group coverage. Flexible Content, nesting and per-subfield error UI remain outside this increment.
+- Verify all four native-PHP SQLite/MySQL targets: 141 real WordPress assertions and 27 Chromium assertions per target, plus 179 isolated PHP assertions and 24 jsdom tests. Flexible Content, nesting and per-subfield error UI remain outside this increment.
 
 ## 0.7.0
 

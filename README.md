@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File, Repeater and Gallery.
+- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File, Repeater, Gallery and Group.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -130,7 +130,7 @@ A built-in **Site Settings** submenu is available under **Alify Custom Field**. 
 3. Publish the group, then visit **Alify Custom Field → Site Settings**.
 4. Enter global values and click **Save Settings**.
 
-All thirteen field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
+All fourteen field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
 
 ```php
 // Read from the built-in 'site' page (not from a post).
@@ -187,7 +187,7 @@ alify_the_option('footer_text', 'footer');
 
 ## Repeater fields
 
-Select **Repeater** as the field type, then add 1–20 subfields in its card. Each subfield has a local name, label, type, instructions, choices, default and required setting. All twelve non-repeater types (including Image/File/Gallery) work as subfields. Add, remove and move subfields with the builder buttons.
+Select **Repeater** as the field type, then add 1–20 subfields in its card. Each subfield has a local name, label, type, instructions, choices, default and required setting. All twelve basic/non-container types (including Image/File/Gallery) work as subfields. Add, remove and move subfields with the builder buttons.
 
 In the post editor, use **Add Row**, **Remove row**, and the up/down buttons to manage row order. A repeater starts empty; subfield defaults apply to newly added rows, not retroactively to existing rows. Marking the repeater required means at least one valid row is required. JavaScript is required for row management.
 
@@ -259,7 +259,7 @@ $settings = alify_get_option('profile', 'site');
 - A required Group needs at least one nonempty subfield (an unchecked toggle does not count); individually required subfields must always validate when the Group is visible.
 - Optional checkbox/toggle-only Groups can be cleared. Missing completion markers never clear saved data.
 - Whole-Group conditional visibility is supported; Groups cannot be condition sources. Subfield conditions and nested Group/Repeater containers are not supported in this increment.
-- Group schemas and subfield keys participate in JSON transfer. Image/file defaults reset during transfer as with other fields. Errors/recovery are shown at the Group boundary, not individually per subfield.
+- Group schemas and subfield keys participate in JSON transfer (the destination needs Group support, version 0.8.0+). Image/file defaults reset during transfer as with other fields. Errors/recovery are shown at the Group boundary, not individually per subfield.
 - `alify_get_field()` also returns the associative object. `alify_get_group()` returns an empty array before the first save; escape subfield output for its context. Renaming subfields does not migrate existing data.
 
 ## Field-group JSON import / export
@@ -312,10 +312,10 @@ Automated checks for 0.8.0:
 npm ci
 npm test       # 24 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 175 assertions with isolated WordPress stubs
+php tests/php-unit.php # 179 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 119 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 141 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -336,7 +336,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 119 backend and 23 Chromium assertions in [CI run 40665970131](https://github.com/alifywork/fieldsPlugin/actions/runs/40665970131), with clean debug-log checks. The browser checks now include actual JSON download, upload, pasted import, conflict rejection, malformed upload and nonce rejection. These remote results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 141 backend and 27 Chromium assertions in [CI run 40668605180](https://github.com/alifywork/fieldsPlugin/actions/runs/40668605180), with clean debug-log checks. The browser checks include actual JSON transfer plus Group text/checkbox/image persistence in Classic and Group persistence after Gutenberg save/reload. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 
