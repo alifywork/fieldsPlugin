@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.0
+
+- Add Radio Button fields with configured choices, string-key storage (including `0`), defaults, required validation and explicit optional clearing.
+- Support posts/Options/basic Group, Repeater and Flexible subfields, conditional sources/targets, the core REST save bridge and schema-only JSON transfer.
+- Reject unknown keys and malformed types while retaining previous scalar/container/Options values. Read checked radio choices, not hidden sentinels, in browser conditions.
+- Add a sequential development roadmap covering the missing/partial ACF-comparison capabilities; next feature is Button Group.
+- Local checks pass: 385 isolated PHP assertions, 48 JS tests and 325 backend assertions on each existing SQLite WordPress/PHP target. Native/browser CI verification is recorded after completion.
+
 ## 0.17.0
 
 - Feature checks pass on all four existing native-PHP targets: 303 backend, 96 browser and 24 HTTP persistence assertions; 364 isolated PHP assertions and 46 JS tests also pass.

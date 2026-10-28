@@ -35,7 +35,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
     }
 
     public static function register() {
@@ -195,6 +195,14 @@ final class Alify_CF {
                 echo '<select' . $attrs . $required . '><option value="">Select an option</option>';
                 foreach (self::choices($field) as $key => $label) { echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>'; }
                 echo '</select>'; break;
+            case 'radio':
+                echo '<fieldset class="alify-radio" id="' . esc_attr($id) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '') . '><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend><input type="hidden" name="' . esc_attr($input) . '" value="">';
+                $index = 0;
+                foreach (self::choices($field) as $key => $label) {
+                    echo '<label class="alify-choice"><input type="radio" id="' . esc_attr($id . '-choice-' . $index++) . '" name="' . esc_attr($input) . '" value="' . esc_attr($key) . '" ' . checked(is_scalar($value) ? (string) $value : '', (string) $key, false) . $required . ' aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '') . '> ' . esc_html($label) . '</label>';
+                }
+                if (empty($field['required'])) { echo '<button type="button" class="button-link" data-radio-clear>Clear selection</button>'; }
+                echo '</fieldset>'; break;
             case 'checkbox':
                 echo '<fieldset id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
                 foreach (self::choices($field) as $key => $label) { echo '<label class="alify-choice"><input type="checkbox" name="' . esc_attr($input) . '[]" value="' . esc_attr($key) . '" ' . checked(in_array((string) $key, (array) $value, true), true, false) . '> ' . esc_html($label) . '</label>'; }
@@ -225,6 +233,7 @@ final class Alify_CF {
         if ($field['type'] === 'checkbox') {
             return array_values(array_intersect(array_map('strval', array_keys(self::choices($field))), array_map('sanitize_text_field', is_array($value) ? $value : array())));
         }
+        if ($field['type'] === 'radio' && !is_string($value) && !is_int($value)) { return ''; }
         if (!is_scalar($value)) { return ''; }
         $value = (string) $value;
         switch ($field['type']) {
@@ -239,6 +248,7 @@ final class Alify_CF {
             case 'url': return esc_url_raw($value, array('http', 'https'));
             case 'number': return is_numeric($value) ? $value : '';
             case 'true_false': return $value === '1' ? '1' : '0';
+            case 'radio':
             case 'select': return array_key_exists($value, self::choices($field)) ? $value : '';
             case 'color': return preg_match('/^#[0-9a-fA-F]{6}$/D', $value) ? strtolower($value) : '';
             case 'time': return preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $value) ? $value : '';
@@ -367,7 +377,7 @@ final class Alify_CF {
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
             $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible', 'link', 'relationship'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if ($field['type'] === 'wysiwyg') { $invalid = !is_string($submitted); }
-            if ($field['type'] === 'post_object' && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
+            if (in_array($field['type'], array('post_object', 'radio'), true) && !is_string($submitted) && !is_int($submitted)) { $invalid = true; }
             if (($field['required'] && $empty) || $invalid) {
                 if (!$issue && $field['type'] === 'group' && $field['required'] && $empty) { $issue = 'Fill at least one subfield in this Group.'; }
                 if (!$issue && $field['type'] === 'flexible' && $field['required'] && $empty) { $issue = 'Add at least one layout row.'; }

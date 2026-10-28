@@ -52,6 +52,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await chooseRelationship();
         check(await value('related').inputValue(), String(fixture.reference), 'Actual AJAX selector writes chosen post/page ID');
         check(await page.locator('.alify-relation-item').count(), 2, 'Relationship AJAX picker prevents duplicate references');
+        await page.locator('.alify-radio input[value="0"]').check();
+        check(await page.locator('.alify-radio input:checked').inputValue(), '0', 'Radio selects zero-valued choice in actual browser');
         check(await value('accent').inputValue(), '', 'Optional color starts empty rather than implicit black');
         await page.locator('[data-color-apply]').click();
         check(await value('accent').inputValue(), '#000000', 'Explicit Apply commits black even when native swatch has not changed');
@@ -114,6 +116,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-relation-item input').evaluateAll(inputs => inputs.map(input => input.value)), [String(fixture.reference_second), String(fixture.reference)], 'Relationship order survives Classic save/reload');
         await page.locator('[data-relation-action="clear"]').click();
         await page.locator('[data-post-clear]').click();
+        check(await page.locator('.alify-radio input:checked').inputValue(), '0', 'Radio choice survives Classic save/reload');
+        await page.locator('[data-radio-clear]').click();
         check(await value('accent').inputValue(), '#2271b1', 'Color survives Classic save/reload');
         check(await value('opens').inputValue(), '09:30', 'Time survives Classic save/reload without conversion');
         check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<strong>rich</strong>'), true, 'Native Visual editor synchronizes HTML on Classic form save');
@@ -126,6 +130,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-link input[type="url"]').inputValue(), '', 'Explicit Link clear survives actual save/reload');
         check(await value('related').inputValue(), '', 'Explicit post reference clear survives save/reload');
         check(await page.locator('.alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
+        check(await page.locator('.alify-radio input:checked').count(), 0, 'Optional Radio clear survives Classic save/reload');
         check(await value('accent').inputValue(), '', 'Cleared color remains empty after actual save/reload');
         check(await page.locator('.alify-flex-row input[name$="[layout]"]').evaluateAll(nodes => nodes.map(node => node.value)), ['text', 'hero'], 'Mixed Flexible layout order survives Classic save/reload');
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Classic flexible body', 'Flexible row values survive Classic save');
@@ -162,6 +167,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
         await value('subtitle').fill('Block subtitle');
+        await page.locator('.alify-radio input[value="b"]').check();
         await page.locator('.alify-group [type="text"]').fill('Block profile');
         await page.locator('[data-row-action="add"]').click();
         await page.locator('.alify-row [type="text"]').fill('Block member');
@@ -204,6 +210,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.reload();
         check(await page.locator('.alify-group [type="text"]').inputValue(), 'Block profile', 'Group text survives actual Gutenberg REST save/reload');
         check(await page.locator('.alify-flex-row textarea').inputValue(), 'Gutenberg flexible body', 'Flexible content survives Gutenberg REST save/reload');
+        check(await page.locator('.alify-radio input:checked').inputValue(), 'b', 'Radio survives same-request Gutenberg REST save/reload');
         check(await value('details').inputValue(), 'Block ALL', 'ALL target survives Gutenberg REST save/reload');
         check(await value('alternate').inputValue(), 'Block ANY', 'ANY target survives Gutenberg REST save/reload');
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/block', 'Link components survive same-request Gutenberg REST save/reload');
@@ -224,7 +231,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 2, 'Row-bound schema exports as v2 for safe older-importer rejection');
-        check(exported.group.fields.length, 15, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 16, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
@@ -268,10 +275,12 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await chooseRelationship();
         await setRich('<p>Options <strong>copy</strong></p>');
         await optionValue('options_title').fill('Saved title');
+        await page.locator('.alify-radio input[value="a"]').check();
         await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).check();
         await page.locator('.alify-group [type="text"]').fill('Saved profile');
         await page.locator('[data-row-action="add"]').click(); await page.locator('.alify-row [type="text"]').fill('Option member');
         await saveOptions();
+        check(await page.locator('.alify-radio input:checked').inputValue(), 'a', 'Radio survives Options HTTP save/reload');
         check(page.url(), optionsURL, 'Options form redirects to its registered page');
         check(await page.locator('.notice-success').count(), 1, 'Actual options save shows success notice');
         check(await optionValue('options_related').inputValue(), String(fixture.reference), 'Selected post reference survives Options HTTP save/reload');

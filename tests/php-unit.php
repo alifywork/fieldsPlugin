@@ -728,4 +728,24 @@ $meta[10]['_alify_cf_related_list'] = array(802, 801, 801);
 same(array($posts[801]), alify_get_relationship('related_list', 10), 'Relationship getter omits unreadable objects and duplicates without changing storage');
 same(array(802, 801, 801), alify_get_field('related_list', 10), 'Filtered Relationship getter leaves raw IDs unchanged');
 $denied = array();
+$radio = field('mode', 'radio'); $radio['choices'] = "0 : Zero\na : Alpha\nb : Beta";
+same('Radio Button', Alify_CF::types()['radio'], 'Radio is a registered field type');
+same('0', Alify_CF::clean_value($radio, 0), 'Radio preserves zero choice key');
+same('a', Alify_CF::clean_value($radio, 'a'), 'Radio returns a single choice key');
+foreach (array('unknown', array(), array('a'), true, 1.5) as $bad) {
+    $errors = array(); same(array(), Alify_CF::validate_values(array($radio), array('mode' => $bad), array('mode' => 'b'), $errors), 'Malformed/unknown radio retains old value');
+    same(true, count($errors) > 0, 'Radio rejection reports error');
+}
+$errors = array(); same(array('mode' => ''), Alify_CF::validate_values(array($radio), array('mode' => ''), array('mode' => 'b'), $errors), 'Optional radio explicitly clears');
+$radio['required'] = true; $errors = array();
+same(array(), Alify_CF::validate_values(array($radio), array('mode' => ''), array('mode' => 'a'), $errors), 'Required radio rejects empty');
+$errors = array(); same(array('mode' => '0'), Alify_CF::validate_values(array($radio), array('mode' => '0'), array(), $errors), 'Required radio accepts zero');
+$radio_rows = field('radio_rows', 'repeater'); $radio_rows['sub_fields'] = array($radio);
+same(array(array('mode' => 'b')), Alify_CF_Repeater::clean($radio_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'mode' => 'b')))), 'Radio is a basic container subfield');
+$issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($radio_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'mode' => array()))), null, false, $issue, $location), 'Malformed radio rejects whole container');
+same(array('row' => 0, 'subfield' => 'mode'), $location, 'Radio rejection identifies exact subfield');
+$dependent = field('details'); $dependent['condition'] = array('field' => $radio['key'], 'operator' => 'equals', 'value' => '0');
+same(true, Alify_CF::visible($dependent, array($radio, $dependent), array($radio['key'] => '0')), 'Radio is a server condition source');
+same(false, Alify_CF::visible($dependent, array($radio, $dependent), array($radio['key'] => '')), 'Empty radio hides dependent');
 echo "PASS: $count PHP contract assertions\n";

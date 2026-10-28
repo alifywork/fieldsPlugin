@@ -73,6 +73,15 @@
         const url = root.querySelector('input[type="url"]');
         url.dispatchEvent(new Event('input', {bubbles: true})); url.focus();
     });
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-radio-clear]');
+        if (!button || button.disabled) return;
+        const root = button.closest('.alify-radio');
+        root.querySelectorAll('input[type="radio"]').forEach(input => { input.checked = false; });
+        root.querySelector('input[type="hidden"]').dispatchEvent(new Event('change', {bubbles: true}));
+        const first = root.querySelector('input[type="radio"]');
+        if (first) first.focus();
+    });
     function syncColor(event) {
         const root = event.target.closest('.alify-color');
         if (!root) return;
@@ -152,7 +161,7 @@
                             let values;
                             if (source.dataset.fieldType === 'gallery') {
                                 values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
-                            } else if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
+                            } else if (['checkbox', 'true_false', 'radio'].includes(source.dataset.fieldType)) {
                                 values = inputs.filter(input => input.checked).map(input => input.value);
                                 if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
                             } else values = inputs.length ? [inputs[0].value] : [''];

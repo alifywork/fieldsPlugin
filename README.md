@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.17.0 — ordered Relationship field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.18.0 — Radio Button field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Relationship, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -28,6 +28,21 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
+
+## Development queue
+
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Radio Button**. Next: **Button Group**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+
+## Radio Button field
+
+**Radio Button (`radio`)** stores one configured choice key as a string, or `''` when an optional selection is cleared. Define choices using `value : Label`, one per line; defaults must match a configured key. The key `0` is a valid selection, including for required fields.
+
+- Supported on posts, existing UI-enabled CPT editors, Options Pages and basic Group/Repeater/Flexible subfields. Dynamic rows receive independent radio group names/IDs.
+- Optional fields have **Clear selection**; required fields use native radio-group validation and reject empty server submissions. Native arrow-key behavior is retained.
+- Unknown keys, arrays, booleans and other malformed values are rejected by value validation. Existing scalar/container/Options data is retained under the normal save-safety contract.
+- Can be a conditional source or target. Browser rules read the checked radio, not the empty submission sentinel; hidden dependent values remain preserved.
+- Classic forms and the Gutenberg core-save bridge submit the same single-key contract. JSON transfers choice definitions/defaults/conditions and basic subfields; destination plugins need **0.18.0+**.
+- `alify_get_field('mode', $post_id)` / `alify_get_option('mode')` return the choice key, not its label. Custom “other” choices, horizontal layout and configurable return formats are not implemented yet.
 
 ## Relationship field
 
@@ -434,16 +449,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.17.0:
+Automated checks for 0.18.0:
 
 ```sh
 npm ci
-npm test       # 46 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 48 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 364 assertions with isolated WordPress stubs
+php tests/php-unit.php # 385 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 303 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 325 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|

@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -657,4 +657,30 @@ test('Relationship blocks additions at 50 without truncating selected IDs', () =
     const w = dom.window, root = w.document.querySelector('.alify-relationship'); w.eval(fs.readFileSync('assets/relationship.js', 'utf8'));
     for (let i = 1; i <= 51; i++) w.AlifyRelationship.add(root, i, 'Reference');
     assert.equal(root.querySelectorAll('.alify-relation-item').length, 50); assert.match(root.querySelector('.alify-post-status').textContent, /Maximum 50/); w.close();
+});
+
+test('Radio builder exposes choices, persists default and supports container subfields', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Mode'); set(w, 'type', 'radio');
+    assert.equal(d.querySelector('.alify-choices').hidden, false);
+    set(w, 'choices', '0 : Zero\na : Alpha'); set(w, 'default', '0');
+    assert.equal(schema(w)[0].type, 'radio'); assert.equal(schema(w)[0].default, '0');
+    set(w, 'type', 'repeater'); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'radio';
+    type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].type, 'radio'); w.close();
+});
+test('Radio conditions use checked choice, not empty sentinel; clearing updates conditions', () => {
+    const w = conditionalEditor('radio', 'equals', '0', '<fieldset class="alify-radio"><input type="hidden" name="mode" value=""><input type="radio" name="mode" value="a"><input type="radio" name="mode" value="0" checked><button type="button" data-radio-clear>Clear</button></fieldset>');
+    const d = w.document, target = d.querySelector('[data-field-key="target"]');
+    assert.equal(target.hidden, false);
+    d.querySelector('[data-radio-clear]').click();
+    assert.equal(d.querySelectorAll('input[type="radio"]:checked').length, 0);
+    assert.equal(target.hidden, true); assert.equal(target.querySelector('input').disabled, true);
+    const choice = d.querySelector('input[value="0"]'); choice.click();
+    assert.equal(target.hidden, false); assert.equal(target.querySelector('input').value, 'retained');
+    const form = d.createElement('form'); d.body.appendChild(form); form.appendChild(d.querySelector('.alify-radio'));
+    assert.equal(Array.from(new w.FormData(form).getAll('mode')).at(-1), '0');
+    form.querySelector('[data-radio-clear]').click();
+    assert.deepEqual(Array.from(new w.FormData(form).getAll('mode')), ['']); w.close();
 });
