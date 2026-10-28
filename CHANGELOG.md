@@ -5,7 +5,7 @@
 - Add independent sibling conditions to Group, Repeater and Flexible layout children: shared PHP/JS chains/operators, local graph/cycle checks, visible-only required checks, dynamic-row visibility and builder advanced JSON controls. No ancestor, other-row or nested-container scope.
 - Preserve editor hidden child values with row-origin MACs instead of positional guesses across sorting/duplication; reject stale origins and explicit API hidden changes atomically. Canonical API callers may explicitly retain unchanged hidden values. Add recursive schema JSON/Local JSON v11 gates; existing unconditioned child schemas retain their original shape.
 - Add optional explicit-consent Google Maps JavaScript/modern Places picker with map clicks, draggable point, stale-result protection, dynamic-row cleanup and manual fallback. Trusted configuration, browser-key/API/billing restrictions and per-page activation are required. No geolocation, background geocoding, new value shape or live-provider certification.
-- Local feature checks: 805 PHP contracts on both runtimes, 93 JS tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions. Native four-target CI verification pending at this commit.
+- Local feature checks: 805 PHP contracts on both runtimes, 93 JS tests, 1,041 minimum / 1,044 modern WordPress SQLite assertions. Verified in [CI run 40770133129](https://github.com/alifywork/fieldsPlugin/actions/runs/40770133129): all four native PHP/WordPress SQLite/MySQL targets pass, including real Chromium local-condition reorder/duplicate/new-row persistence and consent-triggered mocked Maps/Places selection/save/reload, with clean WordPress debug logs. Google provider responses remain controlled fixtures, not live-service certification.
 
 ## 0.32.0
 
