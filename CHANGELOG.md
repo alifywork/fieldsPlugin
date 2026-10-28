@@ -7,7 +7,7 @@
 - Share bounded PHP condition parsing/evaluation across Classic, REST publication, options and rejected-input recovery; retain hidden values even for forged payloads.
 - Validate every source, rejecting self-references, missing fields, conditional chains, container sources and nested/oversized rule sets.
 - Transfer compound conditions through the existing versioned JSON format; destination sites need compound support.
-- Expand PHP, jsdom, real WordPress and browser regression coverage. Subfield/layout conditions and nested rule groups remain out of scope.
+- Verify four native-PHP SQLite/MySQL CI targets: 178 backend and 40 real-browser assertions per target, plus 222 isolated PHP assertions and 28 jsdom tests. Subfield/layout conditions and nested rule groups remain out of scope.
 
 ## 0.9.0
 

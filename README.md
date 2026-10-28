@@ -331,12 +331,12 @@ Automated checks for 0.10.0:
 
 ```sh
 npm ci
-npm test       # 26 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 28 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 201 assertions with isolated WordPress stubs
+php tests/php-unit.php # 222 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 160 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 178 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -357,7 +357,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 160 backend and 30 Chromium assertions in [CI run 40669752864](https://github.com/alifywork/fieldsPlugin/actions/runs/40669752864), with clean debug-log checks. The browser checks include actual JSON transfer, Group media persistence, mixed Flexible layout ordering after Classic save and Flexible content persistence after Gutenberg save/reload. These remote results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 178 backend and 40 Chromium assertions in [CI run 40670562702](https://github.com/alifywork/fieldsPlugin/actions/runs/40670562702), with clean debug-log checks. The browser checks include JSON transfer, Group/Flexible persistence, live ALL/ANY visibility, disabled hidden required inputs, hidden-value retention and compound target persistence after Classic/Gutenberg save/reload. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 
