@@ -1,6 +1,6 @@
 <?php
 $root = getenv('ALIFY_WP_ROOT'); if (!$root || !is_file($root . '/wp-load.php')) { throw new RuntimeException('Disposable provider fixture required.'); }
-define('WP_ADMIN', true); $_SERVER['HTTP_HOST'] = 'alify.test'; $_SERVER['REQUEST_METHOD'] = 'GET'; $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1'; require $root . '/wp-load.php';
+define('WP_ADMIN', true); $_SERVER['REQUEST_URI'] = '/wp-admin/index.php'; $_SERVER['PHP_SELF'] = '/wp-admin/index.php'; $_SERVER['SCRIPT_NAME'] = '/wp-admin/index.php'; $_SERVER['HTTP_HOST'] = 'alify.test'; $_SERVER['REQUEST_METHOD'] = 'GET'; $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1'; require $root . '/wp-load.php';
 if (!defined('ALIFY_CF_TEST_SITE') || !ALIFY_CF_TEST_SITE || getenv('ALIFY_NATIVE_PROVIDERS') !== '1') { throw new RuntimeException('Refusing unmarked provider database.'); }
 $count = 0; function provider_same($a, $b, $label) { global $count; if ($a !== $b) { throw new RuntimeException($label . ': ' . var_export($b, true)); } $count++; }
 $admin = get_user_by('login', 'alify-test-admin'); wp_set_current_user($admin->ID); $posts = array(); $order = null;
@@ -30,5 +30,5 @@ try {
     $html = \Timber\Timber::compile_string('{{ "provider_text"|alify_public_field(post) }}', array('post' => $source)); provider_same('&lt;b&gt;Escaped public text&lt;/b&gt;', trim($html), 'Native Timber/Twig adapter retains HTML autoescaping');
     wp_update_post(array('ID' => $source, 'post_password' => 'fixture-password')); provider_same('', trim(\Timber\Timber::compile_string('{{ "provider_text"|alify_public_field(post) }}', array('post' => $source))), 'Native Timber adapter never exposes password-protected posts');
     $ability = wp_get_ability('alify/read-fields'); provider_same(true, is_object($ability), 'Native WordPress 6.9 ability registers with provider setup'); provider_same(true, is_array($ability->execute(array('post_id' => $target))), 'Native ability executes the permission-checked exposure reader');
-    echo "PASS: $count native WooCommerce HPOS / Polylang / Timber / Abilities assertions.\n";
+    echo "::notice title=Native provider checks::PASS: $count native WooCommerce HPOS / Polylang / Timber / Abilities assertions.\n";
 } finally { wp_set_current_user($admin->ID); $_POST = array(); if ($order && !is_wp_error($order)) { $order->delete(true); } foreach ($posts as $id) { wp_delete_post($id, true); } }
