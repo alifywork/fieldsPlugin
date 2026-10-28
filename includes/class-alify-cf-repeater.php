@@ -34,8 +34,8 @@ final class Alify_CF_Repeater {
             }
             $name = $field['name'] ?? ''; $type = $field['type'] ?? 'text';
             $key = sanitize_key($field['key'] ?? '') ?: 'field_' . wp_generate_uuid4();
-            if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || isset($keys[$key]) || trim($field['label'] ?? '') === '' || !isset(Alify_CF::types()[$type]) || in_array($type, array('repeater', 'group', 'flexible'), true) || !empty($field['condition'])) {
-                $errors[] = 'Container subfields need unique names/keys, labels and a basic type; nesting and subfield conditions are not supported.'; continue;
+            if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || isset($keys[$key]) || trim($field['label'] ?? '') === '' || !isset(Alify_CF::types()[$type]) || in_array($type, array('repeater', 'group', 'flexible', 'wysiwyg'), true) || !empty($field['condition'])) {
+                $errors[] = 'Container subfields need unique names/keys, labels and a supported basic type (rich-text editors excluded); nesting and subfield conditions are not supported.'; continue;
             }
             $names[$name] = true; $keys[$key] = true;
             $clean = array('name' => $name, 'key' => $key, 'type' => $type, 'label' => sanitize_text_field($field['label']), 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'required' => !empty($field['required']));

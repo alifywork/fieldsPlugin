@@ -21,3 +21,6 @@
 
 .alify-link { display: grid; grid-template-columns: minmax(80px, auto) minmax(0, 1fr); align-items: center; gap: 8px; }
 .alify-link [data-link-clear] { justify-self: start; }
+
+.alify-rich > [data-rich-enable] { margin-bottom: 8px; }
+.alify-rich textarea.alify-rich-text { width: 100%; font-family: monospace; }

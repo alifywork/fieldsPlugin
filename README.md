@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.14.0 — structured Link field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.15.0 — WYSIWYG rich-text field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Link, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Select, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -28,6 +28,25 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
+
+## WYSIWYG rich-text field
+
+**WYSIWYG Editor (`wysiwyg`)** is a top-level post/Options field. Start with the escaped HTML textarea, or choose **Enable Visual/Text editor** for WordPress's native TinyMCE/Quicktags interface: paragraphs/headings, bold/italic, lists, quotes, links and undo/redo. JavaScript/editor initialization is not required to submit the textarea fallback.
+
+- Visual content is synchronized to the real field before normal form submission and Gutenberg's same-request REST payload. Text-tab edits are not overwritten by the inactive Visual editor. Native editor instances are saved/removed/reinitialized around Classic metabox sorting.
+- All submitted HTML and defaults use **`wp_kses_post()`**, including administrator input; `unfiltered_html` does not bypass this field policy. Event handlers, executable URLs and disallowed elements are removed. No shortcodes, embeds, blocks or theme filters are executed by the field.
+- Empty paragraphs, NBSP and invisible spacing normalize to `''`. Required means **nonblank text**: formatting-only or media-only content does not satisfy it. Optional blank formatting explicitly clears; invalid non-string payloads are rejected. Existing saved-value retention/publication rules apply.
+- Recovery is separately KSES-filtered and escaped into the textarea. A hidden conditional rich field preserves its stored value. WYSIWYG can be a conditional target but **not a source**.
+- This increment excludes Group/Repeater/Flexible subfields, media-upload buttons and configurable toolbars. Unsupported rich subfields are rejected, not silently downgraded.
+- JSON transfers the field schema and sanitized HTML default only; destination plugins need **0.15.0+**.
+
+```php
+$html = alify_get_field('rich_copy', get_the_ID());
+// For Options: $html = alify_get_option('rich_copy', 'site');
+if (is_string($html)) {
+    echo wp_kses_post($html); // Deliberate HTML output; alify_the_field() still escapes as text.
+}
+```
 
 ## Link field
 
@@ -265,7 +284,7 @@ Rows are stored as a single ordered array in the repeater's post-meta value, usi
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers and structured Link fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
+- Each field supports **1–10 flat rules** with **ALL (AND)** or **ANY (OR)** matching. Use **Add Rule**, select sources/operators/values, then choose the match relation. Sources must be unconditional scalar/choice/media/gallery fields in the same field group; containers, structured Link fields and WYSIWYG fields cannot be sources. Nested rule groups, cross-group references and conditional chains are not implemented.
 - Existing single-rule schemas and JSON exports retain their original shape. Compound schemas use `condition: {relation: "all" | "any", rules: [...]}` and require version 0.10.0+ on the destination site. Each rule still uses `field`, `operator` and `value`.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
@@ -375,7 +394,7 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.14.0:
+Previous verified baseline (0.14.0; rich-text development checks extend it):
 
 ```sh
 npm ci

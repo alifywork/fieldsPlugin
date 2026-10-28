@@ -16,6 +16,16 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
     let checks = 0, persistenceChecks = 0;
     const check = (actual, expected, label) => { assert.deepEqual(actual, expected, label); checks++; };
     const value = name => page.locator(`[name="alify_values[${fixture.group}][${name}]"]`);
+    async function setRich(html) {
+        const textarea = page.locator('textarea[data-rich-editor]');
+        const id = await textarea.getAttribute('id');
+        await page.locator('[data-rich-enable]').click();
+        const visual = page.locator(`[id="${id}-tmce"]`);
+        if (await visual.count()) await visual.click();
+        await page.waitForFunction(id => window.tinymce && tinymce.get(id) && tinymce.get(id).initialized && !tinymce.get(id).isHidden(), id);
+        await page.evaluate(({id, html}) => tinymce.get(id).setContent(html), {id, html});
+        return id;
+    }
     async function saveClassic() { await Promise.all([page.waitForNavigation(), page.locator('#publish').click()]); }
     try {
         await page.goto(base + '/wp-login.php');
@@ -30,6 +40,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-link input[type="url"]').fill('https://example.com/path?q=1&b=2');
         await page.locator('.alify-link input[type="text"]').fill('Visit example');
         await page.locator('.alify-link select').selectOption('_blank');
+        await setRich('<p>Classic <strong>rich</strong></p>');
         await value('opens').fill('09:30');
         await value('subtitle').fill('Classic subtitle');
         await page.locator('.alify-group [type="text"]').fill('Classic profile');
@@ -79,6 +90,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
         check(await value('accent').inputValue(), '#2271b1', 'Color survives Classic save/reload');
         check(await value('opens').inputValue(), '09:30', 'Time survives Classic save/reload without conversion');
+        check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<strong>rich</strong>'), true, 'Native Visual editor synchronizes HTML on Classic form save');
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/path?q=1&b=2', 'Link URL survives actual Classic save/reload');
         check(await page.locator('.alify-link input[type="text"]').inputValue(), 'Visit example', 'Link title survives actual Classic save/reload');
         check(await page.locator('.alify-link select').inputValue(), '_blank', 'Link target survives actual Classic save/reload');
@@ -152,6 +164,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-group [type="checkbox"][value="a"]').check();
         await value('show_details').check();
         await value('details').fill('Block ALL'); await value('alternate').fill('Block ANY');
+        await setRich('<p>Block <em>rich</em></p>');
         await page.locator('.alify-link input[type="url"]').fill('https://example.com/block');
         await page.locator('.alify-link input[type="text"]').fill('Block link');
         await page.locator('.editor-post-publish-button').click();
@@ -163,6 +176,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('details').inputValue(), 'Block ALL', 'ALL target survives Gutenberg REST save/reload');
         check(await value('alternate').inputValue(), 'Block ANY', 'ANY target survives Gutenberg REST save/reload');
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/block', 'Link components survive same-request Gutenberg REST save/reload');
+        check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<em>rich</em>'), true, 'Native Visual editor synchronizes HTML into same-request Gutenberg payload');
         const bypass = await page.evaluate(async ({base, id}) => {
             const response = await fetch(base + '/?rest_route=/wp/v2/posts/' + id, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-WP-Nonce': wpApiSettings.nonce}, body: JSON.stringify({status: 'publish'})});
             return {status: response.status, body: await response.json()};
@@ -177,7 +191,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 2, 'Row-bound schema exports as v2 for safe older-importer rejection');
-        check(exported.group.fields.length, 12, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 13, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
@@ -213,10 +227,11 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const optionValue = name => page.locator(`[name="alify_values[${fixture.options_group}][${name}]"]`);
         const verifyOptions = phase => {
             const result = execFileSync(process.env.PHP_BIN || 'php', [path.join(__dirname, 'verify-options.php'), phase], {encoding: 'utf8'});
-            assert.match(result, /PASS: 3 HTTP options persistence assertions/); persistenceChecks += 3;
+            assert.match(result, /PASS: 4 HTTP options persistence assertions/); persistenceChecks += 4;
         };
         async function saveOptions() { await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save Settings', exact: true}).click()]); }
         await page.goto(optionsURL);
+        await setRich('<p>Options <strong>copy</strong></p>');
         await optionValue('options_title').fill('Saved title');
         await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).check();
         await page.locator('.alify-group [type="text"]').fill('Saved profile');
@@ -224,6 +239,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await saveOptions();
         check(page.url(), optionsURL, 'Options form redirects to its registered page');
         check(await page.locator('.notice-success').count(), 1, 'Actual options save shows success notice');
+        check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<strong>copy</strong>'), true, 'Native Visual editor synchronizes HTML into Options form save');
         verifyOptions('baseline');
         await optionValue('options_title').fill('Attempted title'); await page.locator('.alify-group [type="text"]').fill('Attempted profile');
         await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).uncheck();

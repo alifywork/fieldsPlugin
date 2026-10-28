@@ -46,6 +46,7 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'wysiwyg') { return is_string($raw) ? wp_kses_post(substr($raw, 0, 100000)) : ''; }
         if ($field['type'] === 'link') {
             if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1') { return $previous; }
             return array('url' => self::text($raw['url'] ?? ''), 'title' => self::text($raw['title'] ?? ''), 'target' => in_array($raw['target'] ?? '', array('', '_blank'), true) ? ($raw['target'] ?? '') : '');

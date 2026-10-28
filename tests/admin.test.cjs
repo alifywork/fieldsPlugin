@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -556,4 +556,34 @@ test('Link clear resets all components but preserves completion and focuses URL'
 test('Link builder hides unsupported defaults and serializes its type', () => {
     const w = builder(); w.document.getElementById('alify-add').click(); set(w, 'label', 'Call to action'); set(w, 'type', 'link');
     assert.equal(schema(w)[0].type, 'link'); assert.equal(w.document.querySelector('[data-prop="default"]'), null); w.close();
+});
+
+
+test('rich editor synchronizes Visual before form saves but preserves active Text-tab edits', () => {
+    const dom = new JSDOM('<form><div class="alify-rich"><button type="button" data-rich-enable>Enable</button><textarea id="rich" data-rich-editor>Original</textarea></div></form>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; let settings, active = false, hidden = false;
+    const textarea = d.getElementById('rich');
+    const editor = {isHidden: () => hidden, save: () => { textarea.value = '<p>Visual</p>'; }, focus: () => {}};
+    w.tinymce = {get: () => active ? editor : null};
+    w.wp = {editor: {initialize(id, config) { assert.equal(id, 'rich'); settings = config; active = true; }}};
+    w.eval(fs.readFileSync('assets/rich-text.js', 'utf8'));
+    d.querySelector('button').click(); assert.equal(settings.mediaButtons, false); assert.equal(settings.quicktags, true);
+    assert.equal(d.querySelector('button').hidden, true);
+    d.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); assert.equal(textarea.value, '<p>Visual</p>');
+    hidden = true; textarea.value = '<p>Text edit</p>'; w.AlifyRichText.sync(); assert.equal(textarea.value, '<p>Text edit</p>');
+    w.close();
+});
+
+test('Gutenberg payload flushes rich editors before serialization', async () => {
+    const w = editorBridge(), input = w.document.querySelector('[name="alify_values[7][title]"]'); let sent;
+    w.AlifyRichText = {sync() { input.value = '<p>Latest Visual content</p>'; }};
+    await w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, options => { sent = options; return Promise.resolve(); });
+    assert.equal(sent.data.alify_fields.groups['7'].title, '<p>Latest Visual content</p>'); w.close();
+});
+
+test('WYSIWYG builder uses multiline defaults and excludes rich subfields', () => {
+    const w = builder(); w.document.getElementById('alify-add').click(); set(w, 'label', 'Copy'); set(w, 'type', 'wysiwyg');
+    assert.equal(w.document.querySelector('[data-prop="default"]').tagName, 'TEXTAREA');
+    set(w, 'type', 'repeater'); w.document.querySelector('[data-sub-action="add"]').click();
+    assert.equal(w.document.querySelector('[data-sub-prop="type"] option[value="wysiwyg"]'), null); w.close();
 });

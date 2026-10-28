@@ -23,8 +23,10 @@
                 if (inside) { inside.hidden = false; inside.style.display = ''; }
             }
         }
-        target.focus();
-        if (target.scrollIntoView) target.scrollIntoView({block: 'center', behavior: 'auto'});
+        if (target.matches('[data-rich-editor]') && window.AlifyRichText) window.AlifyRichText.focus(target);
+        else target.focus();
+        const scrollTarget = target.matches('[data-rich-editor]') ? target.closest('.alify-rich') : target;
+        if (scrollTarget && scrollTarget.scrollIntoView) scrollTarget.scrollIntoView({block: 'center', behavior: 'auto'});
     }
     function showError(field, message, location) {
         const text = message.textContent;
@@ -54,7 +56,7 @@
             if (!ids.includes(description.id)) ids.push(description.id);
             control.setAttribute('aria-describedby', ids.join(' '));
         });
-        const target = controls[0] || message;
+        const target = controls.find(control => control.matches('[data-rich-editor]')) || controls[0] || message;
         if (target === message) message.tabIndex = -1;
         if (scope !== field) {
             const jump = document.createElement('button'); jump.type = 'button'; jump.className = 'button-link alify-error-jump'; jump.textContent = 'Go to invalid field';
@@ -145,7 +147,7 @@
                         if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
                         const source = fields.find(item => item.dataset.fieldKey === rule.field);
                         let matched = false;
-                        if (source && !['repeater', 'group', 'flexible', 'link'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
+                        if (source && !['repeater', 'group', 'flexible', 'link', 'wysiwyg'].includes(source.dataset.fieldType) && !JSON.parse(source.dataset.condition || 'null')) {
                             const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                             let values;
                             if (source.dataset.fieldType === 'gallery') {
@@ -161,11 +163,20 @@
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
                     visible = !!rules.length && (!rule.rules || ['all', 'any'].includes(rule.relation)) && validSources && (rule.relation === 'any' ? matches.some(Boolean) : matches.every(Boolean));
                 }
                 field.hidden = !visible;
-                field.querySelectorAll('input, select, textarea, button').forEach(input => { input.disabled = !visible; });
+                field.querySelectorAll('input, select, textarea, button').forEach(input => {
+                    if (field.dataset.fieldType === 'wysiwyg' && input.closest('.wp-editor-wrap')) {
+                        if (!visible) {
+                            if (!input.hasAttribute('data-alify-rich-disabled')) input.dataset.alifyRichDisabled = input.disabled ? '1' : '0';
+                            input.disabled = true;
+                        } else if (input.hasAttribute('data-alify-rich-disabled')) {
+                            input.disabled = input.dataset.alifyRichDisabled === '1'; delete input.dataset.alifyRichDisabled;
+                        }
+                    } else input.disabled = !visible;
+                });
                 field.querySelectorAll('.alify-repeater').forEach(refreshRows);
             });
         });

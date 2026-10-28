@@ -2,6 +2,7 @@
 (function () {
     'use strict';
     function payload() {
+        if (window.AlifyRichText) window.AlifyRichText.sync();
         const root = Object.create(null);
         document.querySelectorAll('.alify-values [name]').forEach(input => {
             if (input.disabled || (['checkbox', 'radio'].includes(input.type) && !input.checked) || ['button', 'submit'].includes(input.type)) return;

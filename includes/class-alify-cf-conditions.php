@@ -34,7 +34,7 @@ final class Alify_CF_Conditions {
             if (!is_array($rule) || !is_string($rule['field'] ?? null) || !is_string($rule['operator'] ?? null) || !is_string($rule['value'] ?? null)) { return false; }
             $source = null;
             foreach ($schema as $candidate) { if ($candidate['key'] === $rule['field']) { $source = $candidate; break; } }
-            if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link'), true) || !empty($source['condition']) || $source['key'] === $field['key']) { return false; }
+            if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg'), true) || !empty($source['condition']) || $source['key'] === $field['key']) { return false; }
             $value = $values[$source['key']] ?? '';
             $items = is_array($value) ? array_map('strval', array_filter($value, 'is_scalar')) : array((string) $value);
             $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0'));

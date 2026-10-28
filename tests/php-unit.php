@@ -6,6 +6,8 @@ function wp_is_post_revision($id) { return false; }
 function current_user_can($cap, $id = 0) { global $allowed, $denied; return $allowed && !in_array($id, $denied, true); }
 function wp_verify_nonce($nonce, $action) { return $nonce === 'valid'; }
 function sanitize_text_field($s) { return is_scalar($s) ? trim(strip_tags((string) $s)) : ''; }
+// Isolated format stub only; real WordPress integration verifies KSES security.
+function wp_kses_post($s) { return strip_tags($s, '<p><strong><em><a><ul><ol><li><br>'); }
 function sanitize_textarea_field($s) { return sanitize_text_field($s); }
 function sanitize_key($s) { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($s)); }
 function wp_unslash($s) { return is_array($s) ? array_map('wp_unslash', $s) : (is_string($s) ? stripslashes($s) : $s); }
@@ -672,4 +674,17 @@ same(array(), alify_get_link('missing_link', 10), 'Typed link getter returns emp
 $errors = array(); $link_target = field('details'); $link_target['condition'] = array('field' => 'field_cta', 'operator' => 'not_empty', 'value' => '');
 Alify_CF::validate_schema(array(field('cta', 'link'), $link_target), 'post', 0, $errors);
 same(true, (bool) $errors, 'Link cannot be an ambiguous conditional source');
+$rich = field('copy', 'wysiwyg');
+same('<p>Hello <strong>world</strong></p>', Alify_CF::clean_value($rich, '<p>Hello <strong>world</strong></p>'), 'WYSIWYG preserves permitted markup');
+foreach (array('', '<p><br></p>', '<p>&nbsp;</p>', '<p>&#8203;</p>', "<p>\n </p>") as $empty_html) {
+    same('', Alify_CF::clean_value($rich, $empty_html), 'Empty formatting normalizes to empty rich text');
+}
+$errors = array(); same(array('copy' => ''), Alify_CF::validate_values(array($rich), array('copy' => '<p><br></p>'), array('copy' => 'Old'), $errors), 'Optional rich text explicitly clears empty formatting');
+$rich['required'] = true; $errors = array();
+same(array(), Alify_CF::validate_values(array($rich), array('copy' => '<p>&nbsp;</p>'), array('copy' => 'Old'), $errors), 'Required rich text rejects blank formatting');
+$rich['required'] = false; $errors = array();
+same(array(), Alify_CF::validate_values(array($rich), array('copy' => array()), array('copy' => 'Old'), $errors), 'Rich text rejects structured payloads even when optional');
+$errors = array(); Alify_CF_Repeater::schema(array($rich), $errors); same(true, (bool) $errors, 'Dynamic containers reject unsupported rich-text subfields');
+$target = field('conditional_copy'); $target['condition'] = array('field' => 'field_copy', 'operator' => 'not_empty', 'value' => ''); $errors = array();
+Alify_CF::validate_schema(array($rich, $target), 'post', 0, $errors); same(true, (bool) $errors, 'Rich text cannot be an ambiguous condition source');
 echo "PASS: $count PHP contract assertions\n";
