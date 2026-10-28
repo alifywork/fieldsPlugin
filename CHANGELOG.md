@@ -5,7 +5,7 @@
 - Add Date Time (`date_time`) with native second-precision editing and canonical `YYYY-MM-DD HH:MM:SS` strings. Accept native `T`/canonical space separators; omitted seconds become `00`.
 - Define floating wall-clock semantics: no timezone/offset/UTC conversion, no implicit DST normalization. Validate real Gregorian dates in years 1000–9999 and reject malformed values, offsets, fractions and invalid defaults.
 - Integrate posts/Options/basic containers, required/optional clearing, canonical conditional sources/targets, core REST validation and schema JSON. Recover unrepresentable invalid inputs from saved values/containers instead of accidental blanks.
-- Local feature checks: 572 PHP assertions, 60 JS tests and 433 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser verification is recorded after completion.
+- All four existing native-PHP targets pass: 433 backend, 141 browser and 24 HTTP persistence assertions, plus 572 isolated PHP assertions and 60 JS tests. Both local PHP-WASM/SQLite targets also pass 433 backend assertions. Verified in CI run 40703913791.
 - Complete Combined Date Time increment; next is configurable Date/Time display and return formats.
 
 ## 0.21.0

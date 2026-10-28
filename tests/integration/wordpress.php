@@ -952,13 +952,13 @@ try {
     expect_same('2024-02-29 09:30:00', Alify_CF::schema($diagnostic_group)[0]['default'], 'Date Time default survives schema validation');
     $date_time_data = array('date_time_mode' => '2024-02-29T09:30', 'date_time_object' => array('__complete' => '1', 'fields' => array('date_time_mode' => '2026-10-28 16:45:59')), 'date_time_rows' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'date_time_mode' => '2024-02-29T09:30:45'))), 'date_time_blocks' => array('__complete' => '1', 'rows' => array(array('layout' => 'date_time', '__complete' => '1', 'fields' => array('date_time_mode' => '2024-02-29T09:30')))), 'date_time_details' => 'forged hidden value');
     save_values($diagnostic_post, $diagnostic_group, $date_time_data);
-    expect_same('2024-02-29 09:30:00', alify_get_field('date_time_mode', $diagnostic_post), 'Required Date Time persists zero key');
+    expect_same('2024-02-29 09:30:00', alify_get_field('date_time_mode', $diagnostic_post), 'Required Date Time persists canonical seconds');
     expect_same(array('date_time_mode' => '2026-10-28 16:45:59'), alify_get_group('date_time_object', $diagnostic_post), 'Date Time works in Group');
     expect_same(array(array('date_time_mode' => '2024-02-29 09:30:45')), alify_get_rows('date_time_rows', $diagnostic_post), 'Date Time works in Repeater');
     expect_same(array(array('layout' => 'date_time', 'fields' => array('date_time_mode' => '2024-02-29 09:30:00'))), alify_get_layouts('date_time_blocks', $diagnostic_post), 'Date Time works in Flexible');
     expect_same(null, alify_get_field('date_time_details', $diagnostic_post), 'Date Time source hides dependent and ignores forged input');
     $date_time_bad = $date_time_data; $date_time_bad['date_time_mode'] = 'unknown'; save_values($diagnostic_post, $diagnostic_group, $date_time_bad);
-    expect_same('2024-02-29 09:30:00', alify_get_field('date_time_mode', $diagnostic_post), 'Unknown Date Time key retains previous value');
+    expect_same('2024-02-29 09:30:00', alify_get_field('date_time_mode', $diagnostic_post), 'Malformed Date Time retains previous value');
     $date_time_bad = $date_time_data; $date_time_bad['date_time_rows']['rows'][0]['date_time_mode'] = array(); save_values($diagnostic_post, $diagnostic_group, $date_time_bad);
     expect_same(array(array('date_time_mode' => '2024-02-29 09:30:45')), alify_get_rows('date_time_rows', $diagnostic_post), 'Malformed Date Time subfield retains entire Repeater');
     $date_time_bad = $date_time_data; $date_time_bad['date_time_mode'] = ''; save_values($diagnostic_post, $diagnostic_group, $date_time_bad);
@@ -983,7 +983,7 @@ try {
     configure_group($diagnostic_options, $date_time_schema, 'options:diagnostics');
     $diagnostic_request['alify_values'] = array($diagnostic_options => $date_time_data); $diagnostic_errors = array();
     expect_same(true, Alify_CF_Options::save('diagnostics', $diagnostic_request, $diagnostic_errors), 'Options supports Date Time and containers');
-    expect_same('2024-02-29 09:30:00', alify_get_option('date_time_mode', 'diagnostics'), 'Options Date Time stores zero');
+    expect_same('2024-02-29 09:30:00', alify_get_option('date_time_mode', 'diagnostics'), 'Options Date Time stores canonical wall-clock value');
     $date_time_saved = Alify_CF_Options::data('diagnostics'); $diagnostic_request['alify_values'][$diagnostic_options] = $date_time_bad;
     expect_same(false, Alify_CF_Options::save('diagnostics', $diagnostic_request, $diagnostic_errors), 'Options rejects malformed Date Time');
     expect_same($date_time_saved, Alify_CF_Options::data('diagnostics'), 'Invalid Date Time preserves whole Options page');
