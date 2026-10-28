@@ -23,9 +23,16 @@ final class Alify_CF_Transfer {
         $location = get_post_meta($id, Alify_CF::LOCATION, true);
         $errors = array(); $fields = Alify_CF::validate_schema(Alify_CF::schema($id), $location, $id, $errors);
         if ($errors) { return new WP_Error('alify_transfer_schema', implode(' ', $errors)); }
-        $json = wp_json_encode(array('format' => 'alify-custom-field', 'version' => 1, 'group' => array('title' => $post->post_title, 'location' => $location, 'fields' => self::portable($fields))), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = wp_json_encode(array('format' => 'alify-custom-field', 'version' => self::version($fields), 'group' => array('title' => $post->post_title, 'location' => $location, 'fields' => self::portable($fields))), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if (!is_string($json) || strlen($json) > self::MAX_BYTES) { return new WP_Error('alify_transfer_size', 'Export exceeds the 1 MiB transfer limit.'); }
         return $json;
+    }
+    /** Older importers must reject row-bound schemas rather than silently drop their limits. */
+    private static function version($fields) {
+        foreach ($fields as $field) {
+            if ($field['type'] === 'repeater' && (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field))) { return 2; }
+        }
+        return 1;
     }
     private static function portable($fields) {
         foreach ($fields as &$field) {
@@ -49,7 +56,7 @@ final class Alify_CF_Transfer {
         if (is_wp_error($auth)) { return $auth; }
         if (!is_string($json) || strlen($json) > self::MAX_BYTES || trim($json) === '') { return new WP_Error('alify_transfer_size', 'Provide JSON no larger than 1 MiB.'); }
         $object = json_decode($json, false, 32);
-        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || ($object->version ?? null) !== 1 || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
+        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
             return new WP_Error('alify_transfer_format', 'Invalid Alify JSON or unsupported format version.');
         }
         $group = json_decode($json, true, 32)['group'];

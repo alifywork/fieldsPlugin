@@ -453,7 +453,9 @@ try {
     $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($limit_group => array('__group_complete' => '1', 'limited_team' => $limit_one))));
     expect_same(200, rest_do_request($request)->get_status(), 'Valid bounded repeater accepted by REST');
     expect_same(array(array('name' => 'First')), alify_get_rows('limited_team', $limit_rest), 'REST stores only complete validated row list');
-    $limit_json = Alify_CF_Transfer::export_json($limit_group, $export_nonce); $limit_doc = json_decode($limit_json, true); $limit_doc['group']['location'] = 'options:row-limits';
+    $limit_json = Alify_CF_Transfer::export_json($limit_group, $export_nonce);
+    expect_same(2, json_decode($limit_json, true)['version'], 'Bounded repeater export uses v2 so older importers reject rather than drop limits');
+    $limit_doc = json_decode($limit_json, true); $limit_doc['group']['location'] = 'options:row-limits';
     Alify_CF_Options::register('row-limits', 'Row limits');
     $limit_options = Alify_CF_Transfer::import_json(wp_json_encode($limit_doc), $import_nonce); $fixtures[] = $limit_options;
     expect_same(Alify_CF::schema($limit_group), Alify_CF::schema($limit_options), 'Configured repeater limits round trip through JSON');

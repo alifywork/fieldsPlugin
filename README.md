@@ -294,7 +294,7 @@ $settings = alify_get_option('profile', 'site');
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
 
-- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`), one group per document, maximum **1 MiB**. Not an ACF JSON importer.
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1` or `2`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; legacy schemas continue to export as version 1.
 - Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
 - Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
 - Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
