@@ -8,8 +8,8 @@ require $root . '/wp-load.php'; if (!defined('ALIFY_CF_TEST_SITE') || !ALIFY_CF_
 require_once ABSPATH . 'wp-admin/includes/plugin.php'; $admin = get_user_by('login', 'alify-test-admin'); wp_set_current_user($admin->ID);
 foreach (array('woocommerce/woocommerce.php', 'polylang/polylang.php') as $plugin) { $result = activate_plugin($plugin); if (is_wp_error($result)) { throw new RuntimeException($result->get_error_message()); } }
 // Finish the vendor's initial cron setup after init, before the next plugins_loaded pass.
-// Otherwise Jetpack schedules its first nonce cleanup before Woo's translated cron labels are available.
-(new Automattic\Jetpack\Connection\Nonce_Handler())->init_schedule();
+// Otherwise Jetpack schedules first nonce/heartbeat jobs before Woo's translated cron labels are available.
+Automattic\Jetpack\Connection\Manager::configure();
 if (!wp_next_scheduled('jetpack_clean_nonces')) { throw new RuntimeException('Vendor cron fixture initialization failed.'); }
 update_option('woocommerce_custom_orders_table_enabled', 'yes'); update_option('woocommerce_custom_orders_table_data_sync_enabled', 'no');
 echo "::notice title=Native provider setup::PASS: native provider plugins activated for isolated adapter fixtures.\n";
