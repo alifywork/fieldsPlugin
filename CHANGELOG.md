@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.3
+
+- Add native MySQL 8.0 CI targets for both PHP/WordPress pairs, including backend assertions and real Chromium Classic/Gutenberg/media flows alongside SQLite.
+- Add an explicit MySQL runner opt-in, loopback/test-database-name guards, separate fixture directories and rejection of database drop-ins.
+- Assert the actual database driver during installation and print the database server version, preventing accidental SQLite substitution.
+- Add eight database-runner refusal tests; database credentials are supplied through the environment rather than committed configuration.
+- MariaDB and wider database versions remain unverified; this increment does not add JSON import/export yet.
+
 ## 0.6.2
 
 - Validate Classic publication/scheduling/private transitions against active field groups; preserve existing public status on invalid edits rather than silently unpublishing content.

@@ -11,8 +11,37 @@ jobs:
         include:
           - php: '7.4'
             wordpress: '6.2'
+            database: sqlite
           - php: '8.3'
             wordpress: '6.8.3'
+            database: sqlite
+          - php: '7.4'
+            wordpress: '6.2'
+            database: mysql
+          - php: '8.3'
+            wordpress: '6.8.3'
+            database: mysql
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: alify-ci-root
+          MYSQL_DATABASE: alify_test
+          MYSQL_USER: alify_test
+          MYSQL_PASSWORD: alify-ci-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -palify-ci-root"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      DB_ENGINE: ${{ matrix.database }}
+      ALIFY_TEST_DIR: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}-${{ matrix.database }}
+      ALIFY_ALLOW_MYSQL_TESTS: '1'
+      ALIFY_MYSQL_HOST: 127.0.0.1:3306
+      ALIFY_MYSQL_DATABASE: alify_test
+      ALIFY_MYSQL_USER: alify_test
+      ALIFY_MYSQL_PASSWORD: alify-ci-only
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -30,7 +59,9 @@ jobs:
         run: |
           find . -path ./node_modules -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l
           php tests/php-unit.php
-      - name: Real WordPress integration (SQLite)
+      - name: Database runner safety guards
+        run: bash tests/integration/guards.sh
+      - name: Real WordPress integration (${{ matrix.database }})
         env:
           WP_VERSION: ${{ matrix.wordpress }}
         run: bash tests/integration/run.sh
@@ -38,8 +69,8 @@ jobs:
         run: npx playwright-core install --with-deps chromium
       - name: Real browser Classic and Gutenberg flows
         env:
-          ALIFY_WP_ROOT: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}/wordpress
-          ALIFY_BROWSER_FIXTURE: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}/browser.json
+          ALIFY_WP_ROOT: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}-${{ matrix.database }}/wordpress
+          ALIFY_BROWSER_FIXTURE: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}-${{ matrix.database }}/browser.json
         run: |
           php tests/browser/seed.php
           php -S 0.0.0.0:8080 -t "$ALIFY_WP_ROOT" tests/browser/router.php > /tmp/alify-browser-server.log 2>&1 &

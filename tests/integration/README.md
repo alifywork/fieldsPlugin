@@ -32,6 +32,25 @@ These are explicit test targets, **not a claim that 6.8.3 is the latest WordPres
 
 Coverage includes activation persistence, init registration, all 13 field schemas, Unicode/quotes/backslashes, scalar and serialized metadata types, galleries/repeaters, cleared toggles/checkboxes, real nonce rejection, revision-save guards, editor/anonymous access checks, hidden-field preservation, options isolation/atomicity/autoload, real options form rendering, inline validation, rejected-input recovery/clearing, user isolation and stale-schema recovery rejection. Publication regressions cover Classic invalid/valid publish and schedule transitions, existing-public status preservation, REST pre-write rejection, same-request values, omitted payloads, new-post creation, authentication, write-only responses and autosaves.
 
+## Native MySQL 8 CI target
+
+The CI matrix also runs the same backend and Chromium suites against a disposable **MySQL 8.0** service, on both PHP/WordPress pairs. This is separate from the locally observed SQLite results above. No MySQL server/native PHP is installed in the Arena sandbox; MySQL results must come from the actual CI jobs.
+
+For a local native-PHP run, first create a dedicated empty database and least-privileged database user on a local MySQL instance, then export:
+
+```sh
+export DB_ENGINE=mysql ALIFY_ALLOW_MYSQL_TESTS=1
+export ALIFY_MYSQL_HOST=127.0.0.1:3306
+export ALIFY_MYSQL_DATABASE=alify_test
+export ALIFY_MYSQL_USER=alify_test
+# Set ALIFY_MYSQL_PASSWORD in your shell without committing it or sharing it.
+bash tests/integration/run.sh
+```
+
+The runner never creates/drops a MySQL database. It installs WordPress tables and mutates fixtures inside the supplied database. Opt-in, an `alify_test`-prefixed database name, explicit loopback host and supplied credentials are mandatory. These guards reduce mistakes; they cannot prove a database is disposable. **Never point this at valuable data or a production tunnel.** `bash tests/integration/guards.sh` checks eight refusal paths without connecting or cloning.
+
+MySQL defaults to a separate `$HOME/.cache/alify-cf-integration-{WP_VERSION}-mysql` directory and refuses an existing database drop-in, preventing SQLite from silently standing in for MySQL. Installation verifies the expected database driver and prints the actual server version. Keep the exported environment available to subsequent PHP seed/server/cleanup processes; the generated disposable config reads it at runtime. For browser testing, set `ALIFY_WP_ROOT`/`ALIFY_BROWSER_FIXTURE` to this MySQL directory instead of the SQLite directory.
+
 ## Real Chromium browser suite
 
 After running the integration installer, install browser dependencies and seed the **marked disposable** site:
@@ -57,7 +76,7 @@ Use only a disposable test server; never expose this setup as a production servi
 
 ## Still pending
 
-- Native MySQL/MariaDB integration runs (SQLite is a translation layer).
+- MariaDB and database versions beyond the explicit MySQL 8.0 CI target.
 - Options-page HTTP redirects, repeater image-subfield media selection, drag sorting, responsive/accessibility audits and individual repeater-subfield error highlighting.
 - Direct SQL/`wp_publish_post()`/cron/custom publishing-pipeline policy enforcement: the current gate covers Classic insertion/update hooks and core post REST saves, not every possible status mutation.
 - Wider compatibility matrix, multisite and third-party plugin/theme interactions.

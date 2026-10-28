@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.2 — publication validation and real-browser coverage**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.3 — native MySQL verification matrix**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -275,7 +275,7 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 ## Verification
 
-Automated checks for 0.6.2:
+Automated checks for 0.6.3:
 
 ```sh
 npm ci
@@ -303,7 +303,9 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Real Chromium:** 14 end-to-end assertions passed locally on WordPress 6.8.3 / PHP.wasm 8.3.33, including Classic rejection/redirect/correction, Gutenberg REST rejection/correction, native media-modal gallery selection, gallery/repeater ordering after save/reload, and raw REST publication protection. Repeatable browser seed/cleanup scripts and native-PHP CI steps cover both matrix targets; see the integration guide.
 
-**Still pending:** MySQL/MariaDB, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
+**Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
+
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. Local sandbox checks do not substitute for the MySQL CI results.
 
 ### Manual staging checklist
 
