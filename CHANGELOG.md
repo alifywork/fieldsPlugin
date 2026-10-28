@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2
+
+- Validate Classic publication/scheduling/private transitions against active field groups; preserve existing public status on invalid edits rather than silently unpublishing content.
+- Bridge Gutenberg metabox values into the same core REST request and reject invalid saves before writing the post; validate saved/default values when a publication request omits fields.
+- Return structured REST errors and show inline editor feedback, retaining core authentication/capability checks and normal autosave availability.
+- Require complete metabox-group markers before saving values; preserve scalar values on incomplete submissions.
+- Add guarded disposable browser fixtures and 14 real-Chromium assertions covering Classic/Gutenberg publication, the native media modal and persisted gallery/repeater order.
+- Add Chromium flows to the native-PHP CI matrix and expand backend WordPress coverage to 80 assertions per target, isolated PHP coverage to 160, and jsdom coverage to 23 tests.
+- MySQL/MariaDB, wider compatibility and options-page browser flows remain pending. This is not a universal gate for direct SQL/cron/custom publishing pipelines.
+
 ## 0.6.1
 
 - Add real WordPress integration tests with disposable SQLite-backed installations and native-PHP GitHub Actions matrix configuration.

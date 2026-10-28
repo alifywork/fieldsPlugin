@@ -31,6 +31,7 @@ function configure_group($id, $fields, $location = 'post') {
     return wp_update_post(array('ID' => $id, 'post_status' => 'publish'), true);
 }
 function save_values($id, $group, $values, $status = 'draft') {
+    $values['__group_complete'] = '1';
     $_POST = wp_slash(array('alify_values_nonce_' . $group => wp_create_nonce('alify_values_' . $id . '_' . $group), 'alify_values' => array($group => $values)));
     return wp_update_post(array('ID' => $id, 'post_status' => $status), true);
 }
@@ -41,7 +42,7 @@ expect_same(true, is_plugin_active('alify-custom-field/alify-custom-field.php'),
 expect_same(true, post_type_exists(Alify_CF::GROUP), 'CPT registered on normal init');
 expect_same(true, current_user_can('edit_posts', Alify_CF::GROUP), 'Admin can manage content');
 $group = fixture_post(Alify_CF::GROUP);
-$post = fixture_post();
+$post = fixture_post(); $initial_post_id = $post;
 $image = wp_insert_attachment(array('post_title' => 'Fixture image', 'post_mime_type' => 'image/png', 'post_status' => 'inherit'), false, $post, true);
 $pdf = wp_insert_attachment(array('post_title' => 'Fixture PDF', 'post_mime_type' => 'application/pdf', 'post_status' => 'inherit'), false, $post, true);
 $fixtures[] = $image; $fixtures[] = $pdf;
@@ -153,11 +154,72 @@ try {
     // Drafting a group removes it from its assigned screen.
     $_POST = array(); wp_update_post(array('ID' => $group, 'post_status' => 'draft'));
     expect_same(array(), Alify_CF::groups('options:site'), 'Draft groups do not render');
+    // Publication transitions and the Gutenberg same-request field bridge.
+    $gate_fields = array(test_field('publish_text', 'text', true), test_field('publish_tags', 'checkbox', true), test_field('publish_photos', 'gallery'), $rows);
+    $show = test_field('publish_show', 'true_false'); $detail = test_field('publish_detail', 'text', true);
+    $detail['condition'] = array('field' => $show['key'], 'operator' => 'equals', 'value' => '1');
+    $gate_fields[] = $show; $gate_fields[] = $detail;
+    configure_group($group, $gate_fields, 'post');
+    $publication = fixture_post();
+    $gate_values = array('__group_complete' => '1', 'publish_text' => 'Ready', 'publish_tags' => array('a'), 'publish_photos' => array('__complete' => '1'), 'team' => array('__complete' => '1'));
+    $bad_gate = $gate_values; $bad_gate['publish_text'] = '';
+    save_values($publication, $group, $bad_gate, 'publish');
+    expect_same('draft', get_post_status($publication), 'Classic invalid publish stays draft');
+    expect_same(true, (bool) get_transient('alify_cf_publication_' . $admin->ID . '_' . $publication), 'Classic publication notice recorded');
+    save_values($publication, $group, $gate_values, 'publish');
+    expect_same('publish', get_post_status($publication), 'Classic correction publishes');
+    expect_same('Ready', alify_get_field('publish_text', $publication), 'Classic publication saves valid fields');
+    save_values($publication, $group, $bad_gate, 'publish');
+    expect_same('publish', get_post_status($publication), 'Invalid edit never unpublishes existing content');
+    expect_same('Ready', alify_get_field('publish_text', $publication), 'Invalid published edit retains previous field value');
+    $scheduled = fixture_post();
+    $_POST = wp_slash(array('alify_values_nonce_' . $group => wp_create_nonce('alify_values_' . $scheduled . '_' . $group), 'alify_values' => array($group => $bad_gate)));
+    wp_update_post(array('ID' => $scheduled, 'post_status' => 'future', 'post_date' => gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS), 'post_date_gmt' => gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS)));
+    expect_same('draft', get_post_status($scheduled), 'Invalid scheduling stays draft');
+    $_POST = wp_slash(array('alify_values_nonce_' . $group => wp_create_nonce('alify_values_' . $scheduled . '_' . $group), 'alify_values' => array($group => $gate_values)));
+    wp_update_post(array('ID' => $scheduled, 'post_status' => 'future', 'post_date' => gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS), 'post_date_gmt' => gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS)));
+    expect_same('future', get_post_status($scheduled), 'Valid scheduling accepted');
+    $rest_post = fixture_post(); $_POST = array();
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $rest_post); $request->set_param('status', 'publish');
+    $response = rest_do_request($request);
+    expect_same(400, $response->get_status(), 'REST publish without fields checks saved required values');
+    expect_same('alify_invalid_fields', $response->get_data()['code'], 'Structured REST validation code');
+    expect_same('draft', get_post_status($rest_post), 'Rejected REST publish does not change status');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $rest_post); $request->set_param('status', 'publish');
+    $request->set_param('title', 'Must not persist'); $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($group => $bad_gate)));
+    $response = rest_do_request($request);
+    expect_same(400, $response->get_status(), 'REST invalid submitted fields rejected before post write');
+    expect_same(false, get_the_title($rest_post) === 'Must not persist', 'Rejected REST request preserves post title');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $rest_post); $request->set_param('status', 'draft');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($group => $gate_values)));
+    $response = rest_do_request($request);
+    expect_same(200, $response->get_status(), 'Valid Gutenberg-style draft request succeeds');
+    expect_same('Ready', alify_get_field('publish_text', $rest_post), 'REST field values persist in same request');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $rest_post); $request->set_param('status', 'publish');
+    $response = rest_do_request($request);
+    expect_same(200, $response->get_status(), 'REST can publish valid saved fields without resubmitting');
+    expect_same('publish', get_post_status($rest_post), 'REST publication persisted');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts'); $request->set_param('title', 'REST create'); $request->set_param('status', 'publish');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($group => $gate_values)));
+    $response = rest_do_request($request);
+    expect_same(201, $response->get_status(), 'REST creation with valid fields succeeds');
+    $created = $response->get_data()['id']; $fixtures[] = $created;
+    expect_same('Ready', alify_get_field('publish_text', $created), 'Created REST post has its field values');
+    expect_same(false, isset($response->get_data()['alify_fields']), 'Write bridge does not expose a public value read API');
+    wp_set_current_user(0);
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $rest_post); $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($group => $gate_values)));
+    expect_same(401, rest_do_request($request)->get_status(), 'REST bridge still requires core authentication');
+    wp_set_current_user($admin->ID);
+    $autosave_post = fixture_post(); $_POST = array();
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
+    $response = rest_do_request($request);
+    expect_same(true, in_array($response->get_status(), array(200, 201), true), 'Autosaves remain available before required fields are completed');
+    expect_same(false, metadata_exists('post', $autosave_post, '_alify_cf_publish_text'), 'Autosave does not write missing custom field values');
     echo "PASS: $count real WordPress assertions; WordPress $wp_version; PHP " . PHP_VERSION . '; ' . get_class($wpdb) . "\n";
 } finally {
     wp_set_current_user($admin->ID); $_POST = array();
     foreach (array_reverse($fixtures) as $id) { wp_delete_post($id, true); }
     delete_option('alify_cf_options_site');
-    Alify_CF_Feedback::put('post_' . $post, array()); Alify_CF_Feedback::put('options_site', array());
+    Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }

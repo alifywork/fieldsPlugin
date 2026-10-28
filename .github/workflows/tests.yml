@@ -34,3 +34,17 @@ jobs:
         env:
           WP_VERSION: ${{ matrix.wordpress }}
         run: bash tests/integration/run.sh
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: Real browser Classic and Gutenberg flows
+        env:
+          ALIFY_WP_ROOT: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}/wordpress
+          ALIFY_BROWSER_FIXTURE: /home/runner/.cache/alify-cf-integration-${{ matrix.wordpress }}/browser.json
+        run: |
+          php tests/browser/seed.php
+          php -S 0.0.0.0:8080 -t "$ALIFY_WP_ROOT" tests/browser/router.php > /tmp/alify-browser-server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true; php tests/browser/cleanup.php' EXIT
+          node -e 'const http=require("http"); let tries=0; function ready(){http.get("http://127.0.0.1:8080/wp-login.php", r=>{r.resume(); if(r.statusCode!==200)process.exit(1)}).on("error",()=>{if(++tries>30)process.exit(1);setTimeout(ready,1000)})} ready()'
+          npm run test:browser
+          test ! -s "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log" || { cat "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log"; exit 1; }

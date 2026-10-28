@@ -25,18 +25,41 @@ The GitHub Actions workflow runs this suite using native PHP. In the Arena sandb
 
 | WordPress | PHP runtime | Database | Result |
 |---|---|---|---|
-| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB | 57 assertions passed, clean debug log |
-| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB | 57 assertions passed, clean debug log |
+| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB | 80 assertions passed, clean debug log |
+| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB | 80 assertions passed, clean debug log |
 
 These are explicit test targets, **not a claim that 6.8.3 is the latest WordPress release**, or a recommendation to deploy an old version. Keep production WordPress/PHP patched.
 
-Coverage includes activation persistence, init registration, all 13 field schemas, Unicode/quotes/backslashes, scalar and serialized metadata types, galleries/repeaters, cleared toggles/checkboxes, real nonce rejection, revision-save guards, editor/anonymous access checks, hidden-field preservation, options isolation/atomicity/autoload, real options form rendering, inline validation, rejected-input recovery/clearing, user isolation and stale-schema recovery rejection.
+Coverage includes activation persistence, init registration, all 13 field schemas, Unicode/quotes/backslashes, scalar and serialized metadata types, galleries/repeaters, cleared toggles/checkboxes, real nonce rejection, revision-save guards, editor/anonymous access checks, hidden-field preservation, options isolation/atomicity/autoload, real options form rendering, inline validation, rejected-input recovery/clearing, user isolation and stale-schema recovery rejection. Publication regressions cover Classic invalid/valid publish and schedule transitions, existing-public status preservation, REST pre-write rejection, same-request values, omitted payloads, new-post creation, authentication, write-only responses and autosaves.
+
+## Real Chromium browser suite
+
+After running the integration installer, install browser dependencies and seed the **marked disposable** site:
+
+```sh
+npm ci
+npx playwright-core install --with-deps chromium
+export ALIFY_WP_ROOT="$HOME/.cache/alify-cf-integration-6.8.3/wordpress"
+export ALIFY_BROWSER_FIXTURE="$HOME/.cache/alify-cf-integration-6.8.3/browser.json"
+php tests/browser/seed.php
+# In a separate terminal (native PHP):
+php -S 0.0.0.0:8080 -t "$ALIFY_WP_ROOT" tests/browser/router.php
+# In the original terminal:
+npm run test:browser
+php tests/browser/cleanup.php
+```
+
+Use only a disposable test server; never expose this setup as a production service. Seed creates an administrator with a random password in a chmod-0600 JSON fixture **outside the document root**, test groups/posts, real PNG uploads and a test-only MU plugin forcing the seeded Classic post into that editor. Cleanup removes them. Do not commit/upload the fixture JSON or server logs. The CI workflow cleans up even on browser failure.
+
+`ALIFY_BROWSER_URL` defaults to `http://127.0.0.1:8080`; `CHROMIUM_EXECUTABLE` optionally selects an installed Chromium executable. The test blocks external browser requests. The native PHP router is for this disposable server only. Local PHP.wasm's CLI server was unstable under browser concurrency, so local browser verification used a scratch Node PHPRequestHandler server instead; the native-PHP server is exercised in CI.
+
+**Observed locally:** 14 Chromium assertions passed on WordPress 6.8.3 / PHP.wasm 8.3.33: actual Classic rejection/redirect/recovery/correction; native gallery media modal; ordered gallery/repeater persistence after save/reload; actual Gutenberg rejection/inline feedback/correction; raw REST omitted-field rejection; no uncaught page JavaScript errors. These are not jsdom/media mocks. CI is configured to repeat these flows on both matrix targets; its remote results are separate from this local observation.
 
 ## Still pending
 
 - Native MySQL/MariaDB integration runs (SQLite is a translation layer).
-- Browser-driven classic and Gutenberg end-to-end flows, actual media-modal interactions, drag sorting, responsive/accessibility checks and real HTTP admin-post redirects.
-- A server-validated publication gate covering classic and Gutenberg saves. Current field validation preserves rejected field values but does **not** prevent the WordPress post from publishing.
+- Options-page HTTP redirects, repeater image-subfield media selection, drag sorting, responsive/accessibility audits and individual repeater-subfield error highlighting.
+- Direct SQL/`wp_publish_post()`/cron/custom publishing-pipeline policy enforcement: the current gate covers Classic insertion/update hooks and core post REST saves, not every possible status mutation.
 - Wider compatibility matrix, multisite and third-party plugin/theme interactions.
 
-A passing backend suite does not replace these remaining release checks. GitHub workflow execution is separate from the locally observed results above.
+Passing backend/browser suites do not replace these remaining release checks.

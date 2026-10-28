@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.1 — backend integration and validation recovery**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.6.2 — publication validation and real-browser coverage**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -247,9 +247,9 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 
 - Field names must start with a lowercase letter and contain only lowercase letters, numbers and underscores. Names are reserved across published, draft, pending, private and scheduled groups matching the same post type. Conflicts reject the entire configuration change, preserving its previous fields and location. Trashed groups do not reserve names; avoid restoring legacy conflicting groups without reviewing them.
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
-- Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
+- Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value; invalid new publication/scheduling is blocked. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested repeaters, Flexible Content, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
+- No nested repeaters, Flexible Content, import/export, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Validation feedback and input recovery
@@ -263,27 +263,35 @@ After a rejected save, a highlighted note distinguishes **attempted unsaved inpu
 - Unauthorized new media selections are not exposed through recovered media previews. Existing allowed IDs can survive row reordering.
 - Recovery values larger than 256 KiB in aggregate are omitted; errors remain and the form explains that values must be entered again.
 - Recovery is ignored after the group's schema changes, avoiding stale values being rendered with a different field type.
-- Options-page validation remains atomic; post saves can still save other valid fields. **Post publication is not gated by field validation yet**, especially across Gutenberg's separate REST/metabox requests.
+- Options-page validation remains atomic; Classic post saves can still save other valid fields/content. Incomplete metabox group submissions retain previous values, including scalars.
+
+### Publication protection
+
+Classic editor attempts to publish, schedule or make a post private validate all active field groups first. Invalid new publication remains a draft (or keeps its previous pending/public status), with a reload notice and inline errors. Editing an already published/scheduled/private post never silently unpublishes it; Classic can still save content and other valid fields.
+
+Gutenberg injects enabled metabox controls into the same core REST save as `alify_fields`. Server-side validation rejects an invalid request with HTTP 400 **before the post write**, and the editor shows field errors. Requests without this payload validate saved/default values before publication, so simply omitting fields is not a required-field bypass. Core authentication/capabilities still apply. The bridge is write-only, not an ACF-compatible or public value-read REST API.
+
+Autosaves and ordinary draft saves without a field payload remain available. Direct SQL, `wp_publish_post()`, cron status transitions and custom third-party publishing pipelines are not comprehensively gated; this is editor/core REST protection, not a database-wide publication policy.
 
 ## Verification
 
-Automated checks for 0.6.1:
+Automated checks for 0.6.2:
 
 ```sh
 npm ci
-npm test       # 20 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 23 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 159 assertions with isolated WordPress stubs
+php tests/php-unit.php # 160 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 57 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 80 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
 | 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
 | 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
 
-Both integration runs had clean WordPress debug logs. These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering and feedback; it does **not** automate a real browser.
+Both integration runs had clean WordPress debug logs. These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
 
 ```sh
 # Requires Git/Bash and a native PHP executable with SQLite extensions.
@@ -293,7 +301,9 @@ WP_VERSION=6.2 bash tests/integration/run.sh
 
 See [integration setup, coverage and limitations](tests/integration/README.md). The runner creates an explicitly marked disposable database under `$HOME/.cache`, never a production database. A GitHub Actions matrix is included; its remote execution is separate from these local results.
 
-**Still pending:** MySQL/MariaDB, browser-driven classic/Gutenberg and media-modal testing, real HTTP redirects, and publication-blocking validation. The existing validation preserves rejected field values but does not prevent WordPress publication.
+**Real Chromium:** 14 end-to-end assertions passed locally on WordPress 6.8.3 / PHP.wasm 8.3.33, including Classic rejection/redirect/correction, Gutenberg REST rejection/correction, native media-modal gallery selection, gallery/repeater ordering after save/reload, and raw REST publication protection. Repeatable browser seed/cleanup scripts and native-PHP CI steps cover both matrix targets; see the integration guide.
+
+**Still pending:** MySQL/MariaDB, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
 ### Manual staging checklist
 

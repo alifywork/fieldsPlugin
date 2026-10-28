@@ -4,6 +4,7 @@ require_once __DIR__ . '/class-alify-cf-repeater.php';
 require_once __DIR__ . '/class-alify-cf-gallery.php';
 require_once __DIR__ . '/class-alify-cf-options.php';
 require_once __DIR__ . '/class-alify-cf-feedback.php';
+require_once __DIR__ . '/class-alify-cf-publication.php';
 
 final class Alify_CF {
     const GROUP = 'alify_field_group';
@@ -12,6 +13,7 @@ final class Alify_CF {
 
     public static function boot() {
         Alify_CF_Options::boot();
+        Alify_CF_Publication::boot();
         add_action('init', array(__CLASS__, 'register'));
         add_action('admin_notices', array(__CLASS__, 'notices'));
         add_action('add_meta_boxes', array(__CLASS__, 'boxes'));
@@ -59,6 +61,11 @@ final class Alify_CF {
             if (current_user_can('upload_files')) { wp_enqueue_media(); }
             wp_enqueue_script('alify-cf-gallery', plugins_url('assets/gallery.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
             wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery'), ALIFY_CF_VERSION, true);
+            if (method_exists($screen, 'is_block_editor') && $screen->is_block_editor()) {
+                $type = get_post_type_object($screen->post_type);
+                wp_enqueue_script('alify-cf-editor', plugins_url('assets/editor.js', ALIFY_CF_FILE), array('wp-api-fetch', 'alify-cf-values'), ALIFY_CF_VERSION, true);
+                wp_localize_script('alify-cf-editor', 'AlifyEditor', array('postId' => get_the_ID(), 'path' => '/' . (!empty($type->rest_namespace) ? $type->rest_namespace : 'wp/v2') . '/' . ($type->rest_base ?: $type->name)));
+            }
         }
         if ($screen->post_type === self::GROUP && $screen->base === 'post') {
             wp_enqueue_script('alify-cf-builder', plugins_url('assets/builder.js', ALIFY_CF_FILE), array('jquery', 'jquery-ui-sortable'), ALIFY_CF_VERSION, true);
@@ -158,7 +165,7 @@ final class Alify_CF {
             if ($field_error) { echo '<p class="alify-field-error" id="' . esc_attr($id . '-error') . '" role="alert">' . esc_html($field_error) . '</p>'; }
             echo '</div>';
         }
-        echo '</div>';
+        echo '<input type="hidden" name="alify_values[' . esc_attr($group->ID) . '][__group_complete]" value="1"></div>';
     }
 
     public static function control($field, $value, $id, $input, $error_id = '') {
@@ -282,6 +289,10 @@ final class Alify_CF {
             $nonce = $_POST['alify_values_nonce_' . $group->ID] ?? '';
             if (!is_string($nonce) || !wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'alify_values_' . $id . '_' . $group->ID)) { continue; }
             $values = isset($_POST['alify_values'][$group->ID]) && is_array($_POST['alify_values'][$group->ID]) ? wp_unslash($_POST['alify_values'][$group->ID]) : array();
+            if (($values['__group_complete'] ?? '') !== '1') {
+                $errors[] = $group->post_title . ': incomplete field group; previous values retained. Reload the editor.';
+                continue;
+            }
             $schema = self::schema($group->ID);
             $previous = array();
             foreach ($schema as $field) { $previous[$field['name']] = alify_get_field($field['name'], $id); }
@@ -340,6 +351,11 @@ final class Alify_CF {
         $screen = get_current_screen();
         $id = isset($_GET['post']) && is_scalar($_GET['post']) ? absint($_GET['post']) : 0;
         if (!$screen || $screen->base !== 'post' || !$id || !current_user_can('edit_post', $id)) { return; }
+        $publication_key = 'alify_cf_publication_' . get_current_user_id() . '_' . $id;
+        if (get_transient($publication_key)) {
+            delete_transient($publication_key);
+            echo '<div class="notice notice-error" role="alert"><p><strong>Alify: publication/scheduling was not accepted.</strong> Correct the fields and try again. The previous publication status was retained (new posts remain drafts).</p></div>';
+        }
         $key = 'alify_cf_errors_' . get_current_user_id() . '_' . $id;
         $errors = get_transient($key);
         if (!is_array($errors) || !$errors) { return; }

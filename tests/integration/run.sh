@@ -36,8 +36,9 @@ define('WP_DEBUG_LOG', __DIR__ . '/../debug.log');
 define('WP_HTTP_BLOCK_EXTERNAL', true);
 define('AUTOMATIC_UPDATER_DISABLED', true);
 define('DISABLE_WP_CRON', true);
-define('WP_HOME', 'http://alify.test');
-define('WP_SITEURL', 'http://alify.test');
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $_SERVER['HTTPS'] = 'on'; }
+define('WP_HOME', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'alify.test'));
+define('WP_SITEURL', WP_HOME);
 $table_prefix = 'wp_';
 if (!defined('ABSPATH')) { define('ABSPATH', __DIR__ . '/'); }
 require_once ABSPATH . 'wp-settings.php';

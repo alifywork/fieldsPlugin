@@ -38,9 +38,15 @@ require __DIR__ . '/../includes/functions.php';
 $count = 0;
 function same($expected, $actual, $message) { global $count; if ($expected !== $actual) { throw new Exception($message . ': ' . var_export($actual, true)); } $count++; }
 function field($name, $type = 'text', $required = false) { return array('name' => $name, 'key' => 'field_' . $name, 'label' => ucfirst($name), 'type' => $type, 'required' => $required, 'choices' => "a : Alpha\nb : Beta", 'default' => '', 'instructions' => ''); }
+function save_fixture($id, $post) {
+    foreach (($_POST['alify_values'] ?? array()) as $group => $values) {
+        if (is_array($values)) { $_POST['alify_values'][$group]['__group_complete'] = '1'; }
+    }
+    Alify_CF::save($id, $post);
+}
 function configure($id, $fields, $location = 'post') {
     $_POST = array('alify_schema_nonce' => 'valid', 'alify_schema' => wp_slash(json_encode($fields)), 'alify_location' => $location);
-    Alify_CF::save($id, get_post($id));
+    save_fixture($id, get_post($id));
 }
 $posts[1] = (object) array('ID' => 1, 'post_type' => Alify_CF::GROUP, 'post_status' => 'publish', 'post_title' => 'Details');
 $posts[2] = (object) array('ID' => 2, 'post_type' => Alify_CF::GROUP, 'post_status' => 'draft', 'post_title' => 'Other');
@@ -74,7 +80,7 @@ $meta[10]['_alify_cf_email'] = 'old@example.com';
 $meta[10]['_alify_cf_hero'] = 50;
 $meta[10]['_alify_cf_tags'] = array('a');
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('email' => 'bad-email', 'hero' => '51', 'path' => wp_slash('C:\\test'))));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('old@example.com', alify_get_field('email', 10), 'Invalid required value retained');
 same(50, alify_get_field('hero', 10), 'Invalid media retained');
 same('C:\\test', alify_get_field('path', 10), 'Backslash round trip');
@@ -82,19 +88,19 @@ same(array(), alify_get_field('tags', 10), 'Unchecked choices cleared');
 same(2, count($transients['alify_cf_errors_1_10']), 'Field-specific save notices');
 $_POST['alify_values_nonce_1'] = 'invalid';
 $_POST['alify_values'][1]['path'] = 'overwrite';
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('C:\\test', alify_get_field('path', 10), 'Invalid nonce cannot overwrite');
 $allowed = false;
 $_POST['alify_values_nonce_1'] = 'valid';
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('C:\\test', alify_get_field('path', 10), 'Permission check');
 $allowed = true;
 $_POST['alify_values'][1]['hero'] = '';
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('', alify_get_field('hero', 10), 'Optional media can be cleared');
 $denied = array(50);
 $_POST['alify_values'][1]['hero'] = '50';
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('', alify_get_field('hero', 10), 'Attachment selection permission enforced');
 same(null, alify_get_field('unknown'), 'Missing value is null');
 // Conditional logic: stable references, operator semantics and authoritative saves.
@@ -109,15 +115,15 @@ same(true, Alify_CF::visible($target, $schema, array('field_enabled' => '1')), '
 $meta[10]['_alify_cf_details'] = 'keep me';
 $transients = array();
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('details' => 'forged hidden value')));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('keep me', alify_get_field('details', 10), 'Hidden forged values ignored');
 same(array(), $transients, 'Hidden required field does not raise errors');
 $_POST['alify_values'][1] = array('enabled' => '1', 'details' => '');
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('keep me', alify_get_field('details', 10), 'Visible required field retains value');
 same(true, isset($transients['alify_cf_errors_1_10']), 'Visible required field raises error');
 $_POST['alify_values'][1]['details'] = 'new value';
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('new value', alify_get_field('details', 10), 'Visible field saves');
 foreach (array('equals' => false, 'not_equals' => true, 'empty' => true, 'not_empty' => false) as $operator => $expected) {
     $target['condition']['operator'] = $operator;
@@ -175,13 +181,13 @@ same('', Alify_CF_Repeater::clean($stored[0], $bad, array(), true), 'New media s
 same(true, is_array(Alify_CF_Repeater::clean($stored[0], $bad, array(array('photo' => 50)), true)), 'Existing media can survive row reordering');
 $denied = array();
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('team' => $payload)));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('B', alify_get_rows('team', 10)[0]['name'], 'Rows saved and retrieved');
 $_POST['alify_values'][1] = array();
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(2, count(alify_get_rows('team', 10)), 'Missing repeater preserves data');
 $_POST['alify_values'][1]['team'] = array('__complete' => '1');
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(array(), alify_get_rows('team', 10), 'Explicit empty repeater clears rows');
 $previous = Alify_CF::schema(1);
 $bad_schema = $repeater; $bad_schema['sub_fields'][] = field('name');
@@ -202,17 +208,17 @@ $repeater['condition'] = array('field' => $toggle['key'], 'operator' => 'equals'
 configure(1, array($toggle, $repeater));
 $meta[10]['_alify_cf_team'] = $clean;
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('team' => array('__complete' => '1'))));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(2, count(alify_get_rows('team', 10)), 'Hidden repeater payload ignored');
 same(array(), alify_get_rows('missing', 10), 'Missing rows return empty array');
 $required_repeater = $stored[0]; $required_repeater['required'] = true;
 configure(1, array($required_repeater));
 $meta[10]['_alify_cf_team'] = $clean;
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('team' => array('__complete' => '1'))));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(2, count(alify_get_rows('team', 10)), 'Required repeater needs at least one row');
 $_POST['alify_values'][1]['team'] = array('__complete' => '1', 'rows' => array(array('name' => wp_slash('C:\\team'), '__row_complete' => '1')));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same('C:\\team', alify_get_rows('team', 10)[0]['name'], 'Repeater backslash round trip');
 $invalid_subfields = $repeater; $invalid_subfields['sub_fields'] = array_fill(0, 21, field('x'));
 $errors = array();
@@ -339,19 +345,19 @@ $denied = array();
 configure(1, array($gallery), 'post');
 same(array(), Alify_CF::schema(1)[0]['default'], 'Gallery defaults to empty array');
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('photos' => $gallery_payload)));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(array(52, 50), alify_get_field('photos', 10), 'Post gallery saves IDs');
 $_POST['alify_values'][1] = array();
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(array(52, 50), alify_get_field('photos', 10), 'Missing post gallery preserves old IDs');
 $_POST['alify_values'][1]['photos'] = array('__complete' => '1');
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(array(), alify_get_field('photos', 10), 'Optional post gallery can be cleared');
 $gallery['required'] = true; configure(1, array($gallery), 'post');
 $meta[10]['_alify_cf_photos'] = array(50);
-Alify_CF::save(10, $posts[10]); // No valid values nonce in schema request: must not overwrite.
+save_fixture(10, $posts[10]); // No valid values nonce in schema request: must not overwrite.
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('photos' => array('__complete' => '1'))));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(array(50), alify_get_field('photos', 10), 'Required empty gallery retains old IDs');
 $target = field('caption'); $target['condition'] = array('field' => $gallery['key'], 'operator' => 'equals', 'value' => '52');
 same(true, Alify_CF::visible($target, array($gallery, $target), array($gallery['key'] => array(50, 52))), 'Gallery condition uses ID membership');
@@ -360,7 +366,7 @@ same(true, Alify_CF::visible($target, array($gallery, $target), array($gallery['
 $toggle = field('show', 'true_false'); $gallery['condition'] = array('field' => $toggle['key'], 'operator' => 'equals', 'value' => '1');
 configure(1, array($toggle, $gallery), 'post');
 $_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('photos' => array('__complete' => '1'))));
-Alify_CF::save(10, $posts[10]);
+save_fixture(10, $posts[10]);
 same(array(50), alify_get_field('photos', 10), 'Hidden gallery preserves IDs');
 $gallery['condition'] = null; $gallery['required'] = false;
 $repeat_gallery = field('slides', 'repeater'); $repeat_gallery['sub_fields'] = array($gallery);
@@ -418,4 +424,10 @@ $recovered = Alify_CF_Feedback::group(array($rows_field), array('team' => array(
 same(array(52), $recovered['values']['team'][0]['photos'], 'Recovery preserves existing restricted media in rows');
 same(hash('sha256', wp_json_encode(array($rows_field))), $recovered['schema'], 'Recovery records schema identity');
 $denied = array();
+// Complete-group marker protects scalar fields too, not only repeaters/galleries.
+configure(1, array(field('title')), 'post');
+$meta[10]['_alify_cf_title'] = 'Keep me';
+$_POST = array('alify_values_nonce_1' => 'valid', 'alify_values' => array(1 => array('title' => 'truncated attempt')));
+Alify_CF::save(10, $posts[10]);
+same('Keep me', alify_get_field('title', 10), 'Incomplete metabox submission preserves scalar data');
 echo "PASS: $count PHP contract assertions\n";

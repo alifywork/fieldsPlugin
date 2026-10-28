@@ -119,7 +119,7 @@ final class Alify_CF_Options {
         foreach ($groups as $group) {
             echo '<section class="alify-options-group"><h2>' . esc_html($group->post_title) . '</h2>';
             Alify_CF::values(null, $group, $data, $feedback[$group->ID] ?? array());
-            echo '<input type="hidden" name="alify_values[' . esc_attr($group->ID) . '][__group_complete]" value="1"></section>';
+            echo '</section>';
         }
         echo '<input type="hidden" name="alify_options_complete" value="1">';
         submit_button('Save Settings');

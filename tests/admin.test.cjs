@@ -319,3 +319,34 @@ test('editing a field clears stale inline feedback for inputs and media change e
     assert.equal(field.querySelector('.alify-field-error').hidden, true);
     assert.equal(input.hasAttribute('aria-invalid'), false); w.close();
 });
+
+function editorBridge() {
+    const dom = new JSDOM(`<div class="alify-values"><div class="alify-value"><input name="alify_values[7][title]" value="Hello"></div><input name="alify_values[7][tags][]" type="checkbox" checked value="a"><input name="alify_values[7][tags][]" type="checkbox" value="b"><input name="alify_values[7][hidden]" disabled value="ignore"><input name="alify_values[7][team][rows][0][name]" value="Member"><input name="alify_values[7][__group_complete]" value="1"></div>`, {runScripts: 'outside-only'});
+    const w = dom.window;
+    w.AlifyEditor = {path: '/wp/v2/posts', postId: '10'};
+    w.wp = {apiFetch: {use(fn) { w.middleware = fn; }}};
+    w.eval(fs.readFileSync('assets/editor.js', 'utf8'));
+    return w;
+}
+test('editor bridge serializes enabled controls and nested arrays into matching core saves', async () => {
+    const w = editorBridge(); let sent;
+    await w.middleware({path: '/wp/v2/posts/10?context=edit', method: 'POST', data: {status: 'publish'}}, options => { sent = options; return Promise.resolve(); });
+    assert.equal(sent.data.status, 'publish');
+    assert.deepEqual(JSON.parse(JSON.stringify(sent.data.alify_fields)), {complete: '1', groups: {'7': {title: 'Hello', tags: ['a'], team: {rows: {'0': {name: 'Member'}}}, __group_complete: '1'}}});
+    w.close();
+});
+test('editor bridge leaves reads, autosaves and unrelated posts unchanged', async () => {
+    const w = editorBridge();
+    for (const options of [{path: '/wp/v2/posts/10'}, {path: '/wp/v2/posts/11', method: 'POST'}, {path: '/wp/v2/posts/10/autosaves', method: 'POST'}]) {
+        await w.middleware(options, received => { assert.equal(received, options); return Promise.resolve(); });
+    }
+    w.close();
+});
+test('editor bridge renders structured server errors as text and rethrows rejection', async () => {
+    const w = editorBridge(); const error = {data: {alify_errors: {'7': {title: '<img src=x>Required'}}}};
+    await assert.rejects(w.middleware({path: '/wp/v2/posts/10', method: 'PATCH'}, () => Promise.reject(error)), caught => caught === error);
+    assert.equal(w.document.querySelector('.alify-field-error').textContent, '<img src=x>Required');
+    assert.equal(w.document.querySelector('img'), null);
+    assert.equal(w.document.querySelector('[name="alify_values[7][title]"]').getAttribute('aria-invalid'), 'true');
+    w.close();
+});

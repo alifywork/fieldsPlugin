@@ -1,0 +1,73 @@
+// Real Chromium against an explicitly seeded disposable WordPress site.
+const {chromium} = require('playwright-core');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const base = process.env.ALIFY_BROWSER_URL || 'http://127.0.0.1:8080';
+if (!process.env.ALIFY_BROWSER_FIXTURE) throw new Error('Set ALIFY_BROWSER_FIXTURE to the private seed file.');
+const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'utf8'));
+(async () => {
+    const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE || undefined, args: ['--no-sandbox', '--disable-dev-shm-usage', ...(process.env.ALIFY_CHROMIUM_SINGLE_PROCESS ? ['--single-process', '--no-zygote'] : [])]});
+    const context = await browser.newContext();
+    await context.route('**/*', route => route.request().url().startsWith(base + '/') ? route.continue() : route.abort());
+    const page = await context.newPage(); page.setDefaultTimeout(20000);
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    let checks = 0;
+    const check = (actual, expected, label) => { assert.deepEqual(actual, expected, label); checks++; };
+    const value = name => page.locator(`[name="alify_values[${fixture.group}][${name}]"]`);
+    async function saveClassic() { await Promise.all([page.waitForNavigation(), page.locator('#publish').click()]); }
+    try {
+        await page.goto(base + '/wp-login.php');
+        await page.locator('#user_login').fill(fixture.username); await page.locator('#user_pass').fill(fixture.password);
+        await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
+        await page.goto(`${base}/wp-admin/post.php?post=${fixture.classic}&action=edit&alify_classic=1`);
+        await value('subtitle').fill('Classic subtitle');
+        await saveClassic();
+        check(await page.locator('#original_post_status').inputValue(), 'draft', 'Classic invalid required checkbox must not publish');
+        check(await page.locator('.alify-field-error').count() > 0, true, 'Classic shows inline error');
+        check(await value('subtitle').inputValue(), 'Classic subtitle', 'Classic restores attempted text');
+        await page.locator(`[name="alify_values[${fixture.group}][tags][]"][value="a"]`).check();
+        await page.locator('.alify-gallery [data-gallery="add"]').click();
+        const modal = page.locator('.media-modal'); await modal.waitFor();
+        const library = modal.getByRole('tab', {name: 'Media Library'}); if (await library.count()) await library.click();
+        await modal.locator(`.attachment[data-id="${fixture.images[0]}"]`).click();
+        await modal.locator(`.attachment[data-id="${fixture.images[1]}"]`).click({modifiers: ['Control']});
+        await modal.locator('.media-button-select').click(); await modal.waitFor({state: 'hidden'});
+        check(await page.locator('.alify-gallery-item').count(), 2, 'Native gallery modal adds images');
+        await page.locator('.alify-gallery [data-gallery="down"]').first().click();
+        await page.locator('[data-row-action="add"]').click();
+        await page.locator('.alify-row [type="text"]').fill('First member');
+        await page.locator('[data-row-action="add"]').click();
+        await page.locator('.alify-row').nth(1).locator('[type="text"]').fill('Second member');
+        await page.locator('.alify-row').nth(1).locator('[data-row-action="up"]').click();
+        await saveClassic();
+        check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
+        check(await page.locator('.alify-row [type="text"]').evaluateAll(nodes => nodes.map(node => node.value)), ['Second member', 'First member'], 'Repeater row order survives reload');
+        check(await page.locator('.alify-gallery-item').evaluateAll(nodes => nodes.map(node => Number(node.dataset.imageId))), [fixture.images[1], fixture.images[0]], 'Gallery order survives real save');
+        await page.goto(`${base}/wp-admin/post.php?post=${fixture.block}&action=edit`);
+        const welcome = page.getByRole('dialog', {name: 'Welcome to the editor'});
+        if (await welcome.count()) await welcome.getByRole('button', {name: 'Close', exact: true}).click();
+        await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
+        check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
+        await value('subtitle').fill('Block subtitle');
+        await page.locator('.editor-post-publish-panel__toggle').click();
+        const invalid = page.waitForResponse(response => response.request().method() === 'POST' && response.status() === 400 && response.url().includes('posts'));
+        await page.locator('.editor-post-publish-button').click(); const invalidResponse = await invalid;
+        const invalidBody = await invalidResponse.json();
+        assert.equal(invalidBody.code, 'alify_invalid_fields', JSON.stringify(invalidBody));
+        await page.locator('.alify-field-error').first().waitFor();
+        check(await page.evaluate(() => wp.data.select('core/editor').getCurrentPost().status), 'draft', 'REST validation blocks Gutenberg publication');
+        check(await page.locator('.alify-field-error').count() > 0, true, 'Gutenberg renders server field errors');
+        await page.locator(`[name="alify_values[${fixture.group}][tags][]"][value="a"]`).check();
+        await page.locator('.editor-post-publish-button').click();
+        await page.waitForFunction(() => wp.data.select('core/editor').getCurrentPost().status === 'publish');
+        check(await page.evaluate(() => wp.data.select('core/editor').getCurrentPost().status), 'publish', 'Gutenberg correction publishes');
+        const bypass = await page.evaluate(async ({base, id}) => {
+            const response = await fetch(base + '/?rest_route=/wp/v2/posts/' + id, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-WP-Nonce': wpApiSettings.nonce}, body: JSON.stringify({status: 'publish'})});
+            return {status: response.status, body: await response.json()};
+        }, {base, id: fixture.rest});
+        check(bypass.status, 400, 'Raw REST publish without fields validates saved data');
+        check(bypass.body.code, 'alify_invalid_fields', 'Raw REST returns structured Alify error');
+        check(errors, [], 'No uncaught browser JS errors');
+        console.log(`PASS: ${checks} real browser assertions (Classic, Gutenberg, media modal, repeater, gallery, raw REST).`);
+    } finally { await context.close(); await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
