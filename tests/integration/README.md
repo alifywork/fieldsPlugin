@@ -25,8 +25,8 @@ The GitHub Actions workflow runs this suite using native PHP. In the Arena sandb
 
 | WordPress | PHP runtime | Database | Result |
 |---|---|---|---|
-| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB | 80 assertions passed, clean debug log |
-| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB | 80 assertions passed, clean debug log |
+| 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB | 119 assertions passed, clean debug log |
+| 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB | 119 assertions passed, clean debug log |
 
 These are explicit test targets, **not a claim that 6.8.3 is the latest WordPress release**, or a recommendation to deploy an old version. Keep production WordPress/PHP patched.
 
@@ -36,14 +36,16 @@ Coverage includes activation persistence, init registration, all 13 field schema
 
 The CI matrix also runs the same backend and Chromium suites against a disposable **MySQL 8.0** service, on both PHP/WordPress pairs. This is separate from the locally observed SQLite results above. No MySQL server/native PHP is installed in the Arena sandbox; MySQL results come from the actual CI jobs.
 
-**Verified in native-PHP CI, 2026-10-28:** [run 40664387498](https://github.com/alifywork/fieldsPlugin/actions/runs/40664387498) passed all four targets:
+**Verified in native-PHP CI, 2026-10-28:** [run 40665970131](https://github.com/alifywork/fieldsPlugin/actions/runs/40665970131) passed all four targets:
 
 | WordPress | Native PHP | Database | Backend | Real Chromium |
 |---|---|---|---|---|
-| 6.2 | 7.4 | MySQL 8.0 | 80 assertions passed | 14 assertions passed |
-| 6.8.3 | 8.3 | MySQL 8.0 | 80 assertions passed | 14 assertions passed |
-| 6.2 | 7.4 | SQLite | 80 assertions passed | 14 assertions passed |
-| 6.8.3 | 8.3 | SQLite | 80 assertions passed | 14 assertions passed |
+| 6.2 | 7.4 | MySQL 8.0 | 119 assertions passed | 23 assertions passed |
+| 6.8.3 | 8.3 | MySQL 8.0 | 119 assertions passed | 23 assertions passed |
+| 6.2 | 7.4 | SQLite | 119 assertions passed | 23 assertions passed |
+| 6.8.3 | 8.3 | SQLite | 119 assertions passed | 23 assertions passed |
+
+Browser coverage now includes actual JSON download and schema inspection, uploaded and pasted imports with redirect to a draft, Unicode/quote/backslash preservation, conflict rejection, invalid nonce and malformed upload. Backend transfer checks also cover capabilities, format/version/size, unavailable locations, nested repeaters, duplicate names/keys, site-local media-default resets and no partial groups after rejection.
 
 All jobs also passed PHP syntax, 160 isolated PHP assertions, 23 jsdom tests and eight runner safety guards; backend and browser debug-log checks were clean. This verifies the named targets, not every MySQL/MariaDB release or plugin/theme combination.
 
@@ -83,7 +85,7 @@ Use only a disposable test server; never expose this setup as a production servi
 
 `ALIFY_BROWSER_URL` defaults to `http://127.0.0.1:8080`; `CHROMIUM_EXECUTABLE` optionally selects an installed Chromium executable. The test blocks external browser requests. The native PHP router is for this disposable server only. Local PHP.wasm's CLI server was unstable under browser concurrency, so local browser verification used a scratch Node PHPRequestHandler server instead; the native-PHP server is exercised in CI.
 
-**Observed locally:** 14 Chromium assertions passed on WordPress 6.8.3 / PHP.wasm 8.3.33: actual Classic rejection/redirect/recovery/correction; native gallery media modal; ordered gallery/repeater persistence after save/reload; actual Gutenberg rejection/inline feedback/correction; raw REST omitted-field rejection; no uncaught page JavaScript errors. These are not jsdom/media mocks. CI is configured to repeat these flows on both matrix targets; its remote results are separate from this local observation.
+**Earlier local browser baseline (0.6.2):** 14 Chromium assertions passed on WordPress 6.8.3 / PHP.wasm 8.3.33: actual Classic rejection/redirect/recovery/correction; native gallery media modal; ordered gallery/repeater persistence after save/reload; actual Gutenberg rejection/inline feedback/correction; raw REST omitted-field rejection; no uncaught page JavaScript errors. These are not jsdom/media mocks. The current native-PHP CI results above supersede this baseline with 23 assertions per target; its remote results are separate from this local observation.
 
 ## Still pending
 

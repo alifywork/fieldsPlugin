@@ -296,7 +296,7 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 160 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 80 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 119 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -313,11 +313,11 @@ WP_VERSION=6.2 bash tests/integration/run.sh
 
 See [integration setup, coverage and limitations](tests/integration/README.md). The runner creates an explicitly marked disposable database under `$HOME/.cache`, never a production database. A GitHub Actions matrix is included; its remote execution is separate from these local results.
 
-**Real Chromium:** 14 end-to-end assertions passed locally on WordPress 6.8.3 / PHP.wasm 8.3.33, including Classic rejection/redirect/correction, Gutenberg REST rejection/correction, native media-modal gallery selection, gallery/repeater ordering after save/reload, and raw REST publication protection. Repeatable browser seed/cleanup scripts and native-PHP CI steps cover both matrix targets; see the integration guide.
+**Earlier local browser baseline (0.6.2):** 14 end-to-end assertions passed locally on WordPress 6.8.3 / PHP.wasm 8.3.33, including Classic rejection/redirect/correction, Gutenberg REST rejection/correction, native media-modal gallery selection, gallery/repeater ordering after save/reload, and raw REST publication protection. Repeatable browser seed/cleanup scripts and native-PHP CI steps cover both matrix targets; see the integration guide.
 
 **Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
-The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 80 backend and 14 Chromium assertions in [CI run 40664387498](https://github.com/alifywork/fieldsPlugin/actions/runs/40664387498), with clean debug-log checks. These remote MySQL results are separate from the local sandbox SQLite checks.
+The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 119 backend and 23 Chromium assertions in [CI run 40665970131](https://github.com/alifywork/fieldsPlugin/actions/runs/40665970131), with clean debug-log checks. The browser checks now include actual JSON download, upload, pasted import, conflict rejection, malformed upload and nonce rejection. These remote results are separate from the local sandbox SQLite checks.
 
 ### Manual staging checklist
 

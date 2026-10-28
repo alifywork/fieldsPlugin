@@ -7,7 +7,7 @@
 - Reuse the editor schema validator for supported fields, repeater/condition rules, registered locations and name conflicts.
 - Preserve field keys and portable defaults while resetting site-local image/file defaults; never transfer content values, media files, source IDs or arbitrary metadata.
 - Require capability and nonce checks, reject malformed/oversized/unsupported documents before insertion, and remove newly created drafts if metadata verification fails.
-- Add real WordPress transfer regressions and real-browser download/upload/conflict flows to the SQLite/MySQL matrix.
+- Verify 119 backend and 23 real-browser assertions per target across the four native-PHP SQLite/MySQL jobs, including actual download, upload, pasted import, conflicts, malformed files and nonce rejection.
 
 ## 0.6.3
 
