@@ -6,7 +6,7 @@
 - Add Image/File/Gallery MIME and local byte restrictions, bounded Gallery counts and configurable image preview sizes. Retain existing permissions/image checks and atomic save behavior.
 - Add opt-in attachment ID/URL/record returns, including ordered Gallery returns, and Link object/URL returns through formatted post/Options/container getters.
 - Support validated structured Link defaults and explicit clearing; no saved-data migration. JSON v5 preserves new settings/defaults and imports v1–v5.
-- Local feature checks pass: 726 PHP assertions on PHP 7.4/8.3, 68 JS tests, 528 backend assertions on both existing SQLite targets. Native matrix/browser verification pending the batch run.
+- Local feature checks pass: 726 PHP assertions on PHP 7.4/8.3, 68 JS tests, 528 backend assertions on both existing SQLite targets. All four native-PHP targets pass: 528 backend / 168 real browser / 24 HTTP persistence checks, verified in CI run 40708689961.
 
 ## 0.24.0
 

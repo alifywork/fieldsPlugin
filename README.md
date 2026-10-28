@@ -556,7 +556,7 @@ Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests us
 | 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
 | 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
 
-Both integration runs had clean WordPress debug logs. The previous 0.24.0 choice batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40707061371](https://github.com/alifywork/fieldsPlugin/actions/runs/40707061371): 494 backend / 161 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
+Both integration runs had clean WordPress debug logs. The 0.25.0 configuration batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40708689961](https://github.com/alifywork/fieldsPlugin/actions/runs/40708689961): 528 backend / 168 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
 
 ```sh
 # Requires Git/Bash and a native PHP executable with SQLite extensions.
