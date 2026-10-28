@@ -14,7 +14,7 @@ final class Alify_CF_Blocks {
             $field['label'] = sanitize_text_field($field['label']);
             if ($field['type'] === 'select') {
                 if (!is_array($field['choices'] ?? null) || !$field['choices'] || count($field['choices']) > 100) { return new WP_Error('alify_block_choices', 'Select needs 1–100 configured choices.'); }
-                foreach ($field['choices'] as $key => &$label) { if (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/D', (string) $key) || !is_string($label) || strlen($label) > 200 || trim(sanitize_text_field($label)) === '') { return new WP_Error('alify_block_choices', 'Invalid choice key/label.'); } $label = sanitize_text_field($label); } unset($label);
+                foreach ($field['choices'] as $key => &$label) { if (in_array((string) $key, array('__proto__', 'constructor', 'prototype'), true) || !preg_match('/^[a-zA-Z0-9_-]{1,64}$/D', (string) $key) || !is_string($label) || strlen($label) > 200 || trim(sanitize_text_field($label)) === '') { return new WP_Error('alify_block_choices', 'Invalid choice key/label.'); } $label = sanitize_text_field($label); } unset($label);
             } elseif (isset($field['choices'])) { return new WP_Error('alify_block_choices', 'Choices only apply to Select.'); }
             $default = array_key_exists('default', $field) ? $field['default'] : ($field['type'] === 'true_false' ? false : ($field['type'] === 'number' ? 0 : ''));
             $field['default'] = self::value($field, $default, $errors); $fields[] = $field;
