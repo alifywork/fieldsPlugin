@@ -75,7 +75,7 @@
             if (subProp === 'label' && (!sub.name || sub.name === slug(previous))) {
                 sub.name = slug(sub.label); event.target.closest('.alify-sub-card').querySelector('[data-sub-prop="name"]').value = sub.name;
             }
-            if (subProp === 'type') { delete sub.display_format; delete sub.return_format; }
+            if (subProp === 'type') { delete sub.display_format; delete sub.return_format; delete sub.layout; delete sub.multiple; delete sub.searchable; }
             if (subProp === 'type' && sub.type === 'password') { sub.default = ''; sub.choices = ''; }
             if (subProp === 'type' || subProp === 'multiple') { render(event.target.closest('.alify-card').dataset.key); return; }
             sync(); return;
@@ -103,7 +103,7 @@
         if (prop === 'label' && (!field.name || field.name === slug(previous))) {
             field.name = slug(field.label); card.querySelector('[data-prop="name"]').value = field.name;
         }
-        if (prop === 'type') { delete field.display_format; delete field.return_format; }
+        if (prop === 'type') { delete field.display_format; delete field.return_format; delete field.layout; delete field.multiple; delete field.searchable; }
         if (prop === 'type' && field.type === 'password') { field.default = ''; field.choices = ''; }
         if (prop === 'type' || prop === 'multiple') { render(field.key); return; }
         card.querySelector('.alify-card-title').textContent = field.label || 'Untitled field';
