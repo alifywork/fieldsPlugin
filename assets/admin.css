@@ -55,3 +55,6 @@
 
 .alify-date-time { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .alify-date-time .description { flex-basis: 100%; }
+
+.alify-temporal { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.alify-temporal-display { color: #50575e; }

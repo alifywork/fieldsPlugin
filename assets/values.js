@@ -97,7 +97,7 @@
         }
     });
     function dateTimeValue(input) {
-        const match = input && input.value.match(/^([1-9][0-9]{3})-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])[T ]([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?$/);
+        const match = input && input.value.match(/^([1-9][0-9]{3})-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])[T ]([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9])(?:\.0{1,3})?)?$/);
         if (!match || match[0] !== input.value) return '';
         const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
         if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1 || date.getUTCDate() !== Number(match[3])) return '';
@@ -109,6 +109,28 @@
         const input = button.closest('.alify-date-time').querySelector('input');
         input.value = ''; input.dispatchEvent(new Event('input', {bubbles: true})); input.focus();
     });
+    function temporalPreview(root) {
+        const input = root.querySelector('[data-temporal-input]'), output = root.querySelector('[data-temporal-preview]');
+        if (!input || !output) return;
+        const type = root.dataset.temporalType;
+        let raw = input.value;
+        if (type === 'date_time') raw = dateTimeValue(input);
+        if (!raw || (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) || (type === 'time' && !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(raw))) { output.textContent = ''; return; }
+        const year = type === 'time' ? 2000 : Number(raw.slice(0, 4)), month = type === 'time' ? 1 : Number(raw.slice(5, 7)), day = type === 'time' ? 1 : Number(raw.slice(8, 10));
+        const days = [31, year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        if (month < 1 || month > 12 || day < 1 || day > days[month - 1]) { output.textContent = ''; return; }
+        const time = type === 'date_time' ? raw.slice(11) : type === 'time' ? raw : '00:00:00';
+        const hour = Number(time.slice(0, 2)), pad = value => String(value).padStart(2, '0');
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const tokens = {Y: String(year).padStart(4, '0'), m: pad(month), d: pad(day), j: String(day), F: months[month - 1], M: months[month - 1].slice(0, 3), H: pad(hour), i: time.slice(3, 5), s: time.slice(6, 8) || '00', g: String(hour % 12 || 12), a: hour < 12 ? 'am' : 'pm', A: hour < 12 ? 'AM' : 'PM'};
+        output.textContent = (root.dataset.displayFormat || '').replace(/[YmdjFMHisgaA]/g, token => tokens[token]);
+    }
+    function temporalEdited(event) {
+        const root = event.target.closest('.alify-temporal'); if (root) temporalPreview(root);
+    }
+    document.addEventListener('input', temporalEdited);
+    document.addEventListener('change', temporalEdited);
+    document.querySelectorAll('.alify-temporal').forEach(temporalPreview);
     function rangeUnits(text) {
         if (!/^-?(?:0|[1-9][0-9]{0,6})(?:\.[0-9]{1,3})?$/.test(text)) return null;
         const parts = text.replace('-', '').split('.');

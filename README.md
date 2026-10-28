@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.22.0 — Date Time field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.23.0 — temporal display and return formats**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -31,18 +31,35 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Combined Date Time**. Next: **Date/Time display and return formats**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Date/Time display and return formats**. Next: **Richer choice-field settings**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+
+## Date/Time display and return formats
+
+Date, Time and Date Time now have separate **Editor display preview** and **Formatted getter return format** preset selectors, at the root and inside basic Group/Repeater/Flexible subfields.
+
+| Type | Supported presets (PHP-style tokens) |
+|---|---|
+| Date | `Y-m-d`, `d/m/Y`, `m/d/Y`, `j M Y`, `F j, Y` |
+| Time | `H:i`, `H:i:s`, `g:i a`, `g:i A`, `g:i:s A` |
+| Date Time | `Y-m-d H:i:s`, `Y-m-d H:i`, `d/m/Y H:i`, `m/d/Y g:i A`, `j M Y g:i A` |
+
+- **Backward compatibility:** `alify_get_field()`, `alify_get_option()`, existing typed/container helpers, metadata/Options, defaults, validation and conditions remain **raw/canonical**. Native controls still submit canonical values; their own visual layout remains browser-localized. The configured editor format controls an adjacent, live **Display** preview, not the native date-picker UI.
+- Opt in to configured return formats with **`alify_get_formatted_field($name, $post_id)`** or **`alify_get_formatted_option($name, $page)`**. These resolve a uniquely matching field in published groups for the object's location and format its basic temporal subfields recursively through supported containers. Missing values remain `null`, cleared values remain `''`; without a unique published definition, return the raw value unchanged. Non-temporal values/unknown saved keys/layouts remain unchanged. Getters do not write data or add authorization; Password values are still plaintext.
+- Example: `alify_get_field('day', $post_id)` returns `2024-02-29`; with return preset `d/m/Y`, `alify_get_formatted_field('day', $post_id)` returns `29/02/2024`. Escape formatted strings for the output context. Helpers perform schema lookup per call; no performance claim or automatic formatted HTML output is implied.
+- Presets use **English** month names and deterministic AM/PM. No timezone conversion, Unix timestamps, locale translation, arbitrary PHP format strings or timezone tokens. Time storage stays minute precision; `H:i:s` returns seconds `00`. Date Time retains actual saved seconds; native zero-only millisecond suffixes are normalized to whole seconds, while nonzero fractions remain invalid.
+- Invalid preset values reject schema changes atomically. Changing presets never migrates content or changes canonical rule values. Invalid legacy temporal strings format as `''`; use raw getters for inspection. Legacy schemas without settings keep their exact schema shape and default canonical presets.
+- **JSON version 3** is emitted whenever temporal formats exist anywhere, including layout subfields, so older importers reject rather than silently drop settings. Requires **0.23.0+**; version 1/2 schemas remain supported. Native controls and saved-value recovery remain unchanged apart from the additional preview.
 
 ## Combined Date Time field
 
 **Date Time (`date_time`)** uses a native `datetime-local` input with second precision. Storage and PHP getters use **`YYYY-MM-DD HH:MM:SS`**. Native `YYYY-MM-DDTHH:MM[:SS]` and canonical space-separated strings are accepted; omitted seconds become `00`.
 
 - **Floating wall-clock contract:** no timezone ID/offset, UTC conversion or timestamp is stored. Site/browser timezone changes do not shift the value. DST gaps/folds are not resolved or rejected as instants: for example `2026-03-08 02:30:00` remains that wall-clock value even where that time does not occur. Applications needing an instant must explicitly choose a timezone and handle ambiguity; do not append `Z` or assume UTC.
-- Years **1000–9999**, real Gregorian calendar dates, hours `00–23`, minutes/seconds `00–59`. Reject impossible dates, leap seconds, fractions, offsets/`Z`, whitespace padding, non-strings and malformed payloads. Nothing silently rolls over. Invalid schema defaults reject the schema update; valid defaults canonicalize.
+- Years **1000–9999**, real Gregorian calendar dates, hours `00–23`, minutes/seconds `00–59`. Reject impossible dates, leap seconds, nonzero fractions, offsets/`Z`, whitespace padding, non-strings and malformed payloads. Nothing silently rolls over. Invalid schema defaults reject the schema update; valid defaults canonicalize.
 - Supported on posts/Options/basic Group, Repeater and Flexible subfields. Required rejects blank; optional fields have **Clear value**. Invalid values retain previous scalar/container/Options data under existing save-safety contracts.
 - Conditional source/target support compares canonical values (e.g. `2024-02-29 09:30:00`), not native `T` input strings. Hidden dependent values remain saved. Classic/Gutenberg/core REST use the same server validator.
 - Invalid dates that cannot be represented by the native input recover from saved values rather than appearing as accidental clears; containers with such invalid dates recover saved rows, with parent diagnostics when row correspondence is lost.
-- Schema JSON transfers defaults, conditions and basic subfields; destination plugins need **0.22.0+**. Use `alify_get_field()` / `alify_get_option()` for canonical strings. Browser locale controls the native UI; configurable PHP display/return formats are the **next** roadmap increment, not part of this release.
+- Schema JSON transfers defaults, conditions and basic subfields; destination plugins need **0.22.0+**. Use `alify_get_field()` / `alify_get_option()` for canonical strings. Browser locale controls the native UI; configurable previews and opt-in formatted returns are available in 0.23.0 (see above).
 
 ## Password field
 
@@ -445,7 +462,7 @@ $settings = alify_get_option('profile', 'site');
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
 
-- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1` or `2`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; legacy schemas continue to export as version 1.
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`, `2` or `3`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; schemas without these features continue to use their existing version.
 - Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
 - Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
 - Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
@@ -493,16 +510,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.22.0:
+Automated checks for 0.23.0:
 
 ```sh
 npm ci
-npm test       # 60 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 62 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 572 assertions with isolated WordPress stubs
+php tests/php-unit.php # 650 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 433 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 460 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|

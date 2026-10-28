@@ -842,4 +842,31 @@ $date_recovery = Alify_CF_Feedback::group(array($date_time), array('meeting_at' 
 same('2024-02-29 09:30:00', $date_recovery['values']['meeting_at'], 'Unrepresentable Date Time recovery uses saved value, not an accidental blank');
 $date_recovery = Alify_CF_Feedback::group(array($date_rows), array('date_rows' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'meeting_at' => 'bad-date')))), array('date_rows' => array(array('meeting_at' => '2024-02-29 09:30:00'))), array('date_rows' => 'Invalid'));
 same(array(array('meeting_at' => '2024-02-29 09:30:00')), $date_recovery['values']['date_rows'], 'Unrepresentable Date Time subfield uses saved container recovery');
+$format_cases = array(
+    'date' => array('2024-02-29', array('Y-m-d' => '2024-02-29', 'd/m/Y' => '29/02/2024', 'm/d/Y' => '02/29/2024', 'j M Y' => '29 Feb 2024', 'F j, Y' => 'February 29, 2024')),
+    'time' => array('13:05', array('H:i' => '13:05', 'H:i:s' => '13:05:00', 'g:i a' => '1:05 pm', 'g:i A' => '1:05 PM', 'g:i:s A' => '1:05:00 PM')),
+    'date_time' => array('2024-02-29 13:05:09', array('Y-m-d H:i:s' => '2024-02-29 13:05:09', 'Y-m-d H:i' => '2024-02-29 13:05', 'd/m/Y H:i' => '29/02/2024 13:05', 'm/d/Y g:i A' => '02/29/2024 1:05 PM', 'j M Y g:i A' => '29 Feb 2024 1:05 PM')),
+);
+foreach ($format_cases as $type => $case) {
+    $field = field('formatted', $type);
+    foreach ($case[1] as $format => $expected) {
+        $field['display_format'] = $format; $field['return_format'] = $format; $errors = array();
+        same(array('display_format' => $format, 'return_format' => $format), Alify_CF_Temporal_Format::settings($field, $errors), 'Supported temporal preset accepted');
+        same($expected, Alify_CF_Temporal_Format::format($field, $case[0]), 'Return format matches preset');
+        same($expected, Alify_CF_Temporal_Format::format($field, $case[0], 'display_format'), 'Display format matches return formatter');
+    }
+    foreach (array('U', 'c', '<script>', array(), null, '') as $bad) { $field['return_format'] = $bad; $errors = array(); Alify_CF_Temporal_Format::settings($field, $errors); same(true, count($errors) > 0, 'Unsupported format rejected'); }
+    same('', Alify_CF_Temporal_Format::format($field, ''), 'Empty temporal remains empty'); same(null, Alify_CF_Temporal_Format::format($field, null), 'Missing temporal remains null');
+    same('', Alify_CF_Temporal_Format::format($field, "bad\0value"), 'Null-byte legacy values do not throw');
+}
+$formatted_date = field('day', 'date'); $formatted_date['return_format'] = 'd/m/Y';
+$formatted_time = field('clock', 'time'); $formatted_time['return_format'] = 'g:i A';
+$formatted_group = field('schedule', 'group'); $formatted_group['sub_fields'] = array($formatted_date, $formatted_time);
+$raw_schedule = array('day' => '2024-02-29', 'clock' => '00:00', 'legacy' => 'untouched');
+same(array('day' => '29/02/2024', 'clock' => '12:00 AM', 'legacy' => 'untouched'), Alify_CF_Temporal_Format::field($formatted_group, $raw_schedule), 'Group formats known temporal subfields without losing unknown keys');
+same('2024-02-29', $raw_schedule['day'], 'Formatting never mutates raw container');
+$formatted_group['type'] = 'repeater'; same(array(array('day' => '29/02/2024', 'clock' => '12:00 AM', 'legacy' => 'untouched')), Alify_CF_Temporal_Format::field($formatted_group, array($raw_schedule)), 'Repeater applies subfield return formats');
+$errors = array(); same(array(), Alify_CF_Temporal_Format::settings(field('legacy', 'date'), $errors), 'Legacy schema settings retain shape');
+same('', Alify_CF_Temporal_Format::format($formatted_date, '2023-02-29'), 'Impossible legacy date does not normalize');
+same('', Alify_CF_Temporal_Format::format($formatted_time, '24:00'), 'Invalid legacy time does not normalize');
 echo "PASS: $count PHP contract assertions\n";

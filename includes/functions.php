@@ -76,3 +76,19 @@ function alify_get_relationship($name, $post_id = 0) {
     }
     return $posts;
 }
+
+/** Opt-in return formats; raw getters and all storage/save paths remain unchanged. */
+function alify_get_formatted_field($name, $post_id = 0) {
+    $post_id = $post_id ? absint($post_id) : get_the_ID();
+    $value = alify_get_field($name, $post_id);
+    if ($value === null) { return null; }
+    $post = get_post($post_id);
+    return $post ? Alify_CF_Temporal_Format::location($post->post_type, $name, $value) : $value;
+}
+
+/** Apply return formats to a site-scoped option, including basic container subfields. */
+function alify_get_formatted_option($name, $page = 'site') {
+    if (!is_string($page)) { return null; }
+    $value = alify_get_option($name, $page);
+    return $value === null ? null : Alify_CF_Temporal_Format::location(Alify_CF_Options::location($page), $name, $value);
+}

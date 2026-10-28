@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.23.0
+
+- Add validated display-preview and return-format presets for Date, Time and Date Time, including basic container subfields. Native controls/storage/conditions stay canonical; previews update without rewriting inputs.
+- Add opt-in `alify_get_formatted_field()` / `alify_get_formatted_option()` with published-schema lookup and container traversal. Keep existing raw getters unchanged; English month names/AM-PM, no timezone conversion or arbitrary format strings.
+- Gate temporal-format schema transfers with JSON version 3, including subfield-only definitions; retain version 1/2 import compatibility.
+- Normalize native zero-only Date Time millisecond suffixes to whole seconds for consistent preview/validation; nonzero fractions remain invalid.
+- Local feature checks: 650 PHP assertions, 62 JS tests and 460 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser verification is recorded after completion.
+- Complete temporal-format increment; next is richer Radio/Select/Checkbox settings.
+
 ## 0.22.0
 
 - Add Date Time (`date_time`) with native second-precision editing and canonical `YYYY-MM-DD HH:MM:SS` strings. Accept native `T`/canonical space separators; omitted seconds become `00`.

@@ -1,5 +1,6 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
+require_once __DIR__ . '/class-alify-cf-temporal-format.php';
 require_once __DIR__ . '/class-alify-cf-date-time.php';
 require_once __DIR__ . '/class-alify-cf-password.php';
 require_once __DIR__ . '/class-alify-cf-range.php';
@@ -225,8 +226,9 @@ final class Alify_CF {
                 $text = is_scalar($value) ? (string) $value : '';
                 $swatch = self::clean_value($field, $text) ?: '#000000';
                 echo '<div class="alify-color"><input type="text"' . $attrs . ' value="' . esc_attr($text) . '" placeholder="#rrggbb" pattern="#[0-9a-fA-F]{6}" maxlength="7" autocomplete="off" spellcheck="false"' . $required . '><input type="color" data-color-picker value="' . esc_attr($swatch) . '" aria-label="' . esc_attr($field['label'] . ': choose color') . '"><button type="button" class="button" data-color-apply>Apply swatch</button><button type="button" class="button" data-color-clear>Clear color</button></div>'; break;
+            case 'date':
             case 'time':
-                echo '<input type="time"' . $attrs . ' value="' . esc_attr(is_scalar($value) ? $value : '') . '" step="60"' . $required . '>'; break;
+                Alify_CF_Temporal_Format::render($field, $value, $id, $input, $error_id); break;
             case 'true_false':
                 echo '<label class="alify-choice"><input type="checkbox"' . $attrs . ' value="1" ' . checked($value, '1', false) . $required . '> Enabled</label>'; break;
             default:
@@ -296,6 +298,7 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if ($type === 'repeater') {

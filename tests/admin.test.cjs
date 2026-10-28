@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', date_time: 'Date Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', date_time: 'Date Time', date: 'Date', time: 'Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -803,5 +803,25 @@ test('Date Time source fails closed for forged invalid calendar/offset values', 
     for (const value of ['2023-02-29T09:30', '2026-10-28T09:30Z', '0999-12-31T09:30']) {
         const w = conditionalEditor('date_time', 'not_empty', '', `<input type="text" value="${value}">`);
         assert.equal(w.document.querySelector('[data-field-key="target"]').hidden, true); w.close();
+    }
+});
+
+test('Temporal builder offers independent root/subfield presets and clears stale type settings', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Day'); set(w, 'type', 'date');
+    set(w, 'display_format', 'F j, Y'); set(w, 'return_format', 'd/m/Y');
+    assert.equal(schema(w)[0].display_format, 'F j, Y'); assert.equal(schema(w)[0].return_format, 'd/m/Y');
+    set(w, 'type', 'time'); assert.equal(schema(w)[0].return_format, undefined); assert.equal(d.querySelector('[data-prop="return_format"]').value, 'H:i');
+    set(w, 'type', 'flexible'); d.querySelector('[data-layout-action="add"]').click(); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'date_time'; type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    const format = d.querySelector('[data-sub-prop="return_format"]'); format.value = 'j M Y g:i A'; format.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].layouts[0].sub_fields[0].return_format, 'j M Y g:i A'); w.close();
+});
+test('Temporal previews match presets without rewriting inputs, names or conditions', () => {
+    const cases = [['date', 'date', '2024-02-29', 'F j, Y', 'February 29, 2024'], ['time', 'time', '00:05', 'g:i:s A', '12:05:00 AM'], ['date_time', 'datetime-local', '2024-02-29T13:05:09', 'j M Y g:i A', '29 Feb 2024 1:05 PM']];
+    for (const [type, inputType, value, format, expected] of cases) {
+        const dom = new JSDOM(`<div class="alify-temporal" data-temporal-type="${type}" data-display-format="${format}"><input data-temporal-input type="${inputType}" name="stored" value="${value}" step="1"><output data-temporal-preview></output></div>`, {runScripts: 'outside-only'}), w = dom.window, d = w.document;
+        w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+        assert.equal(d.querySelector('output').textContent, expected); assert.equal(d.querySelector('input').value.replace(/\.000$/, ''), value);
+        d.querySelector('input').value = ''; d.querySelector('input').dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(d.querySelector('output').textContent, ''); w.close();
     }
 });
