@@ -13,7 +13,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
     await context.route('**/*', route => route.request().url().startsWith(base + '/') ? route.continue() : route.abort());
     const page = await context.newPage(); page.setDefaultTimeout(20000);
     const errors = []; page.on('pageerror', error => errors.push(error.message));
-    let checks = 0;
+    let checks = 0, persistenceChecks = 0;
     const check = (actual, expected, label) => { assert.deepEqual(actual, expected, label); checks++; };
     const value = name => page.locator(`[name="alify_values[${fixture.group}][${name}]"]`);
     async function saveClassic() { await Promise.all([page.waitForNavigation(), page.locator('#publish').click()]); }
@@ -185,7 +185,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const optionValue = name => page.locator(`[name="alify_values[${fixture.options_group}][${name}]"]`);
         const verifyOptions = phase => {
             const result = execFileSync(process.env.PHP_BIN || 'php', [path.join(__dirname, 'verify-options.php'), phase], {encoding: 'utf8'});
-            assert.match(result, /PASS: 3 HTTP options persistence assertions/); checks += 3;
+            assert.match(result, /PASS: 3 HTTP options persistence assertions/); persistenceChecks += 3;
         };
         async function saveOptions() { await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save Settings', exact: true}).click()]); }
         await page.goto(optionsURL);
@@ -234,7 +234,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         } finally { await editorContext.close(); }
         verifyOptions('corrected');
         check(errors, [], 'No uncaught browser JS errors');
-        console.log(`PASS: ${checks} real browser assertions (Classic, Gutenberg, media modal, repeater, gallery, raw REST).`);
+        console.log(`PASS: ${checks} real browser assertions + ${persistenceChecks} HTTP options persistence assertions (Classic, Gutenberg, media, JSON, options).`);
     } finally { await context.close(); await browser.close(); }
 })().catch(error => {
     console.error(error);

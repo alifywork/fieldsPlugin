@@ -6,6 +6,7 @@
 - Exercise actual admin-post success/failure redirects, detailed errors, attempted-input recovery, correction clearing, invalid nonces, incomplete forms and editor permission denial.
 - Verify persisted database values separately from recovery-rendered inputs after each save/rejection, including post/options isolation and autoload-disabled storage.
 - Clean up the dedicated options data, group and editor user; keep credentials in the existing private fixture file.
+- Verify all four native-PHP SQLite/MySQL targets: 211 backend assertions, 64 browser assertions and 18 additional HTTP persistence assertions per target; existing 258 isolated PHP and 31 JS checks also pass.
 - This is a verification increment, not a full accessibility or compatibility certification.
 
 ## 0.11.1
