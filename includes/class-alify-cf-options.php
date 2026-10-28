@@ -50,7 +50,8 @@ final class Alify_CF_Options {
         wp_enqueue_style('alify-cf', plugins_url('assets/admin.css', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION);
         if (current_user_can('upload_files')) { wp_enqueue_media(); }
         wp_enqueue_script('alify-cf-gallery', plugins_url('assets/gallery.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
-        wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery'), ALIFY_CF_VERSION, true);
+        wp_enqueue_script('alify-cf-flexible', plugins_url('assets/flexible.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
+        wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery', 'alify-cf-flexible'), ALIFY_CF_VERSION, true);
     }
 
     /** $request is already unslashed. A failed save leaves the entire page unchanged. */

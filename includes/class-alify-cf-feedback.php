@@ -36,6 +36,21 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if ($field['type'] === 'flexible') {
+            // Invalid structures retain the saved rows; valid rows use the shared bounded recovery.
+            if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1' || !is_array($raw['rows'] ?? array()) || count($raw['rows'] ?? array()) > 50) { return $previous; }
+            $rows = array();
+            foreach ($raw['rows'] ?? array() as $index => $row) {
+                $layout = is_array($row) ? Alify_CF_Flexible::layout($field, $row['layout'] ?? '') : null;
+                if (!$layout || ($row['__complete'] ?? '') !== '1' || !is_array($row['fields'] ?? null)) { return $previous; }
+                // Use the old media pool from every row of this layout, allowing safe reordering.
+                $old = array(); foreach (is_array($previous) ? $previous : array() as $saved) { if (is_array($saved) && ($saved['layout'] ?? '') === $layout['name']) { $old[] = $saved['fields']; } }
+                $as_repeater = $layout; $as_repeater['type'] = 'repeater'; $values = $row['fields']; $values['__row_complete'] = '1';
+                $display = self::display($as_repeater, array('__complete' => '1', 'rows' => array($values)), $old);
+                $rows[] = array('layout' => $layout['name'], 'fields' => $display[0] ?? array());
+            }
+            return $rows;
+        }
         if ($field['type'] === 'group') {
             if (!is_array($raw) || ($raw['__complete'] ?? '') !== '1' || !is_array($raw['fields'] ?? null)) { return $previous; }
             $as_repeater = $field; $as_repeater['type'] = 'repeater';

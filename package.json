@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/admin.test.cjs",
-    "check": "node --check assets/builder.js && node --check assets/values.js && node --check assets/gallery.js && node --check assets/editor.js && node --check tests/browser/wordpress.cjs",
+    "check": "node --check assets/builder.js && node --check assets/values.js && node --check assets/gallery.js && node --check assets/flexible.js && node --check assets/editor.js && node --check tests/browser/wordpress.cjs",
     "test:browser": "node tests/browser/wordpress.cjs"
   },
   "devDependencies": {

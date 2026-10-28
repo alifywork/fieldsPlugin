@@ -29,6 +29,7 @@ final class Alify_CF_Transfer {
     }
     private static function portable($fields) {
         foreach ($fields as &$field) {
+            if (($field['type'] ?? '') === 'flexible' && is_array($field['layouts'] ?? null)) { foreach ($field['layouts'] as &$layout) { if (is_array($layout) && is_array($layout['sub_fields'] ?? null)) { $layout['sub_fields'] = self::portable_input($layout['sub_fields']); } } unset($layout); }
             if (in_array($field['type'], array('image', 'file'), true)) { $field['default'] = ''; }
             if (in_array($field['type'], array('repeater', 'group'), true)) { $field['sub_fields'] = self::portable($field['sub_fields']); }
         }
@@ -37,6 +38,7 @@ final class Alify_CF_Transfer {
     private static function portable_input($fields) {
         foreach ($fields as &$field) {
             if (!is_array($field)) { continue; }
+            if (($field['type'] ?? '') === 'flexible' && is_array($field['layouts'] ?? null)) { foreach ($field['layouts'] as &$layout) { if (is_array($layout) && is_array($layout['sub_fields'] ?? null)) { $layout['sub_fields'] = self::portable_input($layout['sub_fields']); } } unset($layout); }
             if (in_array($field['type'] ?? '', array('image', 'file'), true)) { $field['default'] = ''; }
             if (in_array(($field['type'] ?? ''), array('repeater', 'group'), true) && is_array($field['sub_fields'] ?? null)) { $field['sub_fields'] = self::portable_input($field['sub_fields']); }
         }

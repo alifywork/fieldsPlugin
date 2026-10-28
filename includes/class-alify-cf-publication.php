@@ -17,6 +17,16 @@ final class Alify_CF_Publication {
 
     public static function stored_payload($field, $value) {
         if ($field['type'] === 'gallery') { return array('__complete' => '1', 'ids' => is_array($value) ? $value : array()); }
+        if ($field['type'] === 'flexible') {
+            $rows = array();
+            foreach (is_array($value) ? $value : array() as $row) {
+                $layout = is_array($row) ? Alify_CF_Flexible::layout($field, $row['layout'] ?? '') : null;
+                if (!$layout) { $rows[] = array('layout' => ''); continue; }
+                $layout['type'] = 'group';
+                $payload = self::stored_payload($layout, $row['fields'] ?? array()); $payload['layout'] = $row['layout']; $rows[] = $payload;
+            }
+            return array('__complete' => '1', 'rows' => $rows);
+        }
         if ($field['type'] === 'group') {
             $out = array();
             foreach ($field['sub_fields'] as $sub) { $out[$sub['name']] = self::stored_payload($sub, is_array($value) && array_key_exists($sub['name'], $value) ? $value[$sub['name']] : $sub['default']); }

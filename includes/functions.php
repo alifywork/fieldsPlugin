@@ -45,3 +45,9 @@ function alify_get_group($name, $post_id = 0) {
     $value = alify_get_field($name, $post_id);
     return is_array($value) ? $value : array();
 }
+
+/** Ordered Flexible Content rows: each row has layout and fields. */
+function alify_get_layouts($name, $post_id = 0) {
+    $rows = alify_get_field($name, $post_id);
+    return is_array($rows) ? array_values(array_filter($rows, function($row) { return is_array($row) && is_string($row['layout'] ?? null) && is_array($row['fields'] ?? null); })) : array();
+}

@@ -17,8 +17,8 @@ final class Alify_CF_Group {
         }
         return true;
     }
-    public static function render($field, $value, $id, $input) {
-        echo '<fieldset class="alify-group" id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
+    public static function render($field, $value, $id, $input, $class = 'alify-group') {
+        echo '<fieldset class="' . esc_attr($class) . '" id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
         foreach ($field['sub_fields'] as $sub) {
             $sub_id = $id . '-' . $sub['key'];
             echo '<div class="alify-sub-value"><label class="alify-label" for="' . esc_attr($sub_id) . '">' . esc_html($sub['label']) . ($sub['required'] ? ' <span class="alify-required">*</span>' : '') . '</label><p class="description">' . esc_html($sub['instructions']) . '</p>';

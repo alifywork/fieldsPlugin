@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0
+
+- Add bounded Flexible Content with 1–10 named layouts, 1–20 basic subfields per layout and up to 50 mixed ordered rows.
+- Add layout/subfield builder controls and row add/remove/move controls, with stable layout names and keys.
+- Validate whole values atomically across posts, options and core REST saves; reject unknown layouts, incomplete rows and unauthorized new media while retaining previous values.
+- Support JSON schema transfer, bounded recovery, whole-field conditions, publication validation and `alify_get_layouts()`.
+- Warn on removed saved layouts instead of silently dropping them. Nested containers, per-layout conditions and migrations remain unsupported.
+- Add isolated PHP/jsdom, real WordPress and real-browser Flexible regressions to the native-PHP SQLite/MySQL matrix.
+
 ## 0.8.0
 
 - Add single-level Group fields with 1–20 basic subfields and one associative object per field, on posts and options pages.

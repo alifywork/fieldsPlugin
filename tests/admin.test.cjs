@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group'}};
+    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -365,5 +365,37 @@ test('group builder provides basic subfields, excludes nested containers and cop
     d.querySelector('[data-action="duplicate"]').click();
     const duplicateLabel = d.querySelectorAll('[data-sub-prop="label"]')[1]; duplicateLabel.value = 'Changed'; duplicateLabel.dispatchEvent(new w.Event('input', {bubbles: true}));
     assert.equal(schema(w)[0].sub_fields[0].label, 'Name');
+    w.close();
+});
+
+
+test('flexible builder creates named layouts and isolated basic subfields', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Content'); set(w, 'type', 'flexible');
+    d.querySelector('[data-layout-action="add"]').click();
+    const label = d.querySelector('[data-layout-prop="label"]'); label.value = 'Hero'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
+    d.querySelector('[data-sub-action="add"]').click();
+    const sub = d.querySelector('[data-sub-prop="label"]'); sub.value = 'Title'; sub.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].layouts[0].name, 'hero');
+    assert.equal(schema(w)[0].layouts[0].sub_fields[0].name, 'title');
+    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="flexible"]'), null);
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
+    d.querySelector('[data-action="duplicate"]').click();
+    const copy = d.querySelectorAll('[data-sub-prop="label"]')[1]; copy.value = 'Changed'; copy.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].layouts[0].sub_fields[0].label, 'Title');
+    w.close();
+});
+test('flexible editor adds, reorders and clears layout rows with unique submission names', () => {
+    const dom = new JSDOM('<div class="alify-values"><div class="alify-value"><div class="alify-flexible" data-limit="2"><div class="alify-flex-rows"></div><template data-flex-template="hero"><div class="alify-flex-row"><span class="alify-flex-label"></span><input name="content[rows][__FLEX_ROW__][fields][title]" id="title-__FLEX_ROW__"><button data-flex-action="up">Up</button><button data-flex-action="down">Down</button><button data-flex-action="remove">Remove</button></div></template><select class="alify-flex-choice"><option value="hero">Hero</option></select><button data-flex-action="add">Add</button><span class="alify-flex-count"></span></div></div></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.confirm = () => true;
+    w.eval(fs.readFileSync('assets/flexible.js', 'utf8'));
+    const add = d.querySelector('[data-flex-action="add"]'); add.click(); add.click();
+    const inputs = d.querySelectorAll('.alify-flex-row input');
+    assert.notEqual(inputs[0].name, inputs[1].name); assert.equal(add.disabled, true);
+    inputs[0].value = 'First'; inputs[1].value = 'Second';
+    d.querySelectorAll('[data-flex-action="up"]')[1].click();
+    assert.equal(d.querySelector('.alify-flex-row input').value, 'Second');
+    d.querySelector('[data-flex-action="remove"]').click(); assert.equal(add.disabled, false);
+    d.querySelector('[data-flex-action="remove"]').click(); assert.equal(d.querySelectorAll('.alify-flex-row').length, 0);
     w.close();
 });

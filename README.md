@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.8.0 — structured Group fields**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.9.0 — bounded Flexible Content**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File, Repeater, Gallery and Group.
+- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -243,6 +243,26 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 5. Try deleting the source or making it conditional; verify the group configuration is rejected until affected rules are fixed.
 6. Test groups containing identical legacy keys independently; rules must never read another group's controls.
 
+## Flexible Content
+
+Choose **Flexible Content** and define 1–10 uniquely named layouts, each containing 1–20 basic subfields (including media/gallery). Editors choose a layout, add rows and move/remove them. A field holds at most 50 rows in any mixture of its layouts. There are no nested containers or layout/subfield conditions in this increment; whole-field visibility is supported, but Flexible fields cannot be condition sources.
+
+```php
+foreach (alify_get_layouts('sections', get_the_ID()) as $row) {
+    if ($row['layout'] === 'hero') {
+        echo '<h2>' . esc_html($row['fields']['title'] ?? '') . '</h2>';
+    }
+}
+// Options return the same ordered row array:
+$sections = alify_get_option('sections', 'site');
+```
+
+Each persisted row is `['layout' => 'hero', 'fields' => ['title' => '...']]`. Templates must explicitly handle known layout names and escape values; layout names never execute code. `alify_get_field()` also returns the raw stored array. `alify_get_layouts()` returns an empty array before save.
+
+All rows validate atomically. Invalid subfields, unknown layouts, unauthorized new media or missing completion markers retain the previous complete list. A required Flexible field needs at least one valid row. A complete empty optional list clears it. Existing restricted media is retained only within its original layout's media pool, including reordering.
+
+Layout names/keys and definitions transfer through JSON; content does not. Destination sites need Flexible support (0.9.0+). Image/file defaults reset. Removing/renaming a layout does not migrate data: saved unknown rows show a warning and block replacement until their schema is restored or the editor explicitly removes them. Removing/renaming subfields similarly requires review; no data migration or revision restoration is provided. Errors/recovery are field-level, not per-row diagnostics.
+
 ## Group fields
 
 A **Group** stores related basic subfields as one associative object rather than a list of rows. Add a Group in the field builder, then define 1–20 local subfields. The same local names can be used in different Groups without colliding with top-level fields.
@@ -280,7 +300,7 @@ Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`)
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value; invalid new publication/scheduling is blocked. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Best-effort rejected-input recovery is described below.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested Groups/repeaters, Flexible Content, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
+- No nested containers, public REST value-read API, programmatic registration, revision restoration or ACF data/API compatibility yet. The editor-only REST write bridge is described below.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Validation feedback and input recovery
@@ -306,7 +326,7 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 ## Verification
 
-Automated checks for 0.8.0:
+Automated checks for 0.9.0:
 
 ```sh
 npm ci

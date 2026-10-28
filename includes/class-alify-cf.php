@@ -2,6 +2,7 @@
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-repeater.php';
 require_once __DIR__ . '/class-alify-cf-group.php';
+require_once __DIR__ . '/class-alify-cf-flexible.php';
 require_once __DIR__ . '/class-alify-cf-gallery.php';
 require_once __DIR__ . '/class-alify-cf-options.php';
 require_once __DIR__ . '/class-alify-cf-feedback.php';
@@ -28,7 +29,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
     }
 
     public static function register() {
@@ -63,7 +64,8 @@ final class Alify_CF {
         if ($screen->post_type !== self::GROUP && $screen->base === 'post') {
             if (current_user_can('upload_files')) { wp_enqueue_media(); }
             wp_enqueue_script('alify-cf-gallery', plugins_url('assets/gallery.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
-            wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery'), ALIFY_CF_VERSION, true);
+            wp_enqueue_script('alify-cf-flexible', plugins_url('assets/flexible.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
+            wp_enqueue_script('alify-cf-values', plugins_url('assets/values.js', ALIFY_CF_FILE), array('alify-cf-gallery', 'alify-cf-flexible'), ALIFY_CF_VERSION, true);
             if (method_exists($screen, 'is_block_editor') && $screen->is_block_editor()) {
                 $type = get_post_type_object($screen->post_type);
                 wp_enqueue_script('alify-cf-editor', plugins_url('assets/editor.js', ALIFY_CF_FILE), array('wp-api-fetch', 'alify-cf-values'), ALIFY_CF_VERSION, true);
@@ -124,7 +126,7 @@ final class Alify_CF {
         foreach ($schema as $candidate) {
             if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
         }
-        if (!$source || in_array($source['type'], array('repeater', 'group'), true) || !empty($source['condition'])) { return false; }
+        if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible'), true) || !empty($source['condition'])) { return false; }
         $value = $values[$source['key']] ?? '';
         $items = is_array($value) ? array_map('strval', $value) : array((string) $value);
         $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0'));
@@ -177,6 +179,8 @@ final class Alify_CF {
         switch ($field['type']) {
             case 'gallery':
                 Alify_CF_Gallery::render($field, $value, $id, $input); break;
+            case 'flexible':
+                Alify_CF_Flexible::render($field, $value, $id, $input); break;
             case 'group':
                 Alify_CF_Group::render($field, $value, $id, $input); break;
             case 'repeater':
@@ -202,6 +206,7 @@ final class Alify_CF {
     }
 
     public static function clean_value($field, $value) {
+        if ($field['type'] === 'flexible') { return Alify_CF_Flexible::clean($field, $value); }
         if ($field['type'] === 'group') { return Alify_CF_Group::clean($field, $value); }
         if ($field['type'] === 'gallery') { return Alify_CF_Gallery::clean($value); }
         if ($field['type'] === 'repeater') { return Alify_CF_Repeater::clean($field, $value); }
@@ -249,8 +254,9 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
+            if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
-            $clean['default'] = in_array($type, array('repeater', 'gallery', 'group'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
+            $clean['default'] = in_array($type, array('repeater', 'gallery', 'group', 'flexible'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
             $clean['condition'] = null;
             if (!empty($field['condition'])) {
                 $rule = $field['condition'];
@@ -268,7 +274,7 @@ final class Alify_CF {
             foreach ($fields as $candidate) {
                 if ($candidate['key'] === $field['condition']['field']) { $source = $candidate; break; }
             }
-            if (!$source || in_array($source['type'], array('repeater', 'group'), true) || $source['key'] === $field['key'] || $source['condition']) {
+            if (!$source || in_array($source['type'], array('repeater', 'group', 'flexible'), true) || $source['key'] === $field['key'] || $source['condition']) {
                 $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
             }
         }
@@ -329,7 +335,9 @@ final class Alify_CF {
         foreach ($schema as $field) {
             // Hidden values are preserved, even if a forged request supplies them.
             if (!self::visible($field, $schema, $submitted_values)) { continue; }
-            if ($field['type'] === 'group') {
+            if ($field['type'] === 'flexible') {
+                $value = Alify_CF_Flexible::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
+            } elseif ($field['type'] === 'group') {
                 $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
             } elseif ($field['type'] === 'repeater') {
                 $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
@@ -340,7 +348,7 @@ final class Alify_CF {
             }
             $submitted = $values[$field['name']] ?? '';
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
-            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
+            $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if (($field['required'] && $empty) || $invalid) {
                 $message = ($field['required'] && $empty ? 'A valid value is required.' : 'Invalid value.') . ' Previous saved value retained.';
                 $field_errors[$field['name']] = $message;

@@ -332,6 +332,52 @@ try {
         Alify_CF::validate_schema(array($bad_schema), 'page', 0, $object_errors);
         expect_same(true, (bool) $object_errors, 'Nested container rejected by shared schema validator');
     }
+    // Mixed Flexible Content layouts are ordered and atomic across all save paths.
+    $_POST = array(); wp_update_post(array('ID' => $object_group, 'post_status' => 'draft'));
+    $flex_group = fixture_post(Alify_CF::GROUP); $flex_post = fixture_post();
+    $flex = test_field('blocks', 'flexible', true);
+    $flex['layouts'] = array(array('key' => 'layout_hero', 'name' => 'hero', 'label' => 'Hero', 'sub_fields' => array(test_field('title', 'text', true), test_field('photos', 'gallery'))), array('key' => 'layout_text', 'name' => 'text', 'label' => 'Text', 'sub_fields' => array(test_field('body', 'textarea', true))));
+    configure_group($flex_group, array($flex));
+    expect_same(2, count(Alify_CF::schema($flex_group)[0]['layouts']), 'Flexible schemas store distinct named layouts');
+    $flex_value = array('__complete' => '1', 'rows' => array(array('layout' => 'hero', '__complete' => '1', 'fields' => array('title' => 'Hero heading', 'photos' => array('__complete' => '1', 'ids' => array($image)))), array('layout' => 'text', '__complete' => '1', 'fields' => array('body' => 'سلام Content'))));
+    save_values($flex_post, $flex_group, array('blocks' => $flex_value));
+    $saved_flex = alify_get_layouts('blocks', $flex_post);
+    expect_same(array('hero', 'text'), array_column($saved_flex, 'layout'), 'Mixed layout order persisted in metadata');
+    expect_same(array($image), $saved_flex[0]['fields']['photos'], 'Nested layout gallery stores integers');
+    $bad_flex = $flex_value; $bad_flex['rows'][1]['fields']['body'] = '';
+    save_values($flex_post, $flex_group, array('blocks' => $bad_flex), 'publish');
+    expect_same('draft', get_post_status($flex_post), 'Flexible invalid subfield blocks Classic publish');
+    expect_same($saved_flex, alify_get_layouts('blocks', $flex_post), 'Invalid Flexible row retains entire prior list');
+    $bad_flex = $flex_value; $bad_flex['rows'][0]['layout'] = 'unknown';
+    save_values($flex_post, $flex_group, array('blocks' => $bad_flex));
+    expect_same($saved_flex, alify_get_layouts('blocks', $flex_post), 'Unknown layout cannot overwrite existing list');
+    $reverse_flex = $flex_value; $reverse_flex['rows'] = array_reverse($reverse_flex['rows']);
+    save_values($flex_post, $flex_group, array('blocks' => $reverse_flex), 'publish');
+    expect_same('publish', get_post_status($flex_post), 'Corrected Flexible publishes');
+    expect_same(array('text', 'hero'), array_column(alify_get_layouts('blocks', $flex_post), 'layout'), 'Layout reordering survives actual save');
+    $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $flex_post); $request->set_param('status', 'publish');
+    expect_same(200, rest_do_request($request)->get_status(), 'Saved layouts reconstructed when REST payload omitted');
+    $flex_rest = fixture_post(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $flex_rest); $request->set_param('status', 'publish');
+    expect_same(400, rest_do_request($request)->get_status(), 'Required empty Flexible blocks raw REST publish');
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $flex_rest); $request->set_param('status', 'publish');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($flex_group => array('__group_complete' => '1', 'blocks' => $flex_value))));
+    expect_same(200, rest_do_request($request)->get_status(), 'Flexible accepted through same-request REST bridge');
+    expect_same($saved_flex, alify_get_layouts('blocks', $flex_rest), 'REST persists layout identities and fields');
+    $flex_json = Alify_CF_Transfer::export_json($flex_group, $export_nonce);
+    expect_same(true, is_string($flex_json), 'Flexible schema exports');
+    $flex_doc = json_decode($flex_json, true); $flex_doc['group']['location'] = 'options:flex-tests';
+    Alify_CF_Options::register('flex-tests', 'Flexible tests');
+    $flex_options_group = Alify_CF_Transfer::import_json(wp_json_encode($flex_doc), $import_nonce); $fixtures[] = $flex_options_group;
+    expect_same(true, is_int($flex_options_group), 'Flexible imports as new draft');
+    expect_same(Alify_CF::schema($flex_group), Alify_CF::schema($flex_options_group), 'Layout names, keys and schemas round trip');
+    $_POST = array(); wp_update_post(array('ID' => $flex_options_group, 'post_status' => 'publish'));
+    $flex_option_request = array('alify_options_nonce' => wp_create_nonce('alify_options_flex-tests'), 'alify_options_complete' => '1', 'alify_values' => array($flex_options_group => array('__group_complete' => '1', 'blocks' => $flex_value)));
+    $flex_errors = array();
+    expect_same(true, Alify_CF_Options::save('flex-tests', $flex_option_request, $flex_errors), 'Options Flexible saves atomically');
+    expect_same($saved_flex, alify_get_option('blocks', 'flex-tests'), 'Options layout storage matches posts');
+    $flex_option_request['alify_values'][$flex_options_group]['blocks'] = $bad_flex;
+    expect_same(false, Alify_CF_Options::save('flex-tests', $flex_option_request, $flex_errors), 'Options unknown layout rejected');
+    expect_same($saved_flex, alify_get_option('blocks', 'flex-tests'), 'Invalid options Flexible preserves all rows');
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
@@ -344,6 +390,7 @@ try {
     foreach (array_reverse($fixtures) as $id) { wp_delete_post($id, true); }
     delete_option('alify_cf_options_site');
     delete_option('alify_cf_options_transfer-tests');
+    delete_option('alify_cf_options_flex-tests');
     Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }

@@ -46,8 +46,17 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('[data-row-action="add"]').click();
         await page.locator('.alify-row').nth(1).locator('[type="text"]').fill('Second member');
         await page.locator('.alify-row').nth(1).locator('[data-row-action="up"]').click();
+        await page.locator('.alify-flex-choice').selectOption('hero');
+        await page.locator('[data-flex-action="add"]').click();
+        await page.locator('.alify-flex-row [type="text"]').fill('Hero heading');
+        await page.locator('.alify-flex-choice').selectOption('text');
+        await page.locator('[data-flex-action="add"]').click();
+        await page.locator('.alify-flex-row textarea').fill('Classic flexible body');
+        await page.locator('.alify-flex-row').nth(1).locator('[data-flex-action="up"]').click();
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
+        check(await page.locator('.alify-flex-row input[name$="[layout]"]').evaluateAll(nodes => nodes.map(node => node.value)), ['text', 'hero'], 'Mixed Flexible layout order survives Classic save/reload');
+        check(await page.locator('.alify-flex-row textarea').inputValue(), 'Classic flexible body', 'Flexible row values survive Classic save');
         check(await page.locator('.alify-group [type="text"]').inputValue(), 'Classic profile', 'Group text survives Classic save/reload');
         check(await page.locator('.alify-group [type="checkbox"][value="a"]').isChecked(), true, 'Group checkbox persists');
         check(await page.locator('.alify-group .alify-media input[type="hidden"]').inputValue(), String(fixture.images[0]), 'Group native image selection persists');
@@ -60,6 +69,9 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
         await value('subtitle').fill('Block subtitle');
         await page.locator('.alify-group [type="text"]').fill('Block profile');
+        await page.locator('.alify-flex-choice').selectOption('text');
+        await page.locator('[data-flex-action="add"]').click();
+        await page.locator('.alify-flex-row textarea').fill('Gutenberg flexible body');
         await page.locator('.editor-post-publish-panel__toggle').click();
         const invalid = page.waitForResponse(response => response.request().method() === 'POST' && response.status() === 400 && response.url().includes('posts'));
         await page.locator('.editor-post-publish-button').click(); const invalidResponse = await invalid;
@@ -75,6 +87,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.evaluate(() => wp.data.select('core/editor').getCurrentPost().status), 'publish', 'Gutenberg correction publishes');
         await page.reload();
         check(await page.locator('.alify-group [type="text"]').inputValue(), 'Block profile', 'Group text survives actual Gutenberg REST save/reload');
+        check(await page.locator('.alify-flex-row textarea').inputValue(), 'Gutenberg flexible body', 'Flexible content survives Gutenberg REST save/reload');
         const bypass = await page.evaluate(async ({base, id}) => {
             const response = await fetch(base + '/?rest_route=/wp/v2/posts/' + id, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-WP-Nonce': wpApiSettings.nonce}, body: JSON.stringify({status: 'publish'})});
             return {status: response.status, body: await response.json()};
@@ -88,7 +101,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const download = await downloadReady;
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
-        check(exported.group.fields.length, 7, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 8, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
