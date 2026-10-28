@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.0
+
+- Add single-choice Button Group fields with configured defaults/choices, zero-key preservation and optional clearing. Style real radios as wrapping segments with selected/disabled/focus/forced-colors states; preserve native keyboard/required behavior.
+- Share the proven Radio validation/clearing contract across post/Options/basic containers, conditions, the core REST save bridge and schema-only JSON. Reject unknown/malformed values and preserve previous scalar/container/Options data.
+- Add builder, conditional, cloned-row isolation, backend lifecycle and browser keyboard/save/reload regressions. Radio behavior remains covered separately.
+- Local feature checks pass: 406 PHP assertions, 51 JS tests and 349 backend assertions on both existing PHP-WASM/SQLite targets. Native/browser CI results will be recorded after verification.
+- Mark Button Group as the current increment; next development item is Range. Richer choice settings remain pending.
+
 ## 0.18.0
 
 - Add Radio Button fields with configured choices, string-key storage (including `0`), defaults, required validation and explicit optional clearing.

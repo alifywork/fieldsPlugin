@@ -76,7 +76,7 @@ final class Alify_CF_Repeater {
                 $value = $sub['type'] === 'relationship' ? Alify_CF_Relationship::clean($raw, $allowed_posts, $permissions) : ($sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw));
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
                 $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
-                if ((in_array($sub['type'], array('post_object', 'radio'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                if ((in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
                     $location = array('row' => $position - 1, 'subfield' => $sub['name']);
                     $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
                     return '';

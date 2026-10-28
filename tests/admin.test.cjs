@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {text: 'Text', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -683,4 +683,41 @@ test('Radio conditions use checked choice, not empty sentinel; clearing updates 
     assert.equal(Array.from(new w.FormData(form).getAll('mode')).at(-1), '0');
     form.querySelector('[data-radio-clear]').click();
     assert.deepEqual(Array.from(new w.FormData(form).getAll('mode')), ['']); w.close();
+});
+test('Button Group builder exposes choices, persists default and supports container subfields', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Mode'); set(w, 'type', 'button_group');
+    assert.equal(d.querySelector('.alify-choices').hidden, false);
+    set(w, 'choices', '0 : Zero\na : Alpha'); set(w, 'default', '0');
+    assert.equal(schema(w)[0].type, 'button_group'); assert.equal(schema(w)[0].default, '0');
+    set(w, 'type', 'repeater'); d.querySelector('[data-sub-action="add"]').click();
+    const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'button_group';
+    type.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].type, 'button_group'); w.close();
+});
+test('Button Group conditions use checked choice, not empty sentinel; clearing updates conditions', () => {
+    const w = conditionalEditor('button_group', 'equals', '0', '<fieldset class="alify-radio alify-button-group"><input type="hidden" name="mode" value=""><input type="radio" name="mode" value="a"><input type="radio" name="mode" value="0" checked><button type="button" data-radio-clear>Clear</button></fieldset>');
+    const d = w.document, target = d.querySelector('[data-field-key="target"]');
+    assert.equal(target.hidden, false);
+    d.querySelector('[data-radio-clear]').click();
+    assert.equal(d.querySelectorAll('input[type="radio"]:checked').length, 0);
+    assert.equal(target.hidden, true); assert.equal(target.querySelector('input').disabled, true);
+    const choice = d.querySelector('input[value="0"]'); choice.click();
+    assert.equal(target.hidden, false); assert.equal(target.querySelector('input').value, 'retained');
+    const form = d.createElement('form'); d.body.appendChild(form); form.appendChild(d.querySelector('.alify-radio'));
+    assert.equal(Array.from(new w.FormData(form).getAll('mode')).at(-1), '0');
+    form.querySelector('[data-radio-clear]').click();
+    assert.deepEqual(Array.from(new w.FormData(form).getAll('mode')), ['']); w.close();
+});
+
+test('Button Group cloned rows have independent names, IDs and clearing', () => {
+    const dom = new JSDOM(`<div class="alify-values"><div class="alify-value" data-field-key="team" data-field-type="repeater"><div class="alify-repeater" data-limit="3" data-min="0"><div class="alify-rows"></div><template class="alify-row-template"><div class="alify-row"><fieldset class="alify-radio alify-button-group" id="mode-__ROW__"><input type="hidden" name="rows[__ROW__][mode]" value=""><label><input type="radio" id="mode-__ROW__-a" name="rows[__ROW__][mode]" value="a" checked><span>Alpha</span></label><label><input type="radio" id="mode-__ROW__-b" name="rows[__ROW__][mode]" value="b"><span>Beta</span></label><button type="button" data-radio-clear>Clear</button></fieldset><button type="button" data-row-action="remove">Remove</button><button type="button" data-row-action="up">Up</button><button type="button" data-row-action="down">Down</button></div></template><button type="button" data-row-action="add">Add</button><span class="alify-row-count"></span></div></div></div>`, {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    d.querySelector('[data-row-action="add"]').click(); d.querySelector('[data-row-action="add"]').click();
+    const rows = d.querySelectorAll('.alify-row'), first = rows[0].querySelector('input[type="radio"]'), second = rows[1].querySelector('input[type="radio"]');
+    assert.notEqual(first.name, second.name); assert.notEqual(first.id, second.id);
+    rows[1].querySelector('input[value="b"]').click();
+    assert.equal(first.checked, true); assert.equal(second.checked, false);
+    rows[1].querySelector('[data-radio-clear]').click();
+    assert.equal(rows[1].querySelectorAll('input:checked').length, 0); assert.equal(first.checked, true); w.close();
 });

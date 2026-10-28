@@ -31,3 +31,15 @@
 
 .alify-relation-item { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px; border: 1px solid #dce3ed; margin-bottom: 6px; }
 .alify-relation-title { flex: 1; min-width: 100px; overflow-wrap: anywhere; }
+
+/* Keep real radios focusable: native arrow-key selection and required validation. */
+.alify-button-options { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 8px; }
+.alify-button-options .alify-choice { position: relative; display: inline-flex; margin: 0; max-width: 100%; }
+.alify-button-options input[type="radio"] { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.alify-button-options .alify-choice span { display: block; padding: 8px 14px; border: 1px solid #8c8f94; margin: 0 0 -1px -1px; background: #fff; color: #1d2327; cursor: pointer; overflow-wrap: anywhere; }
+.alify-button-options input:checked + span { background: #2271b1; border-color: #135e96; color: #fff; }
+.alify-button-options input:focus-visible + span { position: relative; z-index: 1; outline: 2px solid #135e96; outline-offset: 2px; }
+.alify-button-options input:disabled + span { opacity: .55; cursor: not-allowed; }
+@media (forced-colors: active) {
+    .alify-button-options input:checked + span { outline: 3px solid Highlight; outline-offset: -4px; }
+}

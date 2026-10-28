@@ -161,7 +161,7 @@
                             let values;
                             if (source.dataset.fieldType === 'gallery') {
                                 values = Array.from(source.querySelectorAll('.alify-gallery-items input[type="hidden"]')).map(input => input.value);
-                            } else if (['checkbox', 'true_false', 'radio'].includes(source.dataset.fieldType)) {
+                            } else if (['checkbox', 'true_false', 'radio', 'button_group'].includes(source.dataset.fieldType)) {
                                 values = inputs.filter(input => input.checked).map(input => input.value);
                                 if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
                             } else values = inputs.length ? [inputs[0].value] : [''];

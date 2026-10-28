@@ -748,4 +748,24 @@ same(array('row' => 0, 'subfield' => 'mode'), $location, 'Radio rejection identi
 $dependent = field('details'); $dependent['condition'] = array('field' => $radio['key'], 'operator' => 'equals', 'value' => '0');
 same(true, Alify_CF::visible($dependent, array($radio, $dependent), array($radio['key'] => '0')), 'Radio is a server condition source');
 same(false, Alify_CF::visible($dependent, array($radio, $dependent), array($radio['key'] => '')), 'Empty radio hides dependent');
+$buttons = field('button_mode', 'button_group'); $buttons['choices'] = "0 : Zero\na : Alpha\nb : Beta";
+same('Button Group', Alify_CF::types()['button_group'], 'Button Group is a registered field type');
+same('0', Alify_CF::clean_value($buttons, 0), 'Button Group preserves zero choice key');
+same('a', Alify_CF::clean_value($buttons, 'a'), 'Button Group returns a single choice key');
+foreach (array('unknown', array(), array('a'), true, 1.5) as $bad) {
+    $errors = array(); same(array(), Alify_CF::validate_values(array($buttons), array('button_mode' => $bad), array('button_mode' => 'b'), $errors), 'Malformed/unknown button_group retains old value');
+    same(true, count($errors) > 0, 'Button Group rejection reports error');
+}
+$errors = array(); same(array('button_mode' => ''), Alify_CF::validate_values(array($buttons), array('button_mode' => ''), array('button_mode' => 'b'), $errors), 'Optional button_group explicitly clears');
+$buttons['required'] = true; $errors = array();
+same(array(), Alify_CF::validate_values(array($buttons), array('button_mode' => ''), array('button_mode' => 'a'), $errors), 'Required button_group rejects empty');
+$errors = array(); same(array('button_mode' => '0'), Alify_CF::validate_values(array($buttons), array('button_mode' => '0'), array(), $errors), 'Required button_group accepts zero');
+$buttons_rows = field('button_group_rows', 'repeater'); $buttons_rows['sub_fields'] = array($buttons);
+same(array(array('button_mode' => 'b')), Alify_CF_Repeater::clean($buttons_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'button_mode' => 'b')))), 'Button Group is a basic container subfield');
+$issue = ''; $location = null;
+same('', Alify_CF_Repeater::clean($buttons_rows, array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'button_mode' => array()))), null, false, $issue, $location), 'Malformed button_group rejects whole container');
+same(array('row' => 0, 'subfield' => 'button_mode'), $location, 'Button Group rejection identifies exact subfield');
+$dependent = field('details'); $dependent['condition'] = array('field' => $buttons['key'], 'operator' => 'equals', 'value' => '0');
+same(true, Alify_CF::visible($dependent, array($buttons, $dependent), array($buttons['key'] => '0')), 'Button Group is a server condition source');
+same(false, Alify_CF::visible($dependent, array($buttons, $dependent), array($buttons['key'] => '')), 'Empty button_group hides dependent');
 echo "PASS: $count PHP contract assertions\n";

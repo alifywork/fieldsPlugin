@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.18.0 — Radio Button field**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.19.0 — Button Group field**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Text, Text Area, WYSIWYG Editor, Number, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -31,7 +31,18 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Radio Button**. Next: **Button Group**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Button Group**. Next: **Range**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+
+## Button Group field
+
+**Button Group (`button_group`)** is a segmented, single-choice control. Define `value : Label` choices and an optional matching default. It stores one string key (including `0`), or `''` after optional clearing; getters return the key, not a label/object.
+
+- Uses real labeled radio inputs styled as segments: native Tab/arrow-key navigation, visible keyboard focus and native required-group validation, without custom keyboard emulation. Segments wrap when space is limited; selected/disabled/forced-colors states have explicit styles.
+- Optional groups have **Clear selection**. Required groups cannot clear, and the server rejects empty, unknown or malformed selections while retaining old saved data under the existing scalar/container/Options contracts.
+- Supported on posts/Options and basic Group/Repeater/Flexible subfields. Cloned rows have independent names/IDs; clearing one group does not affect another.
+- Can be a condition source/target. The checked segment is used, not the hidden empty-submission sentinel. Hidden dependent values remain saved.
+- Classic and Gutenberg/core REST saves use the same value contract. Schema JSON preserves choices/defaults/conditions/basic subfields; destination plugins need **0.19.0+**.
+- Custom-choice creation, multiple selection, configurable return formats and orientation settings are not part of this increment. Richer choice settings remain in the roadmap.
 
 ## Radio Button field
 
@@ -449,16 +460,16 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.18.0:
+Automated checks for 0.19.0:
 
 ```sh
 npm ci
-npm test       # 48 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 51 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 385 assertions with isolated WordPress stubs
+php tests/php-unit.php # 406 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 325 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 349 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
@@ -484,7 +495,7 @@ The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all 22 types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all 23 types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.
