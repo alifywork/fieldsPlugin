@@ -88,3 +88,58 @@ test('image picker rejects non-images and unsafe preview URLs', () => {
     x.document.querySelector('[data-media="choose"]').click();
     assert.equal(x.document.querySelector('img').hasAttribute('src'), false); x.close();
 });
+
+test('builder persists conditional rules and rejects removed source references', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Source');
+    const sourceKey = schema(w)[0].key;
+    d.getElementById('alify-add').click();
+    const cards = () => d.querySelectorAll('.alify-card');
+    const label = cards()[1].querySelector('[data-prop="label"]'); label.value = 'Target'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
+    cards()[1].querySelector('[data-condition-prop="enabled"]').click();
+    function change(prop, value) { const el = cards()[1].querySelector(`[data-condition-prop="${prop}"]`); el.value = value; el.dispatchEvent(new w.Event('input', {bubbles: true})); }
+    change('field', sourceKey); change('value', 'yes');
+    assert.equal(schema(w)[1].condition.field, sourceKey);
+    assert.equal(schema(w)[1].condition.value, 'yes');
+    cards()[1].querySelector('[data-action="duplicate"]').click();
+    change('value', 'no');
+    assert.equal(schema(w)[2].condition.value, 'yes', 'Duplicate must not share mutable rule object');
+    cards()[0].querySelector('[data-action="remove"]').click();
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), false);
+    assert.match(w.lastAlert, /unconditional/);
+    w.close();
+});
+function conditionalEditor(type, operator, comparison, sourceHTML) {
+    const rule = JSON.stringify({field: 'source', operator, value: comparison}).replace(/"/g, '&quot;');
+    const dom = new JSDOM(`<div class="alify-values"><div class="alify-value" data-field-key="source" data-field-type="${type}">${sourceHTML}</div><div class="alify-value" data-field-key="target" data-field-type="text" data-condition="${rule}"><input required value="retained"></div></div>`, {runScripts: 'outside-only'});
+    dom.window.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    return dom.window;
+}
+test('conditional editor hides/disables required fields, restores them, and retains input', () => {
+    const w = conditionalEditor('true_false', 'equals', '1', '<input type="checkbox" value="1">'), d = w.document;
+    const target = d.querySelector('[data-field-key="target"]');
+    assert.equal(target.hidden, true); assert.equal(target.querySelector('input').disabled, true);
+    d.querySelector('[type="checkbox"]').click();
+    assert.equal(target.hidden, false); assert.equal(target.querySelector('input').disabled, false);
+    assert.equal(target.querySelector('input').required, true);
+    d.querySelector('[type="checkbox"]').click();
+    assert.equal(target.querySelector('input').value, 'retained'); w.close();
+});
+test('conditional editor supports all operators, zero and checkbox membership', () => {
+    for (const [operator, expectedHidden] of Object.entries({equals: false, not_equals: true, empty: true, not_empty: false})) {
+        const w = conditionalEditor('number', operator, '0', '<input type="number" value="0">');
+        assert.equal(w.document.querySelector('[data-field-key="target"]').hidden, expectedHidden, operator); w.close();
+    }
+    const w = conditionalEditor('checkbox', 'equals', 'a', '<input type="checkbox" value="a" checked><input type="checkbox" value="b">');
+    assert.equal(w.document.querySelector('[data-field-key="target"]').hidden, false); w.close();
+    const x = conditionalEditor('true_false', 'empty', '', '<input type="checkbox" value="1">');
+    assert.equal(x.document.querySelector('[data-field-key="target"]').hidden, false); x.close();
+});
+test('conditions are scoped to their own group', () => {
+    const w = conditionalEditor('text', 'equals', 'yes', '<input value="no">'), d = w.document;
+    const other = d.createElement('div'); other.className = 'alify-values';
+    other.innerHTML = '<div class="alify-value" data-field-key="source"><input value="yes"></div>';
+    d.body.prepend(other);
+    other.querySelector('input').dispatchEvent(new w.Event('change', {bubbles: true}));
+    assert.equal(d.querySelector('[data-field-key="target"]').hidden, true); w.close();
+});

@@ -1,6 +1,36 @@
 /* global wp */
 (function () {
     'use strict';
+    function refreshConditions() {
+        document.querySelectorAll('.alify-values').forEach(group => {
+            const fields = Array.from(group.querySelectorAll('.alify-value'));
+            fields.forEach(field => {
+                let rule;
+                try { rule = JSON.parse(field.dataset.condition || 'null'); } catch (_) { rule = null; }
+                let visible = true;
+                if (rule) {
+                    const source = fields.find(item => item.dataset.fieldKey === rule.field);
+                    visible = false;
+                    if (source && !JSON.parse(source.dataset.condition || 'null')) {
+                        const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
+                        let values;
+                        if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
+                            values = inputs.filter(input => input.checked).map(input => input.value);
+                            if (source.dataset.fieldType === 'true_false' && !values.length) values = ['0'];
+                        } else values = inputs.length ? [inputs[0].value] : [''];
+                        const empty = !values.length || (values.length === 1 && (values[0] === '' || (source.dataset.fieldType === 'true_false' && values[0] === '0')));
+                        const matches = values.includes(rule.value);
+                        visible = ({equals: matches, not_equals: !matches, empty, not_empty: !empty})[rule.operator] === true;
+                    }
+                }
+                field.hidden = !visible;
+                field.querySelectorAll('input, select, textarea, button').forEach(input => { input.disabled = !visible; });
+            });
+        });
+    }
+    document.addEventListener('input', refreshConditions);
+    document.addEventListener('change', refreshConditions);
+    refreshConditions();
     document.addEventListener('click', function (event) {
         const button = event.target.closest('[data-media]');
         if (!button) return;

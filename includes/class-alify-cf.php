@@ -97,15 +97,43 @@ final class Alify_CF {
         return $choices;
     }
 
+    /** One rule, referencing an unconditional sibling by stable key. */
+    public static function visible($field, $schema, $values) {
+        $rule = $field['condition'] ?? null;
+        if (!$rule) { return true; }
+        $source = null;
+        foreach ($schema as $candidate) {
+            if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
+        }
+        if (!$source || !empty($source['condition'])) { return false; }
+        $value = $values[$source['key']] ?? '';
+        $items = is_array($value) ? array_map('strval', $value) : array((string) $value);
+        $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0'));
+        $matches = in_array((string) $rule['value'], $items, true);
+        switch ($rule['operator']) {
+            case 'equals': return $matches;
+            case 'not_equals': return !$matches;
+            case 'empty': return $empty;
+            case 'not_empty': return !$empty;
+            default: return false;
+        }
+    }
+
     public static function values($post, $group) {
         wp_nonce_field('alify_values_' . $post->ID . '_' . $group->ID, 'alify_values_nonce_' . $group->ID);
-        foreach (self::schema($group->ID) as $field) {
+        $schema = self::schema($group->ID);
+        $current = array();
+        foreach ($schema as $field) {
+            $current[$field['key']] = metadata_exists('post', $post->ID, '_alify_cf_' . $field['name']) ? alify_get_field($field['name'], $post->ID) : $field['default'];
+        }
+        echo '<div class="alify-values">';
+        foreach ($schema as $field) {
             $name = $field['name'];
             $value = metadata_exists('post', $post->ID, '_alify_cf_' . $name) ? alify_get_field($name, $post->ID) : $field['default'];
             $id = 'alify-' . $group->ID . '-' . $field['key'];
             $input = 'alify_values[' . $group->ID . '][' . $name . ']';
             $required = $field['required'] ? ' required' : '';
-            echo '<div class="alify-value"><label class="alify-label" for="' . esc_attr($id) . '">' . esc_html($field['label']) . ($field['required'] ? ' <span class="alify-required">*</span>' : '') . '</label>';
+            echo '<div class="alify-value" data-field-key="' . esc_attr($field['key']) . '" data-field-type="' . esc_attr($field['type']) . '" data-condition="' . esc_attr(wp_json_encode($field['condition'] ?? null)) . '"' . (self::visible($field, $schema, $current) ? '' : ' hidden') . '><label class="alify-label" for="' . esc_attr($id) . '">' . esc_html($field['label']) . ($field['required'] ? ' <span class="alify-required">*</span>' : '') . '</label>';
             if ($field['instructions']) { echo '<p id="' . esc_attr($id . '-help') . '" class="description">' . esc_html($field['instructions']) . '</p>'; }
             $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help') . '"';
             switch ($field['type']) {
@@ -129,6 +157,7 @@ final class Alify_CF {
             }
             echo '</div>';
         }
+        echo '</div>';
     }
 
     public static function clean_value($field, $value) {
@@ -182,7 +211,26 @@ final class Alify_CF {
                 $keys[$key] = true;
                 $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
                 $clean['default'] = self::clean_value($clean, $field['default'] ?? '');
+                $clean['condition'] = null;
+                if (!empty($field['condition'])) {
+                    $rule = $field['condition'];
+                    if (!is_array($rule) || !isset($rule['field'], $rule['operator'], $rule['value']) || !is_string($rule['field']) || !is_string($rule['operator']) || !is_string($rule['value']) || !in_array($rule['operator'], array('equals', 'not_equals', 'empty', 'not_empty'), true)) {
+                        $errors[] = 'Invalid conditional rule for ' . $name;
+                    } else {
+                        $clean['condition'] = array('field' => sanitize_key($rule['field']), 'operator' => $rule['operator'], 'value' => sanitize_text_field($rule['value']));
+                    }
+                }
                 $fields[] = $clean;
+            }
+            foreach ($fields as $field) {
+                if (!$field['condition']) { continue; }
+                $source = null;
+                foreach ($fields as $candidate) {
+                    if ($candidate['key'] === $field['condition']['field']) { $source = $candidate; break; }
+                }
+                if (!$source || $source['key'] === $field['key'] || $source['condition']) {
+                    $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
+                }
             }
             // Reserve names across published and draft groups on the same post type.
             $others = get_posts(array('post_type' => self::GROUP, 'post_status' => array('publish', 'draft', 'pending', 'private', 'future'), 'numberposts' => -1, 'exclude' => array($id), 'meta_key' => self::LOCATION, 'meta_value' => $location));
@@ -201,7 +249,14 @@ final class Alify_CF {
             $nonce = $_POST['alify_values_nonce_' . $group->ID] ?? '';
             if (!is_string($nonce) || !wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'alify_values_' . $id . '_' . $group->ID)) { continue; }
             $values = isset($_POST['alify_values'][$group->ID]) && is_array($_POST['alify_values'][$group->ID]) ? wp_unslash($_POST['alify_values'][$group->ID]) : array();
-            foreach (self::schema($group->ID) as $field) {
+            $schema = self::schema($group->ID);
+            $submitted_values = array();
+            foreach ($schema as $field) {
+                $submitted_values[$field['key']] = self::clean_value($field, $values[$field['name']] ?? '');
+            }
+            foreach ($schema as $field) {
+                // Hidden values are preserved, even if a forged request supplies them.
+                if (!self::visible($field, $schema, $submitted_values)) { continue; }
                 $value = self::clean_value($field, $values[$field['name']] ?? '');
                 $submitted = $values[$field['name']] ?? '';
                 $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1');

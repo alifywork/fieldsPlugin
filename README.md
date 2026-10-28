@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.2.0 — media and validation release**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.3.0 — conditional logic release**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -19,6 +19,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Atomic schema validation and duplicate-name protection across active/draft groups on the same post type.
 - Per-user, per-post save-error notices that name rejected fields and preserve prior values.
 - Labels, stable field keys, field names, instructions, defaults, and required settings.
+- Conditional show/hide rules with live editor updates and server-side enforcement.
 - Expandable cards, drag sorting, keyboard-accessible move buttons, duplication and deletion confirmation.
 - One post-type location rule per group, including custom post types with an admin UI.
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
@@ -74,24 +75,46 @@ if ($url) {
 
 On staging, select/upload an image and a PDF; save and reload, replace and remove them, then test a required empty media field. Attempt to submit a PDF ID for an Image field or a non-attachment post ID for either field. Confirm the previous value survives with an error notice. Verify media selection as administrator and editor, and clearing as a custom role without upload permission.
 
+## Conditional Logic
+
+Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
+
+- Each field supports **one rule**, referencing an **unconditional field in the same group**. AND/OR groups, cross-group references and conditional chains are not implemented.
+- Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
+- Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
+- Checkbox equality tests whether the comparison key is selected; inequality tests absence. An unchecked True / False field counts as empty; number/text `0` does not.
+- Rules reference stable field keys, so renaming/reordering the source does not break them. Removing a referenced source requires updating/disabling its rules before the schema can save. Self-references, cycles and chains are rejected with the previous schema retained.
+- Initially visible fields are calculated from saved values/defaults. JavaScript is required for live updates and disabling hidden inputs so browser validation ignores them.
+- At save time, rules use sanitized submitted source values, not old saved values. Hidden field values are **preserved**, not cleared, even if a forged request submits them. Visible fields retain the existing validation behavior. Sanitization of invalid/HTML input can change a source value on the server; use plain, valid source values for comparisons.
+- Conditional logic is an editing convenience, **not authorization**. Template helpers still return saved hidden values; explicitly apply any frontend display and permission checks in your template.
+
+### Conditional staging checks
+
+1. Create the `show_cta` / required `cta_text` example above. Toggle it, save, reload, and verify visible/hidden states and required behavior in both classic and block editors.
+2. Save CTA text, hide it, save, reveal it, and confirm it survives. Confirm hidden required fields do not trigger validation notices.
+3. Test Select/Checkbox choice keys, empty text, number `0`, unchecked toggles, and each of the four operators.
+4. Rename/reorder the source, duplicate the target, then reload; ensure rules persist and duplicates can be edited independently.
+5. Try deleting the source or making it conditional; verify the group configuration is rejected until affected rules are fixed.
+6. Test groups containing identical legacy keys independently; rules must never read another group's controls.
+
 ## Current limits
 
 - Field names must start with a lowercase letter and contain only lowercase letters, numbers and underscores. Names are reserved across published, draft, pending, private and scheduled groups matching the same post type. Conflicts reject the entire configuration change, preserving its previous fields and location. Trashed groups do not reserve names; avoid restoring legacy conflicting groups without reviewing them.
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Rejected input is not repopulated.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No Repeater, Gallery, Flexible Content, conditional logic, Options Pages, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
+- No Repeater, Gallery, Flexible Content, Options Pages, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Verification
 
-Automated checks for 0.2.0:
+Automated checks for 0.3.0:
 
 ```sh
 npm ci
-npm test       # Six jsdom tests for builder interactions and media behavior
+npm test       # Ten jsdom tests for builder, media and conditional interactions
 npm run check # JavaScript syntax
-php tests/php-unit.php # 26 assertions with isolated WordPress stubs
+php tests/php-unit.php # 45 assertions with isolated WordPress stubs
 ```
 
 PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP files were also parsed against PHP 7.4 grammar. Tests use stubs for WordPress and the media frame, not a live WordPress database or browser. Activation, real media uploads, native sorting and editor integration still require staging checks below.
