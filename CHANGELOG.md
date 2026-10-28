@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.2
+
+- Add dedicated disposable Options Page/group and editor-role browser fixtures without touching Site Settings.
+- Exercise actual admin-post success/failure redirects, detailed errors, attempted-input recovery, correction clearing, invalid nonces, incomplete forms and editor permission denial.
+- Verify persisted database values separately from recovery-rendered inputs after each save/rejection, including post/options isolation and autoload-disabled storage.
+- Clean up the dedicated options data, group and editor user; keep credentials in the existing private fixture file.
+- This is a verification increment, not a full accessibility or compatibility certification.
+
 ## 0.11.1
 
 - Report the first failing Group subfield, Repeater row/subfield and Flexible row/layout/subfield through the existing field-level feedback contract.

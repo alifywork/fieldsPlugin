@@ -81,20 +81,20 @@ php tests/browser/seed.php
 # In a separate terminal (native PHP):
 php -S 0.0.0.0:8080 -t "$ALIFY_WP_ROOT" tests/browser/router.php
 # In the original terminal:
-npm run test:browser
+npm run test:browser # also invokes native php for persisted options checks
 php tests/browser/cleanup.php
 ```
 
 Use only a disposable test server; never expose this setup as a production service. Seed creates an administrator with a random password in a chmod-0600 JSON fixture **outside the document root**, test groups/posts, real PNG uploads and a test-only MU plugin forcing the seeded Classic post into that editor. Cleanup removes them. Do not commit/upload the fixture JSON or server logs. The CI workflow cleans up even on browser failure.
 
-`ALIFY_BROWSER_URL` defaults to `http://127.0.0.1:8080`; `CHROMIUM_EXECUTABLE` optionally selects an installed Chromium executable. The test blocks external browser requests. The native PHP router is for this disposable server only. Local PHP.wasm's CLI server was unstable under browser concurrency, so local browser verification used a scratch Node PHPRequestHandler server instead; the native-PHP server is exercised in CI.
+`ALIFY_BROWSER_URL` defaults to `http://127.0.0.1:8080`; `CHROMIUM_EXECUTABLE` optionally selects an installed Chromium executable. The test blocks external browser requests. Its options-flow persistence verifier invokes `PHP_BIN` (default `php`) against `ALIFY_WP_ROOT`; keep both variables available when using an alternative PHP runtime. The native PHP router is for this disposable server only. Local PHP.wasm's CLI server was unstable under browser concurrency, so local browser verification used a scratch Node PHPRequestHandler server instead; the native-PHP server is exercised in CI.
 
 **Earlier local browser baseline (0.6.2):** 14 Chromium assertions passed on WordPress 6.8.3 / PHP.wasm 8.3.33: actual Classic rejection/redirect/recovery/correction; native gallery media modal; ordered gallery/repeater persistence after save/reload; actual Gutenberg rejection/inline feedback/correction; raw REST omitted-field rejection; no uncaught page JavaScript errors. These are not jsdom/media mocks. The current native-PHP CI results above supersede this baseline with 52 assertions per target; its remote results are separate from this local observation.
 
 ## Still pending
 
 - MariaDB and database versions beyond the explicit MySQL 8.0 CI target.
-- Options-page HTTP redirects, repeater image-subfield media selection, drag sorting, responsive/accessibility audits and individual repeater-subfield error highlighting.
+- Repeater image-subfield media selection, drag sorting, responsive/accessibility audits and individual repeater-subfield error highlighting.
 - Direct SQL/`wp_publish_post()`/cron/custom publishing-pipeline policy enforcement: the current gate covers Classic insertion/update hooks and core post REST saves, not every possible status mutation.
 - Wider compatibility matrix, multisite and third-party plugin/theme interactions.
 

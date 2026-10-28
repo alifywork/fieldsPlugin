@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.11.1 — actionable container validation feedback**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.11.2 — options HTTP-flow hardening**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -342,7 +342,7 @@ Messages never include rejected scalar values, submitted row tokens, unknown lay
 
 ## Verification
 
-Automated checks for 0.11.1:
+Automated checks for 0.11.2:
 
 ```sh
 npm ci
@@ -370,7 +370,7 @@ See [integration setup, coverage and limitations](tests/integration/README.md). 
 
 **Earlier local browser baseline (0.6.2):** 14 end-to-end assertions passed locally on WordPress 6.8.3 / PHP.wasm 8.3.33, including Classic rejection/redirect/correction, Gutenberg REST rejection/correction, native media-modal gallery selection, gallery/repeater ordering after save/reload, and raw REST publication protection. Repeatable browser seed/cleanup scripts and native-PHP CI steps cover both matrix targets; see the integration guide.
 
-**Still pending:** MariaDB, wider MySQL versions, options-page HTTP save/redirect flows, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
+**Still pending:** MariaDB, wider MySQL versions, repeater image-subfield media interactions, responsive/accessibility audits, multisite and wider third-party compatibility.
 
 The CI matrix now includes isolated MySQL 8.0 services alongside SQLite for both PHP/WordPress pairs, running the same backend and browser suites. The MySQL runner requires explicit disposable-database opt-in and loopback credentials; see the integration guide. All four native-PHP targets passed 211 backend and 52 Chromium assertions in [CI run 40676351950](https://github.com/alifywork/fieldsPlugin/actions/runs/40676351950), with clean debug-log checks. The browser checks include actual container error paths, rejection/correction flows and accessible REST error references, as well as row bounds, JSON transfer, Group/Flexible persistence and compound conditions. These remote results are separate from the local sandbox SQLite checks.
 

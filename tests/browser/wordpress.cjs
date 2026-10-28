@@ -1,6 +1,8 @@
 // Real Chromium against an explicitly seeded disposable WordPress site.
 const {chromium} = require('playwright-core');
 const fs = require('node:fs');
+const {execFileSync} = require('node:child_process');
+const path = require('node:path');
 const assert = require('node:assert/strict');
 const base = process.env.ALIFY_BROWSER_URL || 'http://127.0.0.1:8080';
 if (!process.env.ALIFY_BROWSER_FIXTURE) throw new Error('Set ALIFY_BROWSER_FIXTURE to the private seed file.');
@@ -178,6 +180,59 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const malformedReady = page.waitForResponse(response => response.url().includes('admin-post.php') && response.status() === 400);
         await page.getByRole('button', {name: 'Import as draft'}).click(); await malformedReady;
         check((await page.locator('body').textContent()).includes('Invalid Alify JSON'), true, 'Malformed upload rejected by actual HTTP handler');
+        // Real admin-post forms: DOM recovery is checked separately from persisted database values.
+        const optionsURL = base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-options-browser-http';
+        const optionValue = name => page.locator(`[name="alify_values[${fixture.options_group}][${name}]"]`);
+        const verifyOptions = phase => {
+            const result = execFileSync(process.env.PHP_BIN || 'php', [path.join(__dirname, 'verify-options.php'), phase], {encoding: 'utf8'});
+            assert.match(result, /PASS: 3 HTTP options persistence assertions/); checks += 3;
+        };
+        async function saveOptions() { await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save Settings', exact: true}).click()]); }
+        await page.goto(optionsURL);
+        await optionValue('options_title').fill('Saved title');
+        await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).check();
+        await page.locator('.alify-group [type="text"]').fill('Saved profile');
+        await page.locator('[data-row-action="add"]').click(); await page.locator('.alify-row [type="text"]').fill('Option member');
+        await saveOptions();
+        check(page.url(), optionsURL, 'Options form redirects to its registered page');
+        check(await page.locator('.notice-success').count(), 1, 'Actual options save shows success notice');
+        verifyOptions('baseline');
+        await optionValue('options_title').fill('Attempted title'); await page.locator('.alify-group [type="text"]').fill('Attempted profile');
+        await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).uncheck();
+        await page.locator('.alify-row [type="text"]').fill('');
+        await page.locator('.alify-options-page form').evaluate(form => { form.noValidate = true; });
+        await saveOptions();
+        check(await page.locator('.notice-error').count(), 1, 'Invalid options HTTP save redirects with failure notice');
+        check(await optionValue('options_title').inputValue(), 'Attempted title', 'Options restores attempted input separately from saved data');
+        check((await page.locator('.alify-value[data-field-type="repeater"] .alify-field-error').textContent()).includes('Row 1 → Name:'), true, 'Options HTTP flow displays detailed row error');
+        verifyOptions('baseline');
+        await optionValue('options_title').fill('Corrected title'); await page.locator('.alify-group [type="text"]').fill('Corrected profile');
+        await page.locator('.alify-row [type="text"]').fill('Corrected member');
+        await page.locator(`[name="alify_values[${fixture.options_group}][options_tags][]"][value="a"]`).check();
+        await saveOptions();
+        check(await page.locator('.notice-success').count(), 1, 'Corrected options save succeeds');
+        check(await page.locator('.alify-recovery-note').count(), 0, 'Options correction clears recovered-input note');
+        verifyOptions('corrected');
+        const nonce = await page.locator('[name="alify_options_nonce"]').inputValue();
+        const invalidNonce = await context.request.post(base + '/wp-admin/admin-post.php', {maxRedirects: 0, form: {action: 'alify_cf_save_options', alify_options_page: 'browser-http', alify_options_nonce: 'invalid'}});
+        check(invalidNonce.status(), 302, 'Invalid options nonce follows controlled failure redirect');
+        await page.goto(optionsURL);
+        check((await page.locator('.notice-error').textContent()).includes('Security check failed'), true, 'Invalid options nonce yields a security notice');
+        verifyOptions('corrected');
+        const incomplete = await context.request.post(base + '/wp-admin/admin-post.php', {maxRedirects: 0, form: {action: 'alify_cf_save_options', alify_options_page: 'browser-http', alify_options_nonce: nonce, alify_options_complete: '1', [`alify_values[${fixture.options_group}][options_title]`]: 'Must not save'}});
+        check(incomplete.status(), 302, 'Truncated options form uses failure redirect');
+        verifyOptions('corrected');
+        const editorContext = await browser.newContext();
+        try {
+            const editorPage = await editorContext.newPage();
+            await editorPage.route('**/*', route => route.request().url().startsWith(base + '/') ? route.continue() : route.abort());
+            await editorPage.goto(base + '/wp-login.php'); await editorPage.locator('#user_login').fill(fixture.editor_username); await editorPage.locator('#user_pass').fill(fixture.editor_password);
+            await Promise.all([editorPage.waitForURL('**/wp-admin/**'), editorPage.locator('#wp-submit').click()]);
+            const deniedPage = await editorPage.goto(optionsURL); check(deniedPage.status(), 403, 'Editor cannot view administrator options page');
+            const deniedSave = await editorContext.request.post(base + '/wp-admin/admin-post.php', {form: {action: 'alify_cf_save_options', alify_options_page: 'browser-http', alify_options_nonce: nonce}});
+            check(deniedSave.status(), 403, 'Editor cannot submit options even with an administrator nonce');
+        } finally { await editorContext.close(); }
+        verifyOptions('corrected');
         check(errors, [], 'No uncaught browser JS errors');
         console.log(`PASS: ${checks} real browser assertions (Classic, Gutenberg, media modal, repeater, gallery, raw REST).`);
     } finally { await context.close(); await browser.close(); }
