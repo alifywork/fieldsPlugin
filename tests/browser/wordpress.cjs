@@ -166,7 +166,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
         check(exported.version, 2, 'Row-bound schema exports as v2 for safe older-importer rejection');
-        check(exported.group.fields.length, 9, 'Export includes all browser fixture fields');
+        check(exported.group.fields.length, 11, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});
