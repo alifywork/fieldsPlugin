@@ -83,7 +83,13 @@
     function edited(event) {
         const field = event.target.closest('.alify-value');
         if (field) {
-            field.querySelectorAll('.alify-field-error').forEach(error => { error.hidden = true; });
+            const errors = Array.from(field.querySelectorAll('.alify-field-error'));
+            const errorIds = errors.map(error => error.id).filter(Boolean);
+            errors.forEach(error => { error.hidden = true; });
+            field.querySelectorAll('[aria-describedby]').forEach(control => {
+                const ids = control.getAttribute('aria-describedby').split(/\s+/).filter(id => id && !errorIds.includes(id));
+                if (ids.length) control.setAttribute('aria-describedby', ids.join(' ')); else control.removeAttribute('aria-describedby');
+            });
             field.querySelectorAll('[aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
         }
         refreshConditions();

@@ -46,11 +46,13 @@ final class Alify_CF_Repeater {
     }
 
     /** Invalid/truncated payloads return '', causing the caller to retain all old rows. */
-    public static function clean($field, $payload, $old = null, $permissions = false) {
-        if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1') { return ''; }
+    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null) {
+        $issue = '';
+        if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1') { $issue = 'Incomplete submission. Reload the editor.'; return ''; }
         $rows = $payload['rows'] ?? array();
         list($minimum, $maximum) = self::bounds($field);
-        if (!is_array($rows) || count($rows) < $minimum || count($rows) > min($maximum, self::MAX_ROWS) || empty($field['sub_fields'])) { return ''; }
+        if (!is_array($rows) || empty($field['sub_fields'])) { $issue = 'Invalid row structure. Reload the editor.'; return ''; }
+        if (count($rows) < $minimum || count($rows) > min($maximum, self::MAX_ROWS)) { $issue = 'Use between ' . $minimum . ' and ' . min($maximum, self::MAX_ROWS) . ' rows; received ' . count($rows) . '.'; return ''; }
         $allowed_media = array();
         foreach ((array) $old as $row) {
             if (!is_array($row)) { continue; }
@@ -62,15 +64,21 @@ final class Alify_CF_Repeater {
             }
         }
         $clean = array();
+        $position = 0;
         foreach ($rows as $row) {
-            if (!is_array($row) || ($row['__row_complete'] ?? '') !== '1') { return ''; }
+            $position++;
+            if (!is_array($row) || ($row['__row_complete'] ?? '') !== '1') { $issue = 'Row ' . $position . ': Incomplete row. Reload the editor.'; return ''; }
             $out = array();
             foreach ($field['sub_fields'] as $sub) {
                 $raw = $row[$sub['name']] ?? '';
                 $value = $sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw);
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
-                if (($sub['type'] === 'gallery' && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) { return ''; }
-                if ($permissions && in_array($sub['type'], array('image', 'file'), true) && $value !== '' && !in_array((string) $value, $allowed_media, true) && !current_user_can('edit_post', $value)) { return ''; }
+                $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
+                if (($sub['type'] === 'gallery' && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                    $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
+                    return '';
+                }
+                if ($permissions && in_array($sub['type'], array('image', 'file'), true) && $value !== '' && !in_array((string) $value, $allowed_media, true) && !current_user_can('edit_post', $value)) { $issue = $path . 'You cannot select this attachment.'; return ''; }
                 $out[$sub['name']] = $value;
             }
             $clean[] = $out;

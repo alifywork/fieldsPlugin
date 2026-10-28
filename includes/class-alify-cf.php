@@ -160,6 +160,8 @@ final class Alify_CF {
     public static function control($field, $value, $id, $input, $error_id = '') {
         $required = !empty($field['required']) ? ' required' : '';
         $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '');
+        $container_error = $error_id && in_array($field['type'], array('group', 'repeater', 'flexible'), true);
+        if ($container_error) { echo '<div class="alify-container-error" role="group" aria-invalid="true" aria-describedby="' . esc_attr($error_id) . '">'; }
         switch ($field['type']) {
             case 'gallery':
                 Alify_CF_Gallery::render($field, $value, $id, $input); break;
@@ -187,6 +189,7 @@ final class Alify_CF {
             default:
                 echo '<input type="' . esc_attr($field['type']) . '"' . $attrs . ' value="' . esc_attr(is_scalar($value) ? $value : '') . '"' . ($field['type'] === 'number' ? ' step="any"' : '') . $required . '>'; break;
         }
+        if ($container_error) { echo '</div>'; }
     }
 
     public static function clean_value($field, $value) {
@@ -317,12 +320,13 @@ final class Alify_CF {
         foreach ($schema as $field) {
             // Hidden values are preserved, even if a forged request supplies them.
             if (!self::visible($field, $schema, $submitted_values)) { continue; }
+            $issue = '';
             if ($field['type'] === 'flexible') {
-                $value = Alify_CF_Flexible::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
+                $value = Alify_CF_Flexible::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue);
             } elseif ($field['type'] === 'group') {
-                $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
+                $value = Alify_CF_Group::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue);
             } elseif ($field['type'] === 'repeater') {
-                $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true);
+                $value = Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', $previous[$field['name']] ?? null, true, $issue);
             } elseif ($field['type'] === 'gallery') {
                 $value = Alify_CF_Gallery::clean($values[$field['name']] ?? '', $previous[$field['name']] ?? array(), true);
             } else {
@@ -332,7 +336,9 @@ final class Alify_CF {
             $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1') || ($field['type'] === 'group' && Alify_CF_Group::empty_value($field, $value));
             $invalid = (in_array($field['type'], array('repeater', 'gallery', 'group', 'flexible'), true) && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
             if (($field['required'] && $empty) || $invalid) {
-                $message = ($field['required'] && $empty ? 'A valid value is required.' : 'Invalid value.') . ' Previous saved value retained.';
+                if (!$issue && $field['type'] === 'group' && $field['required'] && $empty) { $issue = 'Fill at least one subfield in this Group.'; }
+                if (!$issue && $field['type'] === 'flexible' && $field['required'] && $empty) { $issue = 'Add at least one layout row.'; }
+                $message = ($issue ?: ($field['required'] && $empty ? 'A valid value is required.' : 'Invalid value.')) . ' Previous saved value retained.';
                 $field_errors[$field['name']] = $message;
                 $errors[] = $field['label'] . ': ' . $message;
                 continue;

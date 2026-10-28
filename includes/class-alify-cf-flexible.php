@@ -19,17 +19,24 @@ final class Alify_CF_Flexible {
         foreach ($field['layouts'] ?? array() as $layout) { if ($layout['name'] === $name) { return $layout; } }
         return null;
     }
-    public static function clean($field, $payload, $old = null, $permissions = false) {
-        if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1' || !is_array($payload['rows'] ?? array()) || count($payload['rows'] ?? array()) > self::MAX_ROWS) { return ''; }
+    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null) {
+        $issue = '';
+        if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1' || !is_array($payload['rows'] ?? array()) || count($payload['rows'] ?? array()) > self::MAX_ROWS) { $issue = 'Use a complete layout list with no more than 50 rows. Reload if the submission was incomplete.'; return ''; }
         $out = array();
+        $position = 0;
         foreach ($payload['rows'] ?? array() as $row) {
-            if (!is_array($row) || !is_string($row['layout'] ?? null) || ($row['__complete'] ?? '') !== '1' || !is_array($row['fields'] ?? null)) { return ''; }
-            $layout = self::layout($field, $row['layout']); if (!$layout) { return ''; }
+            $position++;
+            if (!is_array($row) || !is_string($row['layout'] ?? null) || ($row['__complete'] ?? '') !== '1' || !is_array($row['fields'] ?? null)) { $issue = 'Row ' . $position . ': Incomplete layout row. Reload the editor.'; return ''; }
+            $layout = self::layout($field, $row['layout']); if (!$layout) { $issue = 'Row ' . $position . ': Unknown layout. Restore its schema or remove the row explicitly.'; return ''; }
             $previous = array();
             foreach (is_array($old) ? $old : array() as $saved) { if (is_array($saved) && ($saved['layout'] ?? null) === $layout['name'] && is_array($saved['fields'] ?? null)) { $previous[] = $saved['fields']; } }
             $values = $row['fields']; $values['__row_complete'] = '1';
-            $clean = Alify_CF_Repeater::clean($layout, array('__complete' => '1', 'rows' => array($values)), $previous, $permissions);
-            if (!is_array($clean)) { return ''; }
+            $clean = Alify_CF_Repeater::clean($layout, array('__complete' => '1', 'rows' => array($values)), $previous, $permissions, $issue);
+            if (!is_array($clean)) {
+                if (strpos($issue, 'Row 1 → ') === 0) { $issue = substr($issue, strlen('Row 1 → ')); }
+                $issue = 'Row ' . $position . ' (' . $layout['label'] . ') → ' . $issue;
+                return '';
+            }
             $out[] = array('layout' => $layout['name'], 'fields' => $clean[0]);
         }
         return $out;

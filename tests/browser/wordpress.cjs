@@ -25,6 +25,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'draft', 'Classic invalid required checkbox must not publish');
         check(await page.locator('.alify-field-error').count() > 0, true, 'Classic shows inline error');
+        check((await page.locator('.alify-value[data-field-type="group"] .alify-field-error').textContent()).includes('Tags: A valid value is required.'), true, 'Classic Group message identifies invalid subfield');
         check(await value('subtitle').inputValue(), 'Classic subtitle', 'Classic restores attempted text');
         await page.locator(`[name="alify_values[${fixture.group}][tags][]"][value="a"]`).check();
         await page.locator('.alify-group [type="checkbox"][value="a"]').check();
@@ -54,6 +55,12 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('[data-flex-action="add"]').click();
         await page.locator('.alify-flex-row textarea').fill('Classic flexible body');
         await page.locator('.alify-flex-row').nth(1).locator('[data-flex-action="up"]').click();
+        await page.locator('.alify-row [type="text"]').first().evaluate(node => node.removeAttribute('required'));
+        await page.locator('.alify-row [type="text"]').first().fill('');
+        await saveClassic();
+        check(await page.locator('#original_post_status').inputValue(), 'draft', 'Invalid row subfield blocks actual Classic publication');
+        check((await page.locator('.alify-value[data-field-type="repeater"] .alify-field-error').textContent()).includes('Row 1 → Name:'), true, 'Classic summary identifies offending row and subfield');
+        await page.locator('.alify-row [type="text"]').first().fill('Second member');
         await saveClassic();
         check(await page.locator('#original_post_status').inputValue(), 'publish', 'Classic valid form publishes');
         check(await page.locator('.alify-flex-row input[name$="[layout]"]').evaluateAll(nodes => nodes.map(node => node.value)), ['text', 'hero'], 'Mixed Flexible layout order survives Classic save/reload');
@@ -97,6 +104,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-flex-choice').selectOption('text');
         await page.locator('[data-flex-action="add"]').click();
         await page.locator('.alify-flex-row textarea').fill('Gutenberg flexible body');
+        await page.locator('.alify-flex-row textarea').fill('');
         await page.locator('.editor-post-publish-panel__toggle').click();
         const invalid = page.waitForResponse(response => response.request().method() === 'POST' && response.status() === 400 && response.url().includes('posts'));
         await page.locator('.editor-post-publish-button').click(); const invalidResponse = await invalid;
@@ -105,6 +113,14 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-field-error').first().waitFor();
         check(await page.evaluate(() => wp.data.select('core/editor').getCurrentPost().status), 'draft', 'REST validation blocks Gutenberg publication');
         check(await page.locator('.alify-field-error').count() > 0, true, 'Gutenberg renders server field errors');
+        const flexibleError = page.locator('.alify-value[data-field-type="flexible"] .alify-field-error');
+        check((await flexibleError.textContent()).includes('Row 1 (Text) → Body:'), true, 'Gutenberg error names layout, row and subfield');
+        const errorId = await flexibleError.getAttribute('id');
+        check((await page.locator('.alify-flex-row textarea').getAttribute('aria-describedby')).split(/\s+/).includes(errorId), true, 'REST error is linked to affected container controls');
+        await page.locator('.alify-flex-row textarea').fill('Gutenberg flexible body');
+        check(await page.locator('.alify-flex-row textarea').getAttribute('aria-invalid'), null, 'Editing clears stale container invalid state');
+        check((await page.locator('.alify-flex-row textarea').getAttribute('aria-describedby') || '').split(/\s+/).includes(errorId), false, 'Editing removes stale error description link');
+
         await page.locator(`[name="alify_values[${fixture.group}][tags][]"][value="a"]`).check();
         await page.locator('.alify-group [type="checkbox"][value="a"]').check();
         await value('show_details').check();

@@ -3,10 +3,12 @@ if (!defined('ABSPATH')) { exit; }
 
 /** Fixed single-level object; shares basic subfield validation with repeaters. */
 final class Alify_CF_Group {
-    public static function clean($field, $payload, $old = null, $permissions = false) {
-        if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1' || !is_array($payload['fields'] ?? null)) { return ''; }
+    public static function clean($field, $payload, $old = null, $permissions = false, &$issue = null) {
+        $issue = '';
+        if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1' || !is_array($payload['fields'] ?? null)) { $issue = 'Incomplete Group submission. Reload the editor.'; return ''; }
         $row = $payload['fields']; $row['__row_complete'] = '1';
-        $rows = Alify_CF_Repeater::clean($field, array('__complete' => '1', 'rows' => array($row)), is_array($old) ? array($old) : array(), $permissions);
+        $rows = Alify_CF_Repeater::clean($field, array('__complete' => '1', 'rows' => array($row)), is_array($old) ? array($old) : array(), $permissions, $issue);
+        if (strpos($issue, 'Row 1 → ') === 0) { $issue = substr($issue, strlen('Row 1 → ')); }
         return is_array($rows) ? $rows[0] : '';
     }
     public static function empty_value($field, $value) {

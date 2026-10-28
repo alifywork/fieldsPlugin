@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.1
+
+- Report the first failing Group subfield, Repeater row/subfield and Flexible row/layout/subfield through the existing field-level feedback contract.
+- Add actionable row-count/incomplete-structure messages while preserving atomic values and publication checks.
+- Keep rejected values, submitted row tokens, unknown layout names and attachment identities out of diagnostic messages.
+- Link container alerts and REST errors accessibly; clear stale error description references on edit while retaining help references.
+- Add isolated, backend and actual-browser regression coverage. Per-subfield inline placement, focus management and full accessibility auditing remain pending.
+
 ## 0.11.0
 
 - Add configurable Repeater minimum/maximum row counts, with strict 0–50 / 1–50 schema validation and minimum ≤ maximum.

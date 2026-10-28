@@ -37,8 +37,14 @@
                     if (!name || !errors[name[1]]) return;
                     let message = field.querySelector('.alify-field-error');
                     if (!message) { message = document.createElement('p'); message.className = 'alify-field-error'; message.setAttribute('role', 'alert'); field.appendChild(message); }
+                    if (!message.id) message.id = 'alify-editor-error-' + match[1] + '-' + name[1];
                     message.hidden = false; message.textContent = errors[name[1]];
-                    field.querySelectorAll('input, select, textarea').forEach(control => control.setAttribute('aria-invalid', 'true'));
+                    field.querySelectorAll('input, select, textarea').forEach(control => {
+                        control.setAttribute('aria-invalid', 'true');
+                        const descriptions = (control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+                        if (!descriptions.includes(message.id)) descriptions.push(message.id);
+                        control.setAttribute('aria-describedby', descriptions.join(' '));
+                    });
                 });
             });
             throw error;

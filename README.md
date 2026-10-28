@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.11.0 — configurable Repeater row bounds**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.11.1 — actionable container validation feedback**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -332,9 +332,17 @@ Gutenberg injects enabled metabox controls into the same core REST save as `alif
 
 Autosaves and ordinary draft saves without a field payload remain available. Direct SQL, `wp_publish_post()`, cron status transitions and custom third-party publishing pipelines are not comprehensively gated; this is editor/core REST protection, not a database-wide publication policy.
 
+### Container validation diagnostics
+
+Group errors identify the subfield; Repeater errors identify the visual row number and subfield; Flexible errors also identify the schema's layout label. For example: **Row 2 (Contact) → Email: A valid value is required.** Row counts and incomplete structures have explicit correction/reload messages.
+
+This increment reports the **first failing location per container** in the existing field-level alert, across Classic, Gutenberg/core REST and options feedback. It does not yet render separate inline errors beside every subfield, focus/jump to rows, or enumerate all failures at once. Fix the reported issue and save again to reveal another failure. The complete previous container stays saved until validation succeeds.
+
+Messages never include rejected scalar values, submitted row tokens, unknown layout names or attachment identities. Container alerts have accessible description references; REST-created errors link to controls, and editing clears stale invalid/error references without removing existing help descriptions. This is targeted accessibility hardening, not a completed accessibility audit.
+
 ## Verification
 
-Automated checks for 0.11.0:
+Automated checks for 0.11.1:
 
 ```sh
 npm ci

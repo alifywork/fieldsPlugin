@@ -470,6 +470,45 @@ try {
     expect_same(1, Alify_CF::schema($limit_group)[0]['min_rows'], 'Invalid bounds preserve previous schema');
     $limit_doc['group']['fields'][0]['max_rows'] = 51;
     expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($limit_doc), $import_nonce)->get_error_code(), 'Import rejects invalid row bounds before creation');
+    // Container diagnostics preserve atomic saves and use the existing string error contract.
+    $_POST = array(); wp_update_post(array('ID' => $limit_group, 'post_status' => 'draft'));
+    $diagnostic_group = fixture_post(Alify_CF::GROUP); $diagnostic_post = fixture_post();
+    $diagnostic_profile = test_field('diagnostic_profile', 'group'); $diagnostic_profile['sub_fields'] = array(test_field('name', 'text', true));
+    $diagnostic_people = test_field('diagnostic_people', 'repeater'); $diagnostic_people['sub_fields'] = array(test_field('email', 'email', true));
+    $diagnostic_blocks = test_field('diagnostic_blocks', 'flexible'); $diagnostic_blocks['layouts'] = array(array('key' => 'layout_contact', 'name' => 'contact', 'label' => 'Contact', 'sub_fields' => array(test_field('body', 'text', true))));
+    configure_group($diagnostic_group, array($diagnostic_profile, $diagnostic_people, $diagnostic_blocks));
+    $diagnostic_valid = array('diagnostic_profile' => array('__complete' => '1', 'fields' => array('name' => 'Member')), 'diagnostic_people' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'email' => 'one@example.com'), array('__row_complete' => '1', 'email' => 'two@example.com'))), 'diagnostic_blocks' => array('__complete' => '1', 'rows' => array(array('layout' => 'contact', '__complete' => '1', 'fields' => array('body' => 'Saved')))));
+    save_values($diagnostic_post, $diagnostic_group, $diagnostic_valid);
+    $diagnostic_old = array(alify_get_group('diagnostic_profile', $diagnostic_post), alify_get_rows('diagnostic_people', $diagnostic_post), alify_get_layouts('diagnostic_blocks', $diagnostic_post));
+    $diagnostic_bad = $diagnostic_valid; $diagnostic_bad['diagnostic_profile']['fields']['name'] = ''; $diagnostic_bad['diagnostic_people']['rows'][1]['email'] = 'private-invalid'; $diagnostic_bad['diagnostic_blocks']['rows'][0]['fields']['body'] = '';
+    save_values($diagnostic_post, $diagnostic_group, $diagnostic_bad, 'publish');
+    $diagnostic_feedback = Alify_CF_Feedback::get('post_' . $diagnostic_post)[$diagnostic_group]['errors'];
+    expect_same('Name: A valid value is required. Previous saved value retained.', $diagnostic_feedback['diagnostic_profile'], 'Classic Group error names subfield');
+    expect_same('Row 2 → Email: A valid value is required. Previous saved value retained.', $diagnostic_feedback['diagnostic_people'], 'Classic Repeater error names row and subfield');
+    expect_same('Row 1 (Contact) → Body: A valid value is required. Previous saved value retained.', $diagnostic_feedback['diagnostic_blocks'], 'Classic Flexible error names layout and subfield');
+    expect_same($diagnostic_old, array(alify_get_group('diagnostic_profile', $diagnostic_post), alify_get_rows('diagnostic_people', $diagnostic_post), alify_get_layouts('diagnostic_blocks', $diagnostic_post)), 'Detailed errors do not partially replace container values');
+    expect_same('draft', get_post_status($diagnostic_post), 'Detailed validation still blocks publication');
+    ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $diagnostic_html = ob_get_clean();
+    expect_same(true, strpos($diagnostic_html, 'class="alify-container-error" role="group" aria-invalid="true" aria-describedby=') !== false, 'Classic container error is accessibly described');
+    $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $diagnostic_post); $request->set_param('status', 'publish');
+    $diagnostic_bad['__group_complete'] = '1';
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $diagnostic_bad)));
+    $response = rest_do_request($request);
+    expect_same(400, $response->get_status(), 'REST detailed errors reject before post write');
+    expect_same($diagnostic_feedback, $response->get_data()['data']['alify_errors'][$diagnostic_group], 'REST carries the same detailed strings as Classic');
+    expect_same(false, strpos($response->get_data()['message'], 'private-invalid') !== false, 'REST error messages do not leak rejected values');
+    $diagnostic_valid['__group_complete'] = '1'; $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $diagnostic_valid)));
+    expect_same(200, rest_do_request($request)->get_status(), 'Correction clears diagnostic rejection and publishes');
+    expect_same(array(), Alify_CF_Feedback::get('post_' . $diagnostic_post), 'Correction clears diagnostic feedback');
+    Alify_CF_Options::register('diagnostics', 'Diagnostic tests');
+    $diagnostic_json = json_decode(Alify_CF_Transfer::export_json($diagnostic_group, $export_nonce), true); $diagnostic_json['group']['location'] = 'options:diagnostics';
+    $diagnostic_options = Alify_CF_Transfer::import_json(wp_json_encode($diagnostic_json), $import_nonce); $fixtures[] = $diagnostic_options;
+    $_POST = array(); wp_update_post(array('ID' => $diagnostic_options, 'post_status' => 'publish'));
+    $diagnostic_request = array('alify_options_nonce' => wp_create_nonce('alify_options_diagnostics'), 'alify_options_complete' => '1', 'alify_values' => array($diagnostic_options => $diagnostic_valid));
+    $diagnostic_errors = array(); expect_same(true, Alify_CF_Options::save('diagnostics', $diagnostic_request, $diagnostic_errors), 'Valid diagnostic containers save on options page');
+    $diagnostic_request['alify_values'][$diagnostic_options] = $diagnostic_bad;
+    expect_same(false, Alify_CF_Options::save('diagnostics', $diagnostic_request, $diagnostic_errors), 'Options detailed errors preserve atomicity');
+    expect_same($diagnostic_feedback, Alify_CF_Feedback::get('options_diagnostics')[$diagnostic_options]['errors'], 'Options feedback shares detailed row/layout messages');
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
@@ -485,6 +524,7 @@ try {
     delete_option('alify_cf_options_flex-tests');
     delete_option('alify_cf_options_condition-tests');
     delete_option('alify_cf_options_row-limits');
+    delete_option('alify_cf_options_diagnostics');
     Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }

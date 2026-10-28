@@ -457,3 +457,22 @@ test('repeater remove/add limits survive conditional visibility refresh and neve
     assert.equal(d.querySelector('.alify-row input').value, 'keep');
     w.close();
 });
+
+
+test('REST feedback has accessible error references, clears on edit and relinks on repeated rejection', async () => {
+    const w = editorBridge(), d = w.document;
+    const input = d.querySelector('[name="alify_values[7][title]"]'); input.setAttribute('aria-describedby', 'existing-help');
+    w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    const error = {data: {alify_errors: {'7': {title: 'Row 2 → Name: Required.'}}}};
+    const reject = () => w.middleware({path: '/wp/v2/posts/10', method: 'POST'}, () => Promise.reject(error));
+    await assert.rejects(reject(), caught => caught === error);
+    const message = d.querySelector('.alify-field-error');
+    assert.equal(input.getAttribute('aria-describedby'), 'existing-help ' + message.id);
+    await assert.rejects(reject(), caught => caught === error);
+    assert.equal(input.getAttribute('aria-describedby'), 'existing-help ' + message.id);
+    input.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(message.hidden, true); assert.equal(input.getAttribute('aria-describedby'), 'existing-help'); assert.equal(input.hasAttribute('aria-invalid'), false);
+    await assert.rejects(reject(), caught => caught === error);
+    assert.equal(message.hidden, false); assert.equal(input.getAttribute('aria-describedby'), 'existing-help ' + message.id);
+    w.close();
+});
