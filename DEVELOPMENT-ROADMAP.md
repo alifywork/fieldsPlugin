@@ -26,15 +26,15 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 
 ## B. Relational and external fields
 
-11. [ ] Taxonomy selector — permitted taxonomies, single/multiple terms, validation and getters. **Next queue item; continue related-feature batches.**
-12. [ ] User selector — permissions/privacy, bounded search, single/multiple and getters.
-13. [ ] Page Link — page/post/archive URL selection with defined resolution behavior.
+11. [x] **Taxonomy selector** — v0.27.0: registered taxonomy filters, assignment-capability search/new selection, ordered single/multiple metadata IDs and opt-in term objects. No actual term assignment/tree UI.
+12. [x] **User selector** — v0.27.0: role/current-site filters, list_users-protected display-name search, single/multiple IDs and safe ID/display-name formatted records; never WP_User objects.
+13. [x] **Page Link** — v0.27.0: public published post/page/CPT and eligible archive tokens, ordered single/multiple selection, current URL resolution. **Current completed development batch.**
 14. [x] **Post Object/Relationship CPT targets** — v0.26.0: registered show_ui types, per-field filters and permission-filtered search/save validation.
 15. [x] **Reference status restrictions** — v0.26.0: publish/private/draft/pending/future subsets enforced by search and saves.
 16. [ ] Reference taxonomy filters and editor filtering controls.
 17. [x] **Multiple Post Object** — v0.26.0: ordered complete ID lists, picker/reordering/clearing, containers/Options/REST/publication/recovery; no scalar/list migration or list conditional sources.
 18. [x] **Relationship min/max cardinality** — v0.26.0: shared multiple-reference bounds, maximum 50, optional empty versus Required semantics, no truncation.
-19. [x] **Reference return formats** — v0.26.0: opt-in ID/object returns recursively across containers/Options; unavailable or unreadable objects omitted/null; raw IDs unchanged. **Current completed development batch.**
+19. [x] **Reference return formats** — v0.26.0: opt-in ID/object returns recursively across containers/Options; unavailable or unreadable objects omitted/null; raw IDs unchanged.
 20. [ ] Bidirectional relationships — dependency on supported object locations and safe write APIs; avoid recursive writes and partial updates.
 21. [ ] oEmbed — bounded remote provider handling and rendering contract.
 22. [ ] Google Map — provider/key configuration, location storage and external-service constraints.
@@ -138,3 +138,5 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 - **v0.25.0 — Color/media/Link configuration batch:** items 8–10 developed together, including defaults, server validation, formatted getters and JSON v5. Local: 726 PHP / 68 JS / 528 backend assertions on both existing SQLite targets. Verified in [CI run 40708689961](https://github.com/alifywork/fieldsPlugin/actions/runs/40708689961): all four native targets green (528 backend / 168 browser / 24 HTTP persistence checks). Roadmap: 10 complete, 67 pending; this is not a claim that the full backlog is finished.
 
 - **v0.26.0 — Shared reference-engine batch:** complete items 14, 15, 17, 18 and 19 together before new selectors (11–13). Dependency ordering: expand the existing shared reference engine first rather than duplicate target/filter/permission infrastructure in new selectors. Item 16 taxonomy filtering remains pending. Local 755 PHP / 70 JS / 558 backend on both SQLite targets; verified in [CI run 40709951548](https://github.com/alifywork/fieldsPlugin/actions/runs/40709951548): all four native targets pass (558 backend / 175 browser / 24 HTTP persistence checks). Roadmap now 15 complete / 62 pending.
+
+- **v0.27.0 — New selector batch:** items 11–13 complete on the shared selector/search infrastructure. Local: 783 PHP / 74 JS / 600 backend on both SQLite targets; native/browser verification pending. Roadmap: 18 complete / 59 pending. Next unresolved relational item is 16 (taxonomy filtering on references), followed by 20+ and editor-layout batches; no claim that the remaining backlog is complete.

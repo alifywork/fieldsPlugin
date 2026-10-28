@@ -7,6 +7,7 @@ if (!defined('ALIFY_CF_TEST_SITE') || !ALIFY_CF_TEST_SITE) { throw new RuntimeEx
 $admin = get_user_by('login', 'alify-test-admin'); wp_set_current_user($admin->ID);
 if (is_file($file)) {
     $old = json_decode(file_get_contents($file), true);
+    foreach ($old['selector_terms'] ?? array() as $term_id) { wp_delete_term($term_id, 'category'); }
     foreach (array_merge(array($old['group'], $old['classic'], $old['block'], $old['rest'] ?? 0, $old['options_group'] ?? 0, $old['reference'] ?? 0, $old['reference_second'] ?? 0), $old['images'], $old['imports'] ?? array()) as $id) { if ($id) { wp_delete_post($id, true); } }
 }
 
@@ -39,7 +40,10 @@ $photos = browser_field('photos', 'gallery'); $photos['allowed_mimes'] = array('
 $related = browser_field('related', 'post_object'); $related['post_types'] = array('page'); $related['post_statuses'] = array('publish'); $related['return_format'] = 'object';
 $related_many = browser_field('related_many', 'relationship'); $related_many['post_types'] = array('page'); $related_many['post_statuses'] = array('publish'); $related_many['min_items'] = 1; $related_many['max_items'] = 2; $related_many['return_format'] = 'object';
 $extra_refs = browser_field('extra_refs', 'post_object'); $extra_refs['multiple'] = true; $extra_refs['post_types'] = array('page'); $extra_refs['post_statuses'] = array('publish'); $extra_refs['min_items'] = 1; $extra_refs['max_items'] = 2; $extra_refs['return_format'] = 'object';
-$fields = array(browser_field('subtitle', 'text', true), browser_field('tags', 'checkbox', true), browser_field('show_details', 'true_false'), $details, $photos, $team, $profile, $flexible, $alternate, $accent, $opens, $cta, browser_field('rich_copy', 'wysiwyg'), $related, $related_many, $radio, $buttons, $button_details, $range, $range_details, browser_field('masked', 'password'), $meeting, $meeting_detail, $calendar, $choice_multi, $choice_checks, $choice_detail, $extra_refs);
+$topics = browser_field('topics', 'taxonomy'); $topics['multiple'] = true; $topics['taxonomies'] = array('category'); $topics['return_format'] = 'object';
+$assignee = browser_field('assignee', 'user'); $assignee['roles'] = array('administrator'); $assignee['return_format'] = 'array';
+$destination = browser_field('destination', 'page_link'); $destination['post_types'] = array('page');
+$fields = array(browser_field('subtitle', 'text', true), browser_field('tags', 'checkbox', true), browser_field('show_details', 'true_false'), $details, $photos, $team, $profile, $flexible, $alternate, $accent, $opens, $cta, browser_field('rich_copy', 'wysiwyg'), $related, $related_many, $radio, $buttons, $button_details, $range, $range_details, browser_field('masked', 'password'), $meeting, $meeting_detail, $calendar, $choice_multi, $choice_checks, $choice_detail, $extra_refs, $topics, $assignee, $destination);
 $_POST = wp_slash(array('alify_schema_nonce' => wp_create_nonce('alify_schema_' . $group), 'alify_schema' => wp_json_encode($fields), 'alify_location' => 'post'));
 wp_update_post(array('ID' => $group, 'post_status' => 'publish')); $_POST = array();
 $classic = wp_insert_post(array('post_title' => 'Browser classic', 'post_status' => 'draft', 'post_author' => $uid));
@@ -47,6 +51,7 @@ $block = wp_insert_post(array('post_title' => 'Browser block', 'post_status' => 
 $rest = wp_insert_post(array('post_title' => 'Browser REST', 'post_status' => 'draft', 'post_author' => $uid));
 $reference = wp_insert_post(array('post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Browser reference target', 'post_author' => $uid));
 $reference_second = wp_insert_post(array('post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Browser reference target second', 'post_author' => $uid));
+$selector_terms = array(); foreach (array('One', 'Two') as $label) { $term = wp_insert_term('Browser selector topic ' . $label . ' ' . wp_generate_uuid4(), 'category'); $selector_terms[] = $term['term_id']; }
 // Isolated options fixture; no built-in Site Settings values are touched.
 Alify_CF_Options::register('browser-http', 'Browser HTTP Settings');
 delete_option('alify_cf_options_browser-http');
@@ -72,6 +77,6 @@ wp_mkdir_p(WP_CONTENT_DIR . '/mu-plugins');
 $mu = '<?php if (!defined("ALIFY_CF_TEST_SITE") || !ALIFY_CF_TEST_SITE) { return; } add_filter("use_block_editor_for_post", function($enabled, $post) { return $post->ID === ' . (int) $classic . ' || isset($_GET["alify_classic"]) ? false : $enabled; }, 10, 2); add_action("admin_init", function() { remove_action("admin_init", "_maybe_update_core"); remove_action("admin_init", "_maybe_update_plugins"); remove_action("admin_init", "_maybe_update_themes"); }, 0);';
 $mu .= ' add_action("init", function() { alify_add_options_page("browser-http", "Browser HTTP Settings"); });';
 file_put_contents(WP_CONTENT_DIR . '/mu-plugins/alify-browser-test.php', $mu);
-file_put_contents($file, wp_json_encode(array('username' => 'alify-browser', 'password' => $password, 'classic' => $classic, 'block' => $block, 'rest' => $rest, 'group' => $group, 'images' => $images, 'options_group' => $options_group, 'reference' => $reference, 'reference_second' => $reference_second, 'editor_username' => 'alify-browser-editor', 'editor_password' => $editor_password)));
+file_put_contents($file, wp_json_encode(array('username' => 'alify-browser', 'password' => $password, 'classic' => $classic, 'block' => $block, 'rest' => $rest, 'group' => $group, 'images' => $images, 'options_group' => $options_group, 'reference' => $reference, 'reference_second' => $reference_second, 'selector_terms' => $selector_terms, 'user_id' => $uid, 'editor_username' => 'alify-browser-editor', 'editor_password' => $editor_password)));
 chmod($file, 0600);
 echo "Browser fixtures seeded (credentials kept in private fixture file).\n";

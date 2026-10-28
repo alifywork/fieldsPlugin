@@ -48,6 +48,7 @@ final class Alify_CF_Feedback {
     }
 
     private static function display($field, $raw, $previous, $allowed_media = array()) {
+        if (Alify_CF_Selector::supported($field)) { $value = Alify_CF_Selector::clean($field, $raw, $previous, true); return $value === '' && $raw !== '' ? $previous : $value; }
         if (Alify_CF_Choice::multiple($field)) { $clean = Alify_CF_Choice::clean($field, $raw); return is_array($clean) ? $clean : $previous; }
         if ($field['type'] === 'date_time') { $clean = Alify_CF_Date_Time::clean($raw); return $raw === '' ? '' : ($clean !== '' ? $clean : $previous); }
         if ($field['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($field)) {

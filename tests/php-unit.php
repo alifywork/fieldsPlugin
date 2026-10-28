@@ -20,7 +20,7 @@ function sanitize_email($s) { return $s; }
 function esc_url_raw($s, $protocols) { return preg_match('~^https?://~', $s) ? $s : ''; }
 function get_post($id) { global $posts; return $posts[$id] ?? null; }
 function wp_attachment_is_image($id) { return get_post($id)->post_mime_type === 'image/png'; }
-function get_post_types($args, $output) { return array('post' => (object) array('name' => 'post'), 'page' => (object) array('name' => 'page')); }
+function get_post_types($args, $output) { return array('post' => (object) array('name' => 'post', 'public' => true), 'page' => (object) array('name' => 'page', 'public' => true)); }
 function get_post_meta($id, $key, $single) { global $meta; return $meta[$id][$key] ?? ''; }
 function metadata_exists($type, $id, $key) { global $meta; return isset($meta[$id][$key]); }
 function get_the_ID() { return 10; }
@@ -922,4 +922,27 @@ $errors = array(); Alify_CF_Reference_Settings::settings(array_merge($ref_single
 same($ref_payload = array('__complete' => '1', 'ids' => array(910, 911)), Alify_CF_Publication::stored_payload($ref_multi, array(910, 911)), 'Publication reconstructs multi Post Object complete payload');
 $ref_group = field('ref_group', 'group'); $ref_group['sub_fields'] = array($ref_multi); $issue = ''; $path = null; same(array('ref_multi' => array(910, 911)), Alify_CF_Group::clean($ref_group, array('__complete' => '1', 'fields' => array('ref_multi' => $ref_payload)), null, true, $issue, $path), 'Group multi Post Object validates with complete payload and permissions');
 $ref_source_target = field('ref_target'); $ref_source_target['condition'] = array('field' => $ref_multi['key'], 'operator' => 'equals', 'value' => '910'); $errors = array(); Alify_CF::validate_schema(array($ref_multi, $ref_source_target), 'post', 9999, $errors); same(true, count($errors) > 0, 'Multi Post Object is not an ambiguous scalar conditional source');
+// Selector contracts use minimal object stubs; real permissions/search live in integration tests.
+function is_wp_error($value) { return $value instanceof WP_Error; }
+function get_taxonomies($args, $output) { return array('category' => (object) array(), 'post_tag' => (object) array()); }
+function taxonomy_exists($name) { return in_array($name, array('category', 'post_tag'), true); }
+function get_term($id) { return $GLOBALS['selector_terms'][$id] ?? null; }
+function get_taxonomy($name) { return taxonomy_exists($name) ? (object) array('public' => true, 'cap' => (object) array('assign_terms' => 'edit_posts')) : null; }
+function wp_roles() { return (object) array('roles' => array('subscriber' => array(), 'editor' => array())); }
+function get_userdata($id) { return $GLOBALS['selector_users'][$id] ?? null; }
+function is_user_member_of_blog($id) { return isset($GLOBALS['selector_users'][$id]); }
+function get_post_type_object($name) { return in_array($name, array('post', 'page'), true) ? (object) array('public' => true, 'has_archive' => false, 'name' => $name) : null; }
+$GLOBALS['selector_terms'] = array(920 => (object) array('term_id' => 920, 'taxonomy' => 'category', 'name' => 'Topic'), 921 => (object) array('term_id' => 921, 'taxonomy' => 'post_tag', 'name' => 'Tag'));
+$GLOBALS['selector_users'] = array(922 => (object) array('ID' => 922, 'display_name' => 'Display only', 'roles' => array('subscriber')), 923 => (object) array('ID' => 923, 'display_name' => 'Editor', 'roles' => array('editor')));
+$selector_tax = field('selector_tax', 'taxonomy'); $selector_tax['taxonomies'] = array('category'); $selector_tax['return_format'] = 'object';
+$selector_user = field('selector_user', 'user'); $selector_user['multiple'] = true; $selector_user['roles'] = array('subscriber'); $selector_user['return_format'] = 'array';
+$selector_link = field('selector_link', 'page_link'); $selector_link['post_types'] = array('post', 'page'); $selector_link['multiple'] = true;
+$errors = array(); $selector_schema = Alify_CF::validate_schema(array($selector_tax, $selector_user, $selector_link), 'post', 9999, $errors); same(array(), $errors, 'All selector schemas validate'); same(920, Alify_CF::clean_value($selector_tax, '920'), 'Term ID canonicalizes to integer'); same('', Alify_CF::clean_value($selector_tax, '921'), 'Wrong taxonomy rejected');
+same(array(922), Alify_CF::clean_value($selector_user, array('__complete' => '1', 'ids' => array('922', 922))), 'User list deduplicates integer IDs'); same('', Alify_CF::clean_value($selector_user, array('__complete' => '1', 'ids' => array(923))), 'Wrong role rejected');
+foreach (array(array(), array('ids' => array(922)), array('__complete' => '1', 'ids' => null), array('__complete' => '1', 'ids' => array('x' => 922)), array('__complete' => '1', 'ids' => array_fill(0, 51, 922)), array('__complete' => '1', 'ids' => array(true))) as $bad) { $errors = array(); same(array(), Alify_CF::validate_values(array($selector_user), array('selector_user' => $bad), array('selector_user' => array(922)), $errors), 'Malformed multi selector retains previous list'); same(true, count($errors) > 0, 'Malformed selector reports error'); }
+$errors = array(); same(array(), Alify_CF::validate_values(array($selector_tax), array('selector_tax' => array()), array('selector_tax' => 920), $errors), 'Malformed empty array cannot clear scalar selector'); same(array(), Alify_CF::clean_value($selector_user, array('__complete' => '1')), 'Optional user list clears');
+foreach (array(array('type' => 'taxonomy', 'taxonomies' => array('missing')), array('type' => 'user', 'roles' => array('missing')), array('type' => 'page_link', 'post_types' => array('attachment')), array('type' => 'user', 'multiple' => 'yes'), array('type' => 'user', 'return_format' => 'object')) as $bad) { $errors = array(); Alify_CF_Selector::settings($bad, $errors); same(true, count($errors) > 0, 'Invalid selector settings rejected'); }
+same(array('__complete' => '1', 'ids' => array(922)), Alify_CF_Publication::stored_payload($selector_user, array(922)), 'Publication reconstructs user selector marker');
+same(920, Alify_CF_Selector::format($selector_tax, 920)->term_id, 'Term object formatting'); same(array(array('id' => 922, 'display_name' => 'Display only')), Alify_CF_Selector::format($selector_user, array(922)), 'User records expose only ID/display_name');
+$selector_condition = field('selector_condition'); $selector_condition['condition'] = array('field' => $selector_tax['key'], 'operator' => 'equals', 'value' => '920'); $errors = array(); Alify_CF::validate_schema(array($selector_tax, $selector_condition), 'post', 9999, $errors); same(true, count($errors) > 0, 'Selector conditional source rejected');
 echo "PASS: $count PHP contract assertions\n";

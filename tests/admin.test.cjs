@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', date_time: 'Date Time', date: 'Date', time: 'Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {taxonomy: 'Taxonomy', user: 'User', page_link: 'Page Link', text: 'Text', date_time: 'Date Time', date: 'Date', time: 'Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -898,4 +898,32 @@ test('Reference list honors configured maximum instead of hardcoded 50', () => {
     const dom = new JSDOM('<div class="alify-relationship" data-limit="2"><div class="alify-relation-items"></div><input type="hidden" name="refs[__complete]"><button data-relation-action="clear">Clear</button><span class="alify-relation-count"></span><p class="alify-post-status"></p></div>', {runScripts: 'outside-only'});
     const w = dom.window, root = w.document.querySelector('.alify-relationship'); w.eval(fs.readFileSync('assets/relationship.js', 'utf8'));
     for (let i = 1; i <= 3; i++) w.AlifyRelationship.add(root, i, 'Reference'); assert.equal(root.querySelectorAll('.alify-relation-item').length, 2); assert.equal(root.querySelector('.alify-relation-count').textContent, '2 / 2 references'); assert.match(root.querySelector('.alify-post-status').textContent, /Maximum 2/); w.close();
+});
+
+test('Selector builder supports taxonomy, user roles and public Page Link settings at roots/subfields', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Topics'); set(w, 'type', 'taxonomy'); set(w, 'taxonomies', 'category\npost_tag'); set(w, 'return_format', 'object');
+    const multiple = d.querySelector('[data-prop="multiple"]'); multiple.checked = true; multiple.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].multiple, true); assert.equal(schema(w)[0].taxonomies, 'category\npost_tag'); assert.equal(d.querySelector('[data-prop="default"]'), null);
+    set(w, 'type', 'user'); set(w, 'roles', 'editor'); set(w, 'return_format', 'array'); assert.equal(schema(w)[0].roles, 'editor'); assert.equal(schema(w)[0].taxonomies, undefined);
+    set(w, 'type', 'page_link'); set(w, 'post_types', 'page'); const archive = d.querySelector('[data-prop="allow_archives"]'); archive.checked = true; archive.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(schema(w)[0].allow_archives, true);
+    set(w, 'type', 'group'); d.querySelector('[data-sub-action="add"]').click(); const type = d.querySelector('[data-sub-prop="type"]'); type.value = 'user'; type.dispatchEvent(new w.Event('input', {bubbles: true})); assert.ok(d.querySelector('[data-sub-prop="roles"]')); assert.equal(d.querySelector('[data-sub-prop="default"]'), null); w.close();
+});
+function selectorWindow(multi = false) {
+    const dom = new JSDOM(`<form><div class="alify-selector" data-settings='{"type":"user","roles":[]}' data-multiple="${multi ? '1' : '0'}">${multi ? '' : '<input type="hidden" name="chosen" data-selector-empty value="">'}<div class="alify-selector-selected"></div>${multi ? '<input type="hidden" name="chosen[__complete]" value="1">' : ''}<input data-selector-search><button type="button" data-selector-find>Search</button><button type="button" data-selector-clear>Clear</button><div class="alify-selector-results"></div><p data-selector-status></p><button type="button" data-selector-prev>Previous</button><button type="button" data-selector-next>Next</button></div></form>`, {runScripts: 'outside-only'});
+    const w = dom.window; w.AlifySelector = {url: '/wp-admin/admin-ajax.php', nonce: 'test'}; w.eval(fs.readFileSync('assets/selector.js', 'utf8')); return w;
+}
+test('Single selector search uses settings and text-only labels, sentinel cannot overwrite selected value', async () => {
+    const w = selectorWindow(), d = w.document; let sent; w.fetch = async (url, options) => { sent = options.body; return {ok: true, json: async () => ({success: true, data: {items: [{id: 12, title: '<b>Display</b>'}]}})}; };
+    d.querySelector('[data-selector-find]').click(); await new Promise(resolve => setImmediate(resolve)); assert.equal(sent.get('settings'), '{"type":"user","roles":[]}'); assert.equal(sent.get('nonce'), 'test');
+    d.querySelector('[data-selector-pick]').click(); assert.equal(d.querySelector('b'), null); assert.equal(Object.fromEntries(new w.FormData(d.querySelector('form'))).chosen, '12');
+    d.querySelector('[data-selector-clear]').click(); assert.equal(Object.fromEntries(new w.FormData(d.querySelector('form'))).chosen, ''); w.close();
+});
+test('Multiple selectors preserve order, prevent duplicates and submit explicit clear marker', async () => {
+    const w = selectorWindow(true), d = w.document; w.fetch = async () => ({ok: true, json: async () => ({success: true, data: {items: [{id: 1, title: 'One'}, {id: 2, title: 'Two'}]}})});
+    d.querySelector('[data-selector-find]').click(); await new Promise(resolve => setImmediate(resolve)); d.querySelector('[data-selector-pick="1"]').click(); d.querySelector('[data-selector-pick="2"]').click(); d.querySelector('[data-selector-pick="1"]').click();
+    assert.equal(d.querySelectorAll('.alify-selector-item').length, 2); d.querySelectorAll('[data-selector-up]')[1].click(); assert.deepEqual(Array.from(new w.FormData(d.querySelector('form')).getAll('chosen[ids][]')), ['2', '1']);
+    d.querySelector('[data-selector-clear]').click(); assert.equal(new w.FormData(d.querySelector('form')).get('chosen[__complete]'), '1'); assert.equal(d.querySelectorAll('.alify-selector-item').length, 0); w.close();
+});
+test('Selector rejects stale AJAX results after search input changes', async () => {
+    const w = selectorWindow(), d = w.document; let finish; w.fetch = () => new Promise(resolve => { finish = resolve; }); d.querySelector('[data-selector-find]').click(); d.querySelector('[data-selector-search]').dispatchEvent(new w.Event('input', {bubbles: true}));
+    finish({ok: true, json: async () => ({success: true, data: {items: [{id: 1, title: 'Stale'}]}})}); await new Promise(resolve => setImmediate(resolve)); assert.equal(d.querySelector('[data-selector-pick]'), null); w.close();
 });

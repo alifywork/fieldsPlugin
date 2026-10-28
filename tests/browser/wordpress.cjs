@@ -50,6 +50,15 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await extraRefs.locator('[data-post-type]').selectOption('page'); await extraRefs.locator('[data-post-search]').fill('Browser reference target'); await extraRefs.locator('[data-post-find]').click();
         await extraRefs.locator(`[data-post-id="${fixture.reference}"]`).click(); await extraRefs.locator(`[data-post-id="${fixture.reference_second}"]`).click();
     }
+    const objectSelector = name => page.locator(`.alify-value[data-field-key="field_${name}"] .alify-selector`);
+    const selectorIDs = name => objectSelector(name).locator('.alify-selector-selected input').evaluateAll(inputs => inputs.map(input => input.value));
+    async function chooseObjects() {
+        const topics = objectSelector('topics'); await topics.locator('[data-selector-search]').fill('Browser selector topic'); await topics.locator('[data-selector-find]').click();
+        await topics.locator(`[data-selector-pick="${fixture.selector_terms[0]}"]`).click(); await topics.locator(`[data-selector-pick="${fixture.selector_terms[1]}"]`).click();
+        await topics.locator('.alify-selector-item').nth(1).locator('[data-selector-up]').click();
+        const assignee = objectSelector('assignee'); await assignee.locator('[data-selector-search]').fill('alify-browser'); await assignee.locator('[data-selector-find]').click(); await assignee.locator(`[data-selector-pick="${fixture.user_id}"]`).click();
+        const destination = objectSelector('destination'); await destination.locator('[data-selector-search]').fill('Browser reference target'); await destination.locator('[data-selector-find]').click(); await destination.locator(`[data-selector-pick="post:${fixture.reference}"]`).click();
+    }
     async function saveClassic() { await Promise.all([page.waitForNavigation(), page.locator('#publish').click()]); }
     try {
         await page.goto(base + '/wp-login.php');
@@ -65,6 +74,10 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await multi.locator('option[value="b"]').evaluate(option => option.hidden), false, 'Local search never hides selected keys');
         await multi.locator('..').locator('[data-select-search]').fill(''); await multi.selectOption(['0', 'a']);
         check(await value('choice_detail').isVisible(), true, 'Multi Select condition reads selected zero key, not search/marker'); await value('choice_detail').fill('Multi condition content');
+        await chooseObjects();
+        check(await selectorIDs('topics'), [String(fixture.selector_terms[1]), String(fixture.selector_terms[0])], 'Taxonomy AJAX selector preserves reordered term IDs');
+        check(await selectorIDs('assignee'), [String(fixture.user_id)], 'User AJAX selector selects a display-name-only result');
+        check(await selectorIDs('destination'), ['post:' + fixture.reference], 'Page Link AJAX selector stores public post token');
         await chooseReference();
         await chooseRelationship();
         await chooseExtraRefs();
@@ -191,6 +204,10 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('masked').inputValue(), classicPassword, 'Password preserves exact value across Classic save/reload');
         check(await value('masked').getAttribute('type'), 'password', 'Reload resets Password to masked');
         await password.locator('[data-password-clear]').click();
+        check(await selectorIDs('topics'), [String(fixture.selector_terms[1]), String(fixture.selector_terms[0])], 'Taxonomy selection survives Classic save/reload');
+        check(await selectorIDs('assignee'), [String(fixture.user_id)], 'User scalar sentinel does not overwrite selected ID on Classic save');
+        check(await selectorIDs('destination'), ['post:' + fixture.reference], 'Page Link survives Classic save/reload');
+        for (const name of ['topics', 'assignee', 'destination']) await objectSelector(name).locator('[data-selector-clear]').click();
         check(await extraIDs(), [String(fixture.reference), String(fixture.reference_second)], 'Multiple Post Object survives Classic save/reload');
         await extraRefs.locator('[data-relation-action="clear"]').click();
         check(await selectedMulti(), ['0', 'a'], 'Native multi Select survives Classic save/reload');
@@ -215,6 +232,9 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-link input[type="url"]').inputValue(), '', 'Explicit Link clear survives actual save/reload');
         check(await value('related').inputValue(), '', 'Explicit post reference clear survives save/reload');
         check(await page.locator('.alify-relationship[data-reference-kind="relationship"] .alify-relation-item').count(), 0, 'Explicit Relationship clear survives save/reload');
+        check(await selectorIDs('topics'), [], 'Taxonomy list clear survives Classic save/reload');
+        check(await selectorIDs('assignee'), [], 'User single clear survives Classic save/reload');
+        check(await selectorIDs('destination'), [], 'Page Link single clear survives Classic save/reload');
         check(await extraIDs(), [], 'Optional multiple Post Object explicitly clears despite nonempty minimum');
         check(await selectedMulti(), [], 'Explicit multi Select clear survives Classic save/reload without reapplying defaults');
         check(await value('choice_detail').inputValue(), 'Multi condition content', 'Hidden multi-choice dependent retains saved value');
@@ -263,6 +283,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.waitForFunction(() => window.wp && wp.data && wp.data.select('core/editor').getCurrentPostId());
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
         await chooseExtraRefs();
+        await chooseObjects();
         await multi.selectOption(['a', 'b']);
         await value('subtitle').fill('Block subtitle');
         await value('meeting_at').fill('2026-10-28T16:45:59');
@@ -316,6 +337,9 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-radio:not(.alify-button-group) input:checked').inputValue(), 'b', 'Radio survives same-request Gutenberg REST save/reload');
         check(await buttons.locator('input:checked').inputValue(), 'b', 'Button Group survives Gutenberg REST save/reload');
         check(await value('amount').inputValue(), '1.5', 'Range survives same-request Gutenberg REST save');
+        check(await selectorIDs('topics'), [String(fixture.selector_terms[1]), String(fixture.selector_terms[0])], 'Gutenberg persists ordered taxonomy selector payload');
+        check(await selectorIDs('assignee'), [String(fixture.user_id)], 'Gutenberg persists scalar User selector');
+        check(await selectorIDs('destination'), ['post:' + fixture.reference], 'Gutenberg persists Page Link token');
         check(await extraIDs(), [String(fixture.reference), String(fixture.reference_second)], 'Gutenberg serializes complete multiple Post Object payload');
         check(await value('accent').inputValue(), '#abcdef00', 'Transparent alpha color is canonical after Gutenberg REST save/reload');
         check(await selectedMulti(), ['a', 'b'], 'Gutenberg serializes every native multi selection into same-request REST save');
@@ -342,8 +366,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const download = await downloadReady;
         const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
         check(exported.format, 'alify-custom-field', 'Actual download contains versioned configuration JSON');
-        check(exported.version, 6, 'Reference schema exports as v6 for safe older-importer rejection');
-        check(exported.group.fields.length, 28, 'Export includes all browser fixture fields');
+        check(exported.version, 7, 'Selector schema exports as v7 for safe older-importer rejection');
+        check(exported.group.fields.length, 31, 'Export includes all browser fixture fields');
         const originalExport = JSON.stringify(exported);
         exported.group.location = 'page';
         await page.locator('#alify-json-file').setInputFiles({name: 'group.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported))});

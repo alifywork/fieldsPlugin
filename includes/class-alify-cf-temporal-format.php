@@ -37,6 +37,7 @@ final class Alify_CF_Temporal_Format {
         return $date->format(self::selected($field, $key));
     }
     public static function field($field, $value) {
+        if (Alify_CF_Selector::supported($field)) { return Alify_CF_Selector::format($field, $value); }
         if (Alify_CF_Reference_Settings::supported($field)) { return Alify_CF_Reference_Settings::format($field, $value); }
         if (Alify_CF_Field_Settings::media($field) || $field['type'] === 'link') { return Alify_CF_Field_Settings::format($field, $value); }
         if (Alify_CF_Choice::supported($field['type'])) { return Alify_CF_Choice::format($field, $value); }

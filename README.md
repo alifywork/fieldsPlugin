@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- Taxonomy, User, Page Link, Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -462,7 +462,7 @@ $settings = alify_get_option('profile', 'site');
 
 Open **Alify Custom Field → JSON Import / Export** (requires `manage_options`). Select one configured group and download JSON; on the destination site upload that file or paste its JSON, then choose **Import as draft**. Review the new draft before publishing.
 
-- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`–`6`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; Color/media/Link configuration requires version 5; new reference configuration requires version 6; schemas without these features continue to use their existing version.
+- Versioned Alify format (`format: "alify-custom-field"`, integer `version: 1`–`7`), one group per document, maximum **1 MiB**. Not an ACF JSON importer. Version 2 is emitted for configured repeater bounds so older importers reject the file instead of silently discarding limits; temporal format settings (including subfields) require version 3; richer choice settings/nonempty Checkbox defaults require version 4; Color/media/Link configuration requires version 5; new reference configuration requires version 6; Taxonomy/User/Page Link selectors require version 7; schemas without these features continue to use their existing version.
 - Transfers the title, registered location, field definitions, stable field keys, scalar defaults, choices, conditions and single-level repeater/gallery configuration.
 - Never transfers content values, media files, source post IDs, statuses, arbitrary metadata or options-page registrations. Image/file defaults are reset because attachment IDs are site-local; gallery/repeater content is never a schema default.
 - Imports always create a **new draft**, never update or publish an existing group. Duplicate names in another non-trashed group at the same location reject the import—even on the source site. Rename the fields/change location first if intentionally creating a copy.
@@ -550,25 +550,37 @@ Post Object and Relationship support the following on post/Options roots and sup
 - Search remains nonce/capability checked, paginated (20 queried candidates per page, up to 100 pages), and read-permission filtered. Filter values sent by the picker are search constraints, **not authorization**; no private totals or unreadable titles are returned. Changing permissions can leave a page empty. No taxonomy filtering or bidirectional writes yet.
 - New reference settings require **schema JSON v6 / plugin 0.26.0+**, including subfield-only configuration. Imports continue accepting v1–v6.
 
+## Taxonomy, User and Page Link selectors (0.27.0)
+
+All three work on post/Options roots and supported basic container subfields. Use the search button/Enter, select results, remove or clear selections; multiple lists support moving earlier/later, deduplication and a hard maximum of 50 submitted items. Search has no unfiltered totals and supports pages 1–100. Requests are nonce/capability checked; stale responses are ignored after a query changes.
+
+- **Taxonomy (`taxonomy`)**: configure 1–20 registered `show_ui` taxonomies (default `category`). Raw values are term IDs; formatted return is `id` or a currently available `WP_Term` (`object`). New selections/search require that taxonomy's `assign_terms` capability. Public taxonomies resolve for frontend formatted reads; nonpublic terms require assignment permission. This field stores metadata only: it does **not** create terms, assign WordPress post terms or synchronize term relationships. Term selection is flat/searchable, not a hierarchical tree.
+- **User (`user`)**: optional allowlist of up to 20 registered role slugs; empty permits any current-site member. Search/new selections require **`list_users`** (plus editor/settings capability for the AJAX endpoint), so ordinary editors do not automatically get a user directory. Search uses display names only and returns ID/display-name labels, not email/login/password fields. Formatted return is `id` or `array` containing only `{id, display_name}`; safe records require `list_users` or the selected user's own identity. Anonymous/unavailable records become `null` or are omitted from lists. This deliberately never returns a `WP_User` object. Nonmembers/deleted/spam users and role mismatches are rejected; existing valid saved IDs may be retained without granting directory access. This is current-site membership checking, not a verified multisite compatibility claim.
+- **Page Link (`page_link`)**: configure public UI-enabled post types (default post/page) and optionally allow archives for those types. Only published public posts and eligible `has_archive` types are selectable. Raw values are stable strings **`post:123`** / **`archive:book`**, not copied URLs; formatted getters resolve current permalinks/archive links. Lists preserve order. Missing/draft/trashed/nonpublic targets format to `null` or are omitted. A public password-protected post's URL does not bypass WordPress password protection. There is no arbitrary external URL or private/draft preview URL selection; use Link for external URLs.
+
+Single values clear with `''`; multiple editor-bridge payloads use `{"__complete":"1","ids":[...]}` and explicit empty `{"__complete":"1"}`. Malformed, truncated, unknown or disallowed values retain the previous field/container; Options retains the whole page. Required values cannot clear. Raw IDs/tokens remain available even where formatted records are privacy-filtered: **raw metadata is not an authorization API**, so themes must enforce their own access policy and context-escape output.
+
+Defaults, conditional-source use, automatic taxonomy/user modification, cross-site ID migration and nested containers are unsupported. Selectors may be conditional targets. Single/multiple schema changes do not migrate saved data. Imports require destination taxonomies/roles/post types to be registered; **schema JSON v7 / plugin 0.27.0+** is required, recursively including subfield-only selectors. Imports accept v1–v7, and exports contain configuration, not selected site-local IDs or user records.
+
 ## Verification
 
-Automated checks for 0.26.0:
+Automated checks for 0.27.0:
 
 ```sh
 npm ci
-npm test       # 70 jsdom tests for builder, media, conditions, repeaters and feedback
+npm test       # 74 jsdom tests for builder, media, conditions, repeaters and feedback
 npm run check # JavaScript syntax
-php tests/php-unit.php # 755 assertions with isolated WordPress stubs
+php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 558 assertions per target:
+Isolated PHP contracts passed in PHP.wasm 7.4.33 and 8.3.33; JavaScript tests use jsdom and a mocked media frame. **Real WordPress backend integration** also passed with 600 assertions per target:
 
 | WordPress | PHP | Database |
 |---|---|---|
 | 6.2 | PHP.wasm 7.4.33 | SQLite / WP_SQLite_DB |
 | 6.8.3 | PHP.wasm 8.3.33 | SQLite / WP_SQLite_DB |
 
-Both integration runs had clean WordPress debug logs. The 0.26.0 reference batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40709951548](https://github.com/alifywork/fieldsPlugin/actions/runs/40709951548): 558 backend / 175 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
+Both integration runs had clean WordPress debug logs. The previous 0.26.0 reference batch passes all four native-PHP CI targets, including real Chromium and HTTP persistence flows ([run 40709951548](https://github.com/alifywork/fieldsPlugin/actions/runs/40709951548): 558 backend / 175 browser / 24 HTTP assertions per target). These are explicit test targets, not a latest-version claim or a recommendation to deploy old versions. The suite exercises actual activation, hooks, capabilities, nonces, uploads, metadata, options, rendering, feedback, Classic publication/scheduling, core REST validation/creation/authentication and autosaves. This backend suite is separate from the browser suite.
 
 ```sh
 # Requires Git/Bash and a native PHP executable with SQLite extensions.

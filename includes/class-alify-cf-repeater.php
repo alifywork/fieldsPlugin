@@ -39,9 +39,10 @@ final class Alify_CF_Repeater {
             }
             $names[$name] = true; $keys[$key] = true;
             $clean = array('name' => $name, 'key' => $key, 'type' => $type, 'label' => sanitize_text_field($field['label']), 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'required' => !empty($field['required']));
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors), Alify_CF_Selector::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('gallery', 'link', 'relationship'), true) ? array() : Alify_CF::clean_value($clean, $field['default'] ?? ''));
+            if (Alify_CF_Selector::supported($clean)) { $clean['default'] = Alify_CF_Selector::multiple($clean) ? array() : ''; if (($field['default'] ?? '') !== '' && ($field['default'] ?? array()) !== array()) { $errors[] = 'Selector defaults are not supported.'; } }
             if ($type === 'link') { $clean['default'] = Alify_CF_Field_Settings::link_default($field['default'] ?? '', $errors); }
             if ($type === 'color' && ($field['default'] ?? '') !== '' && $clean['default'] === '') { $errors[] = 'Color default must be valid hex.'; }
             if ($type === 'checkbox' || Alify_CF_Choice::multiple($clean)) { $clean['default'] = Alify_CF_Choice::defaults($clean, $field['default'] ?? '', $errors); }
@@ -61,10 +62,11 @@ final class Alify_CF_Repeater {
         list($minimum, $maximum) = self::bounds($field);
         if (!is_array($rows) || empty($field['sub_fields'])) { $issue = 'Invalid row structure. Reload the editor.'; return ''; }
         if (count($rows) < $minimum || count($rows) > min($maximum, self::MAX_ROWS)) { $issue = 'Use between ' . $minimum . ' and ' . min($maximum, self::MAX_ROWS) . ' rows; received ' . count($rows) . '.'; return ''; }
-        $allowed_media = array(); $allowed_posts = array();
+        $allowed_media = array(); $allowed_posts = array(); $allowed_selectors = array();
         foreach ((array) $old as $row) {
             if (!is_array($row)) { continue; }
             foreach ($field['sub_fields'] as $sub) {
+                if (Alify_CF_Selector::supported($sub)) { foreach (Alify_CF_Selector::multiple($sub) ? (is_array($row[$sub['name']] ?? null) ? $row[$sub['name']] : array()) : array($row[$sub['name']] ?? '') as $saved) { if (is_int($saved) || is_string($saved)) { $allowed_selectors[$sub['name']][] = $saved; } } }
                 if ($sub['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($sub)) { foreach (is_array($row[$sub['name']] ?? null) ? $row[$sub['name']] : array() as $saved_id) { if (is_int($saved_id) || is_string($saved_id)) { $allowed_posts[] = (string) $saved_id; } } }
                 if ($sub['type'] === 'post_object' && is_scalar($row[$sub['name']] ?? null)) { $allowed_posts[] = (string) $row[$sub['name']]; }
                 if ($sub['type'] === 'gallery') {
@@ -82,10 +84,11 @@ final class Alify_CF_Repeater {
             foreach ($field['sub_fields'] as $sub) {
                 $raw = $row[$sub['name']] ?? '';
                 $value = ($sub['type'] === 'relationship' || Alify_CF_Reference_Settings::multiple($sub)) ? Alify_CF_Relationship::clean($raw, $allowed_posts, $permissions, $sub) : ($sub['type'] === 'gallery' ? Alify_CF_Gallery::clean($raw, $allowed_media, $permissions) : Alify_CF::clean_value($sub, $raw));
+                if (Alify_CF_Selector::supported($sub)) { $value = Alify_CF_Selector::clean($sub, $raw, $allowed_selectors[$sub['name']] ?? array(), $permissions); }
                 $value = Alify_CF_Field_Settings::constrain($sub, $value);
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
                 $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
-                if (($sub['type'] === 'color' && array_key_exists($sub['name'], $row) && !is_string($raw)) || (Alify_CF_Choice::multiple($sub) && $value === '') || ($sub['type'] === 'date_time' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'password' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'range' && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== '' && Alify_CF_Range::units($row[$sub['name']]) === null) || (Alify_CF_Reference_Settings::multiple($sub) && $value === '') || (!Alify_CF_Reference_Settings::multiple($sub) && in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                if ((Alify_CF_Selector::supported($sub) && !Alify_CF_Selector::multiple($sub) && array_key_exists($sub['name'], $row) && !is_string($raw) && !is_int($raw)) || (Alify_CF_Selector::multiple($sub) && $value === '') || ($sub['type'] === 'color' && array_key_exists($sub['name'], $row) && !is_string($raw)) || (Alify_CF_Choice::multiple($sub) && $value === '') || ($sub['type'] === 'date_time' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'password' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'range' && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== '' && Alify_CF_Range::units($row[$sub['name']]) === null) || (Alify_CF_Reference_Settings::multiple($sub) && $value === '') || (!Alify_CF_Reference_Settings::multiple($sub) && in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
                     $location = array('row' => $position - 1, 'subfield' => $sub['name']);
                     $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
                     return '';

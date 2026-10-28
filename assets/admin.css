@@ -65,3 +65,8 @@
 .alify-select-search { flex-basis: 100%; display: flex; gap: 8px; align-items: center; }
 .alify-select select { min-width: 180px; max-width: 100%; }
 .alify-select-status { flex-basis: 100%; }
+
+.alify-selector { display: grid; gap: 8px; max-width: 760px; }
+.alify-selector-item { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+.alify-selector-item span { flex: 1; }
+.alify-selector-results { display: flex; flex-wrap: wrap; gap: 6px; }
