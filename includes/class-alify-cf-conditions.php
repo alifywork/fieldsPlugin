@@ -61,7 +61,10 @@ final class Alify_CF_Conditions {
             $source = null; foreach ($schema as $candidate) { if ($candidate['key'] === $rule['field']) { $source = $candidate; break; } }
             if (!$source || !self::source($source) || $source['key'] === $field['key']) { return $memo[$field['key']] = false; }
             if (!self::resolve($source, $schema, $values, $memo)) { $results[] = false; continue; }
-            $value = $values[$source['key']] ?? ''; $items = is_array($value) ? array_map('strval', array_filter($value, 'is_scalar')) : array((string) $value);
+            $value = $values[$source['key']] ?? '';
+            // Recovery/render payloads may still carry a complete marker. Compare tokens, never the marker.
+            if (is_array($value) && array_values($value) !== $value && (Alify_CF_Selector::supported($source) || Alify_CF_Reference_Settings::multiple($source) || in_array($source['type'], array('relationship', 'gallery'), true))) { $value = ($value['__complete'] ?? '') === '1' && is_array($value['ids'] ?? null) ? $value['ids'] : array(); }
+            $items = is_array($value) ? array_map('strval', array_filter($value, 'is_scalar')) : array((string) $value);
             $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0')); $matches = in_array($rule['value'], $items, true); $operator = $rule['operator'];
             if (in_array($operator, array('contains', 'starts_with', 'ends_with'), true)) {
                 $matches = false; if ($rule['value'] !== '') { foreach ($items as $item) { $needle = $rule['value']; if (($operator === 'contains' && strpos($item, $needle) !== false) || ($operator === 'starts_with' && strpos($item, $needle) === 0) || ($operator === 'ends_with' && substr($item, -strlen($needle)) === $needle)) { $matches = true; break; } } }
