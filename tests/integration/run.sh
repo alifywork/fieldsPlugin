@@ -72,8 +72,19 @@ require_once ABSPATH . 'wp-settings.php';
 PHP
 : > "$ROOT/debug.log"
 export ALIFY_WP_ROOT="$ROOT/wordpress"
-"$PHP_BIN" "$REPO/tests/integration/install.php"
-"$PHP_BIN" "$REPO/tests/integration/wordpress.php"
-if [[ -s "$ROOT/debug.log" ]]; then
-  echo 'Unexpected WordPress debug output:'; cat "$ROOT/debug.log"; exit 1
+status=0
+"$PHP_BIN" "$REPO/tests/integration/install.php" || status=$?
+if [[ "$status" == 0 ]]; then
+  "$PHP_BIN" "$REPO/tests/integration/wordpress.php" || status=$?
 fi
+if [[ -s "$ROOT/debug.log" ]]; then
+  echo 'Unexpected WordPress debug output:'; cat "$ROOT/debug.log"
+  if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+    while IFS= read -r line; do
+      line="${line//%/%25}"
+      printf '::error title=WordPress integration debug::%s\n' "$line"
+    done < "$ROOT/debug.log"
+  fi
+  exit 1
+fi
+exit "$status"

@@ -89,6 +89,22 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         const conflictReady = page.waitForResponse(response => response.url().includes('admin-post.php') && response.status() === 400);
         await page.getByRole('button', {name: 'Import as draft'}).click(); await conflictReady;
         check((await page.locator('body').textContent()).includes('already used'), true, 'Actual conflicting paste fails without overwriting existing group');
+        await page.goto(base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-transfer');
+        exported.group.location = 'options:site';
+        exported.group.fields[0].default = "Quote's C:\\site سلام";
+        await page.locator('#alify-json').fill(JSON.stringify(exported));
+        await Promise.all([page.waitForURL('**/post.php?post=**&action=edit'), page.getByRole('button', {name: 'Import as draft'}).click()]);
+        fixture.imports.push(Number(new URL(page.url()).searchParams.get('post')));
+        fs.writeFileSync(process.env.ALIFY_BROWSER_FIXTURE, JSON.stringify(fixture), {mode: 0o600});
+        check(await page.locator('#original_post_status').inputValue(), 'draft', 'Pasted JSON also creates draft through actual HTTP handler');
+        check(JSON.parse(await page.locator('#alify-schema').inputValue())[0].default, exported.group.fields[0].default, 'Pasted JSON preserves quotes, slashes and Unicode');
+        const deniedImport = await context.request.post(base + '/wp-admin/admin-post.php', {form: {action: 'alify_cf_import', alify_transfer_nonce: 'invalid', alify_json: originalExport}});
+        check(deniedImport.status(), 403, 'Actual HTTP import handler rejects invalid nonce');
+        await page.goto(base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-transfer');
+        await page.locator('#alify-json-file').setInputFiles({name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{')});
+        const malformedReady = page.waitForResponse(response => response.url().includes('admin-post.php') && response.status() === 400);
+        await page.getByRole('button', {name: 'Import as draft'}).click(); await malformedReady;
+        check((await page.locator('body').textContent()).includes('Invalid Alify JSON'), true, 'Malformed upload rejected by actual HTTP handler');
         check(errors, [], 'No uncaught browser JS errors');
         console.log(`PASS: ${checks} real browser assertions (Classic, Gutenberg, media modal, repeater, gallery, raw REST).`);
     } finally { await context.close(); await browser.close(); }

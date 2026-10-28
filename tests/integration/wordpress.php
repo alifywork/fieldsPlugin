@@ -243,11 +243,20 @@ try {
     expect_same($document['group']['fields'], Alify_CF::schema($imported), 'Schema round trip preserves keys, defaults, conditions and local subfields');
     expect_same('options:site', get_post_meta($imported, Alify_CF::LOCATION, true), 'Registered options location imported');
     expect_same(false, metadata_exists('post', $imported, 'injected'), 'Arbitrary metadata not imported');
+    $media_document = $document; $media_document['group']['location'] = 'post';
+    $media_field = test_field('transfer_avatar', 'image'); $media_field['default'] = $image;
+    $media_document['group']['fields'][] = $media_field;
+    $media_document['group']['fields'][3]['sub_fields'][] = $media_field;
+    $media_import = Alify_CF_Transfer::import_json(wp_json_encode($media_document), $import_nonce);
+    expect_same(true, is_int($media_import), 'Schema with source-site media defaults imports'); $fixtures[] = $media_import;
+    expect_same('', Alify_CF::schema($media_import)[5]['default'], 'Root media default reset on import');
+    expect_same('', Alify_CF::schema($media_import)[3]['sub_fields'][2]['default'], 'Repeater media default reset on import');
     $before_import_count = (int) wp_count_posts(Alify_CF::GROUP)->draft;
     foreach (array('', '{', '[]', 'null', str_repeat('x', Alify_CF_Transfer::MAX_BYTES + 1), '{"format":"alify-custom-field","version":2,"group":{}}') as $invalid) {
         expect_same(true, is_wp_error(Alify_CF_Transfer::import_json($invalid, $import_nonce)), 'Malformed, oversized or unknown-version input rejected');
     }
-    $valid_document = $document; $valid_document['group']['location'] = 'post';
+    $valid_document = $document; $valid_document['group']['location'] = 'options:transfer-tests';
+    Alify_CF_Options::register('transfer-tests', 'Transfer tests');
     foreach (array('missing_type', 'options:not_registered', 'attachment', Alify_CF::GROUP) as $location) {
         $bad = $valid_document; $bad['group']['location'] = $location;
         expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Unavailable location rejected');
@@ -258,6 +267,12 @@ try {
     expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Broken condition rejected');
     $bad = $valid_document; $bad['group']['fields'][3]['sub_fields'][0]['type'] = 'repeater';
     expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Nested repeater rejected');
+    $bad = $valid_document; $bad['group']['fields'] = array_fill(0, 201, test_field('too_many'));
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Oversized field count rejected');
+    $bad = $valid_document; $bad['group']['fields'][1]['key'] = $bad['group']['fields'][0]['key'];
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Duplicate field keys rejected');
+    $bad = $valid_document; $bad['group']['fields'][1]['name'] = $bad['group']['fields'][0]['name'];
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($bad), $import_nonce)->get_error_code(), 'Duplicate field names rejected');
     expect_same('alify_transfer_nonce', Alify_CF_Transfer::import_json(wp_json_encode($valid_document), 'bad')->get_error_code(), 'Import nonce enforced');
     wp_set_current_user($editor);
     expect_same('alify_transfer_forbidden', Alify_CF_Transfer::export_json($source, $export_nonce)->get_error_code(), 'Editor cannot export group');
