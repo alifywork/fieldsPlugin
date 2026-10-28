@@ -34,12 +34,12 @@ final class Alify_CF_Repeater {
             }
             $name = $field['name'] ?? ''; $type = $field['type'] ?? 'text';
             $key = sanitize_key($field['key'] ?? '') ?: 'field_' . wp_generate_uuid4();
-            if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || isset($keys[$key]) || trim($field['label'] ?? '') === '' || !isset(Alify_CF::types()[$type]) || in_array($type, array('repeater', 'group', 'flexible', 'wysiwyg'), true) || !empty($field['condition'])) {
-                $errors[] = 'Container subfields need unique names/keys, labels and a supported basic type (rich-text editors excluded); nesting and subfield conditions are not supported.'; continue;
+            if (!preg_match('/^[a-z][a-z0-9_]*$/', $name) || isset($names[$name]) || isset($keys[$key]) || trim($field['label'] ?? '') === '' || !isset(Alify_CF::types()[$type]) || in_array($type, array('repeater', 'group', 'flexible', 'tab', 'accordion', 'message'), true) || !empty($field['condition'])) {
+                $errors[] = 'Container subfields need unique names/keys, labels and a supported basic type; nesting and subfield conditions are not supported.'; continue;
             }
             $names[$name] = true; $keys[$key] = true;
             $clean = array('name' => $name, 'key' => $key, 'type' => $type, 'label' => sanitize_text_field($field['label']), 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'required' => !empty($field['required']));
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors), Alify_CF_Selector::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors), Alify_CF_Selector::settings($field, $errors), Alify_CF_API::settings($field, $errors), Alify_CF_Editor_Fields::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             $clean['default'] = in_array($type, array('post_object', 'password'), true) ? '' : (in_array($type, array('gallery', 'link', 'relationship'), true) ? array() : Alify_CF::clean_value($clean, $field['default'] ?? ''));
             if (Alify_CF_Selector::supported($clean)) { $clean['default'] = Alify_CF_Selector::multiple($clean) ? array() : ''; if (($field['default'] ?? '') !== '' && ($field['default'] ?? array()) !== array()) { $errors[] = 'Selector defaults are not supported.'; } }
@@ -88,7 +88,7 @@ final class Alify_CF_Repeater {
                 $value = Alify_CF_Field_Settings::constrain($sub, $value);
                 $empty = $value === '' || $value === array() || ($sub['type'] === 'true_false' && $value !== '1');
                 $path = 'Row ' . $position . ' → ' . $sub['label'] . ': ';
-                if ((Alify_CF_Selector::supported($sub) && !Alify_CF_Selector::multiple($sub) && array_key_exists($sub['name'], $row) && !is_string($raw) && !is_int($raw)) || (Alify_CF_Selector::multiple($sub) && $value === '') || ($sub['type'] === 'color' && array_key_exists($sub['name'], $row) && !is_string($raw)) || (Alify_CF_Choice::multiple($sub) && $value === '') || ($sub['type'] === 'date_time' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'password' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'range' && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== '' && Alify_CF_Range::units($row[$sub['name']]) === null) || (Alify_CF_Reference_Settings::multiple($sub) && $value === '') || (!Alify_CF_Reference_Settings::multiple($sub) && in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
+                if (($sub['type'] === 'wysiwyg' && !is_string($raw)) || (Alify_CF_Selector::supported($sub) && !Alify_CF_Selector::multiple($sub) && array_key_exists($sub['name'], $row) && !is_string($raw) && !is_int($raw)) || (Alify_CF_Selector::multiple($sub) && $value === '') || ($sub['type'] === 'color' && array_key_exists($sub['name'], $row) && !is_string($raw)) || (Alify_CF_Choice::multiple($sub) && $value === '') || ($sub['type'] === 'date_time' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'password' && array_key_exists($sub['name'], $row) && !is_string($row[$sub['name']])) || ($sub['type'] === 'range' && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== '' && Alify_CF_Range::units($row[$sub['name']]) === null) || (Alify_CF_Reference_Settings::multiple($sub) && $value === '') || (!Alify_CF_Reference_Settings::multiple($sub) && in_array($sub['type'], array('post_object', 'radio', 'button_group'), true) && !is_string($raw) && !is_int($raw)) || (in_array($sub['type'], array('gallery', 'link', 'relationship'), true) && $value === '') || (!empty($sub['required']) && $empty) || ($raw !== '' && $raw !== array() && $value === '')) {
                     $location = array('row' => $position - 1, 'subfield' => $sub['name']);
                     $issue = $path . ($sub['type'] === 'gallery' && $value === '' ? 'Choose up to 50 available images you can edit, with a complete gallery selection.' : (!empty($sub['required']) && $empty ? 'A valid value is required.' : 'Enter a valid ' . $sub['type'] . ' value.'));
                     return '';
@@ -105,7 +105,7 @@ final class Alify_CF_Repeater {
     public static function render($field, $value, $id, $input) {
         $rows = is_array($value) ? $value : array();
         list($minimum, $maximum) = self::bounds($field);
-        echo '<div class="alify-repeater" data-base-id="' . esc_attr($id) . '" data-min="' . esc_attr($minimum) . '" data-limit="' . esc_attr($maximum) . '"><div class="alify-rows">';
+        echo '<div class="alify-repeater" data-base-id="' . esc_attr($id) . '" data-min="' . esc_attr($minimum) . '" data-limit="' . esc_attr($maximum) . '"' . Alify_CF_Editor_Fields::attributes($field) . '><div class="alify-rows">';
         foreach ($rows as $index => $row) { self::row($field, is_array($row) ? $row : array(), $id, $input, $index); }
         echo '</div><template class="alify-row-template">';
         self::row($field, null, $id, $input, '__ROW__');
@@ -118,7 +118,7 @@ final class Alify_CF_Repeater {
             $sub_id = $id . '-' . $index . '-' . $sub['key'];
             $name = $input . '[rows][' . $index . '][' . $sub['name'] . ']';
             $value = $row === null ? $sub['default'] : ($row[$sub['name']] ?? '');
-            echo '<div class="alify-sub-value" data-subfield="' . esc_attr($sub['name']) . '"><label class="alify-label" for="' . esc_attr($sub_id) . '">' . esc_html($sub['label']) . (!empty($sub['required']) ? ' <span class="alify-required">*</span>' : '') . '</label><p class="description" id="' . esc_attr($sub_id . '-help') . '">' . esc_html($sub['instructions']) . '</p>';
+            echo '<div class="alify-sub-value" data-subfield="' . esc_attr($sub['name']) . '" data-sub-type="' . esc_attr($sub['type']) . '"><label class="alify-label" for="' . esc_attr($sub_id) . '">' . esc_html($sub['label']) . (!empty($sub['required']) ? ' <span class="alify-required">*</span>' : '') . '</label><p class="description" id="' . esc_attr($sub_id . '-help') . '">' . esc_html($sub['instructions']) . '</p>';
             Alify_CF::control($sub, $value, $sub_id, $name);
             echo '</div>';
         }

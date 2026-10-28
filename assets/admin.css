@@ -70,3 +70,11 @@
 .alify-selector-item { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
 .alify-selector-item span { flex: 1; }
 .alify-selector-results { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.alify-row-bar > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.alify-row-collapsed > .alify-sub-value, .alify-row-collapsed > .alify-layout-fields { display: none; }
+.alify-tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #c3c4c7; margin-bottom: 12px; }
+.alify-tabs > .alify-value { border: 0; padding: 8px 0; }
+.alify-value[data-field-type="tab"] > label, .alify-value[data-field-type="accordion"] > label { display: none; }
+.alify-tabs [aria-selected="true"] { font-weight: 700; background: #2271b1; color: #fff; }
+.alify-message { padding: 12px; border-left: 4px solid #2271b1; background: #f0f6fc; }

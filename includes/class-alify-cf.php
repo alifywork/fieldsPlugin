@@ -2,6 +2,9 @@
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-selector.php';
+require_once __DIR__ . '/class-alify-cf-api.php';
+require_once __DIR__ . '/class-alify-cf-models.php';
+require_once __DIR__ . '/class-alify-cf-editor-fields.php';
 require_once __DIR__ . '/class-alify-cf-reference-settings.php';
 require_once __DIR__ . '/class-alify-cf-field-settings.php';
 require_once __DIR__ . '/class-alify-cf-temporal-format.php';
@@ -28,6 +31,8 @@ final class Alify_CF {
     const LOCATION = '_alify_cf_location';
 
     public static function boot() {
+        Alify_CF_API::boot();
+        Alify_CF_Models::boot();
         Alify_CF_Options::boot();
         Alify_CF_Post_Object::boot();
         Alify_CF_Selector::boot();
@@ -44,7 +49,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('taxonomy' => 'Taxonomy', 'user' => 'User', 'page_link' => 'Page Link', 'text' => 'Text', 'password' => 'Password', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'range' => 'Range', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'button_group' => 'Button Group', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'date_time' => 'Date Time', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content');
+        return array_merge(array('tab' => 'Tab', 'accordion' => 'Accordion', 'message' => 'Message', 'icon_picker' => 'Icon Picker', 'taxonomy' => 'Taxonomy', 'user' => 'User', 'page_link' => 'Page Link', 'text' => 'Text', 'password' => 'Password', 'textarea' => 'Text Area', 'wysiwyg' => 'WYSIWYG Editor', 'number' => 'Number', 'range' => 'Range', 'email' => 'Email', 'url' => 'URL', 'link' => 'Link', 'post_object' => 'Post Object', 'relationship' => 'Relationship', 'select' => 'Select', 'radio' => 'Radio Button', 'button_group' => 'Button Group', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'date_time' => 'Date Time', 'color' => 'Color Picker', 'time' => 'Time', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater', 'gallery' => 'Gallery', 'group' => 'Group', 'flexible' => 'Flexible Content'), Alify_CF_API::types());
     }
 
     public static function register() {
@@ -63,10 +68,13 @@ final class Alify_CF {
     }
 
     public static function groups($post_type) {
-        return get_posts(array('post_type' => self::GROUP, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => self::LOCATION, 'meta_value' => $post_type));
+        $groups = get_posts(array('post_type' => self::GROUP, 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => self::LOCATION, 'meta_value' => $post_type));
+        foreach (Alify_CF_API::groups($post_type) as $group) { $groups[] = (object) array('ID' => $group['id'], 'post_title' => $group['title']); }
+        return $groups;
     }
 
     public static function schema($id) {
+        $registered = Alify_CF_API::schema($id); if ($registered !== null) { return $registered; }
         $schema = get_post_meta($id, self::SCHEMA, true);
         return is_array($schema) ? $schema : array();
     }
@@ -175,6 +183,8 @@ final class Alify_CF {
     }
 
     public static function control($field, $value, $id, $input, $error_id = '') {
+        if (Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker') { Alify_CF_Editor_Fields::render($field, $value, $id, $input); return; }
+        if (Alify_CF_API::custom($field['type'])) { Alify_CF_API::custom_render($field, $value, $id, $input, $error_id); return; }
         $required = !empty($field['required']) ? ' required' : '';
         $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help' . ($error_id ? ' ' . $error_id : '')) . '"' . ($error_id ? ' aria-invalid="true"' : '');
         $container_error = $error_id && in_array($field['type'], array('group', 'repeater', 'flexible'), true);
@@ -209,7 +219,7 @@ final class Alify_CF {
                 if (Alify_CF_Reference_Settings::multiple($field)) { Alify_CF_Relationship::render($field, $value, $id, $input); break; }
                 Alify_CF_Post_Object::render($field, $value, $id, $input); break;
             case 'wysiwyg':
-                echo '<div class="alify-rich"><button type="button" class="button" data-rich-enable>Enable Visual/Text editor</button><textarea class="alify-rich-text" data-rich-editor' . $attrs . ' aria-required="' . (!empty($field['required']) ? 'true' : 'false') . '" rows="8">' . esc_textarea(is_string($value) ? wp_kses_post($value) : '') . '</textarea><p class="description">WordPress post HTML only. Required fields need text; empty formatting or media-only content is not sufficient.</p></div>'; break;
+                echo '<div class="alify-rich"><button type="button" class="button" data-rich-enable>Enable Visual/Text editor</button><textarea class="alify-rich-text" data-rich-editor data-rich-toolbar="' . esc_attr($field['toolbar'] ?? 'full') . '" data-rich-mode="' . esc_attr($field['editor_mode'] ?? 'both') . '" data-rich-media="' . (!empty($field['media_buttons']) && current_user_can('upload_files') ? '1' : '0') . '"' . $attrs . ' aria-required="' . (!empty($field['required']) ? 'true' : 'false') . '" rows="8">' . esc_textarea(is_string($value) ? wp_kses_post($value) : '') . '</textarea><p class="description">WordPress post HTML only. Required fields need text; empty formatting or media-only content is not sufficient.</p></div>'; break;
             case 'textarea':
                 echo '<textarea' . $attrs . $required . ' rows="4">' . esc_textarea(is_scalar($value) ? $value : '') . '</textarea>'; break;
             case 'select':
@@ -250,6 +260,9 @@ final class Alify_CF {
     }
 
     public static function clean_value($field, $value) {
+        if (Alify_CF_Editor_Fields::presentation($field['type'])) { return ''; }
+        if ($field['type'] === 'icon_picker') { return Alify_CF_Editor_Fields::clean_icon($field, $value); }
+        if (Alify_CF_API::custom($field['type'])) { return Alify_CF_API::custom_clean($field, $value); }
         if (Alify_CF_Selector::supported($field)) { return Alify_CF_Selector::clean($field, $value); }
         if (Alify_CF_Choice::multiple($field)) { return Alify_CF_Choice::clean($field, $value); }
         if ($field['type'] === 'date_time') { return Alify_CF_Date_Time::clean($value); }
@@ -312,7 +325,7 @@ final class Alify_CF {
             if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
-            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors), Alify_CF_Selector::settings($field, $errors));
+            $clean = array_merge($clean, Alify_CF_Temporal_Format::settings($field, $errors), Alify_CF_Choice::settings($field, $errors), Alify_CF_Field_Settings::settings($field, $errors), Alify_CF_Reference_Settings::settings($field, $errors), Alify_CF_Selector::settings($field, $errors), Alify_CF_API::settings($field, $errors), Alify_CF_Editor_Fields::settings($field, $errors));
             if ($type === 'range') { $clean = array_merge($clean, Alify_CF_Range::settings($field, $errors)); }
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
             if ($type === 'repeater') {
@@ -338,18 +351,20 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
                 }
-                if (!$source || Alify_CF_Selector::supported($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'), true) || Alify_CF_Reference_Settings::multiple($source) || $source['key'] === $field['key'] || $source['condition']) {
+                if (!$source || Alify_CF_Editor_Fields::presentation($source['type']) || Alify_CF_API::custom($source['type']) || Alify_CF_Selector::supported($source) || in_array($source['type'], array('repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password'), true) || Alify_CF_Reference_Settings::multiple($source) || $source['key'] === $field['key'] || $source['condition']) {
                     $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
                 }
             }
         }
         // Reserve names across published and draft groups on the same post type.
         $others = get_posts(array('post_type' => self::GROUP, 'post_status' => array('publish', 'draft', 'pending', 'private', 'future'), 'numberposts' => -1, 'exclude' => array($id), 'meta_key' => self::LOCATION, 'meta_value' => $location));
+        foreach (Alify_CF_API::groups($location) as $group) { if ($group['id'] !== $id) { $others[] = (object) array('ID' => $group['id'], 'post_title' => $group['title']); } }
         foreach ($others as $other) {
             foreach (self::schema($other->ID) as $field) {
                 if (isset($names[$field['name']])) { $errors[] = 'Field name "' . $field['name'] . '" is already used by group "' . $other->post_title . '". Use a different name.'; }
             }
         }
+        foreach ($fields as $field) { if ((!empty($field['api_read']) || !empty($field['public_output'])) && Alify_CF_Password::contains($field)) { $errors[] = 'Password-containing fields cannot be exposed for reading/output.'; } }
         return $fields;
     }
 
@@ -398,6 +413,7 @@ final class Alify_CF {
             $submitted_values[$field['key']] = self::clean_value($field, $values[$field['name']] ?? '');
         }
         foreach ($schema as $field) {
+            if (Alify_CF_Editor_Fields::presentation($field['type'])) { continue; }
             // Hidden values are preserved, even if a forged request supplies them.
             if (!self::visible($field, $schema, $submitted_values)) { continue; }
             $issue = ''; $location = null;

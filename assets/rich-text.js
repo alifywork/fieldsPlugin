@@ -14,12 +14,12 @@
         if (editorFor(textarea)) return;
         textarea.dataset.richEnabled = '1';
         wp.editor.initialize(textarea.id, {
-            mediaButtons: false,
-            quicktags: true,
-            tinymce: {
+            mediaButtons: textarea.dataset.richMedia === '1',
+            quicktags: textarea.dataset.richMode !== 'visual',
+            tinymce: textarea.dataset.richMode === 'text' ? false : {
                 // Store explicit HTML paragraphs; the native post editor otherwise strips them on save.
                 wpautop: false,
-                toolbar1: 'formatselect,bold,italic,bullist,numlist,blockquote,link,unlink,undo,redo',
+                toolbar1: textarea.dataset.richToolbar === 'basic' ? 'bold,italic,bullist,numlist,link,unlink,undo,redo' : 'formatselect,bold,italic,bullist,numlist,blockquote,link,unlink,undo,redo',
                 toolbar2: '',
                 setup: function (editor) {
                     editor.on('change input undo redo', function () {
@@ -64,5 +64,11 @@
             });
         });
     }
-    window.AlifyRichText = {sync, focus};
+    function detach(root) { root.querySelectorAll(selector).forEach(textarea => { syncOne(textarea); if (textarea.dataset.richEnabled === '1' && window.wp && wp.editor) wp.editor.remove(textarea.id); }); }
+    function restore(root) { root.querySelectorAll(selector).forEach(textarea => { if (textarea.dataset.richEnabled === '1') enable(textarea); }); }
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-row-action="up"], [data-row-action="down"], [data-row-action="remove"], [data-flex-action="up"], [data-flex-action="down"], [data-flex-action="remove"]');
+        if (!button || button.disabled) return; const row = button.closest('.alify-row, .alify-flex-row'); if (!row) return; detach(row); queueMicrotask(() => { if (row.isConnected) restore(row); });
+    }, true);
+    window.AlifyRichText = {sync, focus, detach, restore, enable};
 })();

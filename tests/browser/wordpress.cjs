@@ -474,6 +474,46 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         verifyOptions('corrected');
         const deniedSearch = await context.request.post(base + '/wp-admin/admin-ajax.php', {form: {action: 'alify_cf_search_posts', nonce: 'invalid', search: 'Browser reference', page: '1'}});
         check(deniedSearch.status(), 403, 'Actual AJAX post search rejects invalid nonce');
+        // Isolated page group: native TinyMCE row lifecycle, layout sections and model UI.
+        const advancedURL = base + '/wp-admin/post.php?post=' + fixture.advanced_post + '&action=edit&alify_classic=1';
+        await page.goto(advancedURL);
+        const advanced = page.locator(`.alify-values[data-group-id="${fixture.advanced_group}"]`);
+        const tabs = page.locator('[data-editor-tab]'); check(await tabs.count(), 2, 'Two presentation tabs render');
+        const rowsRoot = page.locator('[data-field-key="field_advanced_rows"] .alify-repeater');
+        await rowsRoot.locator('[data-row-action="add"]').click();
+        let row = rowsRoot.locator('.alify-rows > .alify-row').first();
+        check(await row.evaluate(element => element.classList.contains('alify-row-collapsed')), true, 'New row respects collapsed presentation');
+        await row.locator('[data-row-tool="collapse"]').click(); await row.locator('input[name$="[heading]"]').fill('First');
+        async function rowEditor(row, html) { const id = await row.locator('textarea[data-rich-editor]').getAttribute('id'); await row.locator('[data-rich-enable]').click(); const visual = page.locator(`[id="${id}-tmce"]`); if (await visual.count()) await visual.click(); await page.waitForFunction(id => window.tinymce && tinymce.get(id) && tinymce.get(id).initialized && !tinymce.get(id).isHidden(), id); if (html) await page.evaluate(({id, html}) => tinymce.get(id).setContent(html), {id, html}); return id; }
+        const originalId = await rowEditor(row, '<p>Dynamic <strong>copy</strong></p>');
+        await row.locator('[data-row-tool="clone"]').click();
+        check(await rowsRoot.locator('.alify-rows > .alify-row').count(), 2, 'Content row duplicates from pristine template');
+        const copied = rowsRoot.locator('.alify-rows > .alify-row').nth(1); await copied.locator('[data-row-tool="collapse"]').click();
+        check((await copied.locator('textarea').inputValue()).includes('<strong>copy</strong>'), true, 'Duplicate synchronizes native editor content');
+        const copiedId = await copied.locator('textarea').getAttribute('id'); check(copiedId !== originalId, true, 'Duplicated editor gets fresh ID');
+        check(await copied.locator('.mce-tinymce').count(), 0, 'Live TinyMCE wrapper is never cloned');
+        await copied.locator('input[name$="[heading]"]').fill('Second'); await rowEditor(copied);
+        await copied.locator('[data-row-action="up"]').click();
+        await page.waitForFunction(id => window.tinymce && tinymce.get(id) && tinymce.get(id).initialized, copiedId);
+        check(await rowsRoot.locator('.alify-row').first().locator('input[name$="[heading]"]').inputValue(), 'Second', 'Keyboard move works with active rich editor');
+        check(await rowsRoot.locator('.alify-rows').evaluate(element => !!window.jQuery(element).sortable('instance')), true, 'Drag sorting is initialized with native jQuery UI');
+        const flexRoot = page.locator('[data-field-key="field_advanced_flex"] .alify-flexible'); await flexRoot.locator('[data-flex-action="add"]').click();
+        await rowEditor(flexRoot.locator('.alify-flex-row'), '<p>Flexible <em>copy</em></p>');
+        await flexRoot.locator('[data-row-tool="clone"]').click(); check(await flexRoot.locator('.alify-flex-row').count(), 2, 'Flexible rich row duplicates independently');
+        await page.locator('[data-icon-picker]').selectOption('dashicons-heart'); check(await page.locator('[data-icon-preview]').getAttribute('class'), 'dashicons dashicons-heart', 'Icon picker previews safe library identifier');
+        await tabs.nth(1).click(); check(await rowsRoot.locator('input[name$="[heading]"]').first().isEnabled(), true, 'Inactive presentation tab does not drop values');
+        await page.locator('[data-editor-accordion]').click(); check(await page.locator('[data-editor-accordion]').getAttribute('aria-expanded'), 'false', 'Accordion collapses accessibly');
+        await page.locator('[data-editor-accordion]').click(); await page.locator(`input[name="alify_values[${fixture.advanced_group}][advanced_text]"]`).fill('Tab value');
+        await Promise.all([page.waitForNavigation(), page.locator('#save-post').click()]);
+        check(await rowsRoot.locator('.alify-row').first().locator('input[name$="[heading]"]').inputValue(), 'Second', 'Duplicated/reordered rows persist through Classic save');
+        check((await rowsRoot.locator('textarea').first().inputValue()).includes('<strong>copy</strong>'), true, 'Dynamic rich content persists after editor movement');
+        check((await flexRoot.locator('textarea').nth(1).inputValue()).includes('<em>copy</em>'), true, 'Duplicated Flexible HTML persists');
+        check(await page.locator('[data-icon-picker]').inputValue(), 'dashicons-heart', 'Icon identifier persists');
+        await page.goto(base + '/wp-admin/edit.php?post_type=alify_field_group&page=alify-models');
+        const modelForm = page.locator('form').filter({has: page.locator('input[name="slug"]')}).first();
+        await modelForm.locator('input[name="slug"]').fill('alify_browser'); await modelForm.locator('input[name="label"]').fill('Browser managed options');
+        await Promise.all([page.waitForNavigation(), modelForm.locator('button').click()]);
+        check((await page.locator('body').textContent()).includes('options: alify_browser'), true, 'Content Models UI saves nonce-checked configuration');
         check(errors, [], 'No uncaught browser JS errors');
         console.log(`PASS: ${checks} real browser assertions + ${persistenceChecks} HTTP options persistence assertions (Classic, Gutenberg, media, JSON, options).`);
     } finally { await context.close(); await browser.close(); }

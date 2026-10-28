@@ -20,6 +20,15 @@ final class Alify_CF_Reference_Settings {
             if (!is_array($raw) || !$raw || array_values($raw) !== $raw || count($raw) > 20) { $errors[] = 'Reference filters need 1–20 registered types or supported statuses.'; continue; }
             $out[$key] = array(); foreach ($raw as $item) { if (!is_string($item) || !in_array(trim($item), $allowed, true)) { $errors[] = 'Reference filter contains an unavailable type/status.'; } else { $out[$key][] = trim($item); } } $out[$key] = array_values(array_unique($out[$key]));
         }
+        if (array_key_exists('taxonomy_filters', $field)) {
+            $raw = $field['taxonomy_filters']; if (is_string($raw)) { $raw = json_decode($raw, true, 8); }
+            if (!is_array($raw) || array_values($raw) !== $raw || count($raw) > 10) { $errors[] = 'Reference taxonomy filters need up to 10 flat clauses.'; }
+            else { $out['taxonomy_filters'] = array(); foreach ($raw as $clause) {
+                if (!is_array($clause) || !is_string($clause['taxonomy'] ?? null) || !taxonomy_exists($clause['taxonomy']) || !is_array($clause['terms'] ?? null) || !$clause['terms'] || array_values($clause['terms']) !== $clause['terms'] || count($clause['terms']) > 50 || !in_array($clause['operator'] ?? 'IN', array('IN', 'NOT IN'), true)) { $errors[] = 'Invalid taxonomy filter clause.'; continue; }
+                $terms = array(); foreach ($clause['terms'] as $id) { if ((!is_int($id) && !is_string($id)) || !preg_match('/^[1-9][0-9]*$/D', (string) $id) || (string) (int) $id !== (string) $id) { $errors[] = 'Invalid filter term ID.'; continue; } $term = get_term((int) $id, $clause['taxonomy']); if (!$term || is_wp_error($term) || $term->taxonomy !== $clause['taxonomy']) { $errors[] = 'Unavailable taxonomy filter term.'; } else { $terms[] = (int) $id; } }
+                $out['taxonomy_filters'][] = array('taxonomy' => $clause['taxonomy'], 'terms' => array_values(array_unique($terms)), 'operator' => $clause['operator'] ?? 'IN');
+            } }
+        }
         if ($field['type'] === 'post_object' && array_key_exists('multiple', $field)) {
             if (!in_array($field['multiple'], array(true, false, 0, 1, '0', '1'), true)) { $errors[] = 'Post Object multiple must be boolean.'; } else { $out['multiple'] = (bool) $field['multiple']; }
         }
@@ -36,10 +45,11 @@ final class Alify_CF_Reference_Settings {
     public static function allowed($post, $field = array()) {
         if (!$post) { return false; }
         $types = $field['post_types'] ?? array('post', 'page');
+        foreach ($field['taxonomy_filters'] ?? array() as $clause) { $terms = wp_get_object_terms($post->ID, $clause['taxonomy'], array('fields' => 'ids')); if (is_wp_error($terms)) { return false; } $matches = (bool) array_intersect($clause['terms'], $terms); if (($clause['operator'] === 'IN' && !$matches) || ($clause['operator'] === 'NOT IN' && $matches)) { return false; } }
         return in_array($post->post_type, $types, true) && in_array($post->post_status, $field['post_statuses'] ?? array('publish', 'private', 'draft', 'pending', 'future'), true);
     }
     public static function attributes($field) {
-        $settings = array_intersect_key($field, array_flip(array('post_types', 'post_statuses')));
+        $settings = array_intersect_key($field, array_flip(array('post_types', 'post_statuses', 'taxonomy_filters')));
         return ' data-reference-kind="' . esc_attr($field['type']) . '" data-reference-settings="' . esc_attr(wp_json_encode($settings)) . '" data-limit="' . esc_attr($field['max_items'] ?? 50) . '"';
     }
     public static function format($field, $value) {

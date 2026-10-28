@@ -43,7 +43,7 @@ final class Alify_CF_Flexible {
         return $out;
     }
     public static function render($field, $value, $id, $input) {
-        echo '<div class="alify-flexible" data-limit="50"><div class="alify-flex-rows">';
+        echo '<div class="alify-flexible" data-limit="50"' . Alify_CF_Editor_Fields::attributes($field) . '><div class="alify-flex-rows">';
         foreach (is_array($value) ? $value : array() as $index => $row) {
             if (!is_array($row)) { continue; }
             $layout = self::layout($field, $row['layout'] ?? '');

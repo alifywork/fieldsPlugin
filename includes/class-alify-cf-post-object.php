@@ -26,19 +26,24 @@ final class Alify_CF_Post_Object {
         return (is_post_publicly_viewable($post) && !post_password_required($post)) || self::readable($id, $field) ? $post : null;
     }
     public static function assets() {
+        wp_enqueue_script('alify-cf-layout', plugins_url('assets/layout.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
+        wp_enqueue_script('alify-cf-rows', plugins_url('assets/rows.js', ALIFY_CF_FILE), array('jquery-ui-sortable', 'alify-cf-rich-text'), ALIFY_CF_VERSION, true);
         wp_enqueue_script('alify-cf-selector', plugins_url('assets/selector.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
         wp_localize_script('alify-cf-selector', 'AlifySelector', array('url' => admin_url('admin-ajax.php', 'relative'), 'nonce' => wp_create_nonce('alify_cf_search_objects')));
         wp_enqueue_script('alify-cf-post-object', plugins_url('assets/post-object.js', ALIFY_CF_FILE), array(), ALIFY_CF_VERSION, true);
         wp_enqueue_script('alify-cf-relationship', plugins_url('assets/relationship.js', ALIFY_CF_FILE), array('alify-cf-post-object'), ALIFY_CF_VERSION, true);
         wp_localize_script('alify-cf-post-object', 'AlifyPostObject', array('url' => admin_url('admin-ajax.php', 'relative'), 'nonce' => wp_create_nonce('alify_cf_search_posts')));
     }
-    public static function search($term, $type, $page, $nonce, $settings = array()) {
+    public static function search($term, $type, $page, $nonce, $settings = array(), $selected_term = '') {
         $errors = array(); $field = Alify_CF_Reference_Settings::settings(array_merge(is_array($settings) ? $settings : array(), array('type' => 'post_object')), $errors);
         if ($errors || !is_array($settings)) { return new WP_Error('alify_search_input', 'Invalid reference filters.', array('status' => 400)); }
         if (!is_string($nonce) || !wp_verify_nonce($nonce, 'alify_cf_search_posts')) { return new WP_Error('alify_search_nonce', 'Security check failed. Reload the editor.', array('status' => 403)); }
         if (!current_user_can('edit_posts') && !current_user_can('edit_pages') && !current_user_can('manage_options')) { return new WP_Error('alify_search_forbidden', 'You cannot search post references.', array('status' => 403)); }
         if (!is_string($term) || strlen($term) > 200 || !is_string($type) || !in_array($type, array_merge(array(''), $field['post_types'] ?? array('post', 'page')), true) || (!is_int($page) && !is_string($page)) || !preg_match('/^[1-9][0-9]{0,2}$/D', (string) $page) || (int) $page > 100) { return new WP_Error('alify_search_input', 'Use a valid search and page from 1 to 100.', array('status' => 400)); }
-        $posts = get_posts(array('post_type' => $type ?: ($field['post_types'] ?? array('post', 'page')), 'post_status' => $field['post_statuses'] ?? array('publish', 'private', 'draft', 'pending', 'future'), 's' => sanitize_text_field($term), 'posts_per_page' => 20, 'paged' => (int) $page, 'orderby' => 'ID', 'order' => 'DESC', 'no_found_rows' => true, 'suppress_filters' => false));
+        $tax_query = array('relation' => 'AND');
+        foreach ($field['taxonomy_filters'] ?? array() as $clause) { $tax_query[] = array('taxonomy' => $clause['taxonomy'], 'field' => 'term_id', 'terms' => $clause['terms'], 'operator' => $clause['operator'], 'include_children' => false); }
+        if ($selected_term !== '') { $found = false; foreach ($field['taxonomy_filters'] ?? array() as $clause) { if ($clause['operator'] === 'IN' && (is_string($selected_term) || is_int($selected_term)) && in_array((string) $selected_term, array_map('strval', $clause['terms']), true)) { $tax_query[] = array('taxonomy' => $clause['taxonomy'], 'field' => 'term_id', 'terms' => array((int) $selected_term), 'include_children' => false); $found = true; break; } } if (!$found) { return new WP_Error('alify_search_input', 'Invalid editor taxonomy filter.', array('status' => 400)); } }
+        $posts = get_posts(array('post_type' => $type ?: ($field['post_types'] ?? array('post', 'page')), 'post_status' => $field['post_statuses'] ?? array('publish', 'private', 'draft', 'pending', 'future'), 's' => sanitize_text_field($term), 'posts_per_page' => 20, 'paged' => (int) $page, 'orderby' => 'ID', 'order' => 'DESC', 'no_found_rows' => true, 'suppress_filters' => false, 'tax_query' => count($tax_query) > 1 ? $tax_query : array()));
         $items = array();
         foreach ($posts as $post) {
             if (!self::readable($post->ID, $field)) { continue; }
@@ -49,7 +54,7 @@ final class Alify_CF_Post_Object {
     }
     public static function ajax() {
         $data = wp_unslash($_POST);
-        $result = self::search($data['search'] ?? '', $data['type'] ?? '', $data['page'] ?? '1', $data['nonce'] ?? '', $data['reference_settings'] ?? array());
+        $result = self::search($data['search'] ?? '', $data['type'] ?? '', $data['page'] ?? '1', $data['nonce'] ?? '', isset($data['reference_settings_json']) && is_string($data['reference_settings_json']) ? json_decode($data['reference_settings_json'], true, 12) : ($data['reference_settings'] ?? array()), $data['reference_term'] ?? '');
         if (is_wp_error($result)) { $extra = $result->get_error_data(); wp_send_json_error(array('message' => $result->get_error_message()), $extra['status'] ?? 400); }
         wp_send_json_success($result);
     }
@@ -61,6 +66,7 @@ final class Alify_CF_Post_Object {
     }
     private static function type_options($field) { $html = ''; foreach ($field['post_types'] ?? array('post', 'page') as $type) { $html .= '<option value="' . esc_attr($type) . '">' . esc_html($type) . '</option>'; } return $html; }
     public static function search_controls($id, $field = array()) {
+        if (!empty($field['taxonomy_filters'])) { echo '<label>Configured taxonomy filter <select data-post-term><option value="">All configured terms</option>'; foreach ($field['taxonomy_filters'] as $clause) { $taxonomy = get_taxonomy($clause['taxonomy']); if (!$taxonomy || (!$taxonomy->public && !current_user_can($taxonomy->cap->assign_terms)) || $clause['operator'] !== 'IN') { continue; } foreach ($clause['terms'] as $term_id) { $term = get_term($term_id); if ($term && !is_wp_error($term)) { echo '<option value="' . esc_attr($term_id) . '">' . esc_html($term->name) . '</option>'; } } } echo '</select></label>'; }
         echo '<div class="alify-post-search"><label for="' . esc_attr($id . '-search') . '">Search posts/pages</label><input type="search" id="' . esc_attr($id . '-search') . '" maxlength="200" data-post-search><label for="' . esc_attr($id . '-type') . '">Type</label><select id="' . esc_attr($id . '-type') . '" data-post-type><option value="">All allowed types</option>' . self::type_options($field) . '</select><button type="button" class="button" data-post-find>Search</button><div class="alify-post-results"></div><p class="alify-post-status" role="status" aria-live="polite"></p><button type="button" class="button" data-post-prev disabled>Previous</button> <button type="button" class="button" data-post-next disabled>Next</button></div>';
     }
 

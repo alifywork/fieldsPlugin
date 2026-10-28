@@ -92,3 +92,19 @@ function alify_get_formatted_option($name, $page = 'site') {
     $value = alify_get_option($name, $page);
     return $value === null ? null : Alify_CF_Temporal_Format::location(Alify_CF_Options::location($page), $name, $value);
 }
+
+/** Trusted deployment registration; these APIs do not create editable database copies. */
+function alify_register_field_group($definition) { return Alify_CF_API::register_group($definition); }
+function alify_register_field($group_key, $field) { return Alify_CF_API::register_field($group_key, $field); }
+function alify_register_field_type($type, $callbacks) { return Alify_CF_API::register_type($type, $callbacks); }
+/** Capability checked, editor-payload writes. Return true or WP_Error; no implicit bypass. */
+function alify_update_fields($values, $post_id) { return Alify_CF_API::write($values, $post_id); }
+function alify_update_field($name, $value, $post_id) { return is_string($name) ? Alify_CF_API::write(array($name => $value), $post_id) : new WP_Error('alify_name', 'Invalid field name.'); }
+function alify_update_options($values, $page = 'site') { return Alify_CF_API::write($values, $page, true); }
+function alify_update_option($name, $value, $page = 'site') { return is_string($name) ? Alify_CF_API::write(array($name => $value), $page, true) : new WP_Error('alify_name', 'Invalid field name.'); }
+/** Stored canonical row objects are repacked and whole-container validated; indices are zero-based. */
+function alify_update_row($name, $index, $row, $post_id) { return Alify_CF_API::mutate_row($name, $index, $row, $post_id); }
+function alify_delete_row($name, $index, $post_id) { return Alify_CF_API::mutate_row($name, $index, null, $post_id, true); }
+function alify_each_row($name, $post_id = 0) { foreach (alify_get_rows($name, $post_id) as $index => $row) { yield $index => $row; } }
+function alify_get_sub_field($row, $name) { return is_array($row) && is_string($name) ? ($row['fields'][$name] ?? $row[$name] ?? null) : null; }
+function alify_export_group_php($group_id) { return Alify_CF_API::export_php($group_id); }

@@ -8,10 +8,11 @@ $fixture = json_decode(file_get_contents($file), true);
 wp_set_current_user(get_user_by('login', 'alify-test-admin')->ID);
 $_POST = array();
 foreach ($fixture['selector_terms'] ?? array() as $term_id) { wp_delete_term($term_id, 'category'); }
-foreach (array_merge(array($fixture['group'], $fixture['classic'], $fixture['block'], $fixture['rest'], $fixture['options_group'] ?? 0, $fixture['reference'] ?? 0, $fixture['reference_second'] ?? 0), $fixture['images'], $fixture['imports'] ?? array()) as $id) { if ($id) { wp_delete_post($id, true); } }
+foreach (array_merge(array($fixture['group'], $fixture['classic'], $fixture['block'], $fixture['rest'], $fixture['advanced_group'] ?? 0, $fixture['advanced_post'] ?? 0, $fixture['options_group'] ?? 0, $fixture['reference'] ?? 0, $fixture['reference_second'] ?? 0), $fixture['images'], $fixture['imports'] ?? array()) as $id) { if ($id) { wp_delete_post($id, true); } }
 require_once ABSPATH . 'wp-admin/includes/user.php';
 $user = get_user_by('login', $fixture['username']); if ($user) { wp_delete_user($user->ID); }
 delete_option('alify_cf_options_browser-http');
+delete_option('alify_cf_models');
 $editor = get_user_by('login', $fixture['editor_username'] ?? 'alify-browser-editor'); if ($editor) { wp_delete_user($editor->ID); }
 $mu = WP_CONTENT_DIR . '/mu-plugins/alify-browser-test.php'; if (is_file($mu)) { unlink($mu); }
 unlink($file);

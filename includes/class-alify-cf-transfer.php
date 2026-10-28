@@ -27,18 +27,20 @@ final class Alify_CF_Transfer {
         if (!is_string($json) || strlen($json) > self::MAX_BYTES) { return new WP_Error('alify_transfer_size', 'Export exceeds the 1 MiB transfer limit.'); }
         return $json;
     }
+    private static function advanced_conditions($condition) { if (!is_array($condition)) { return false; } foreach ($condition['rules'] ?? array($condition) as $node) { if (isset($node['rules']) || in_array($node['operator'] ?? '', array('contains', 'starts_with', 'ends_with'), true)) { return true; } } return false; }
     /** Older importers must reject row-bound schemas rather than silently drop their limits. */
     private static function version($fields) {
         $version = 1;
         foreach ($fields as $field) {
-            if (Alify_CF_Selector::supported($field)) { $version = 7; }
+            if (Alify_CF_API::custom($field['type']) || Alify_CF_Editor_Fields::presentation($field['type']) || $field['type'] === 'icon_picker' || array_intersect(array_keys($field), array('api_read', 'api_write', 'public_output', 'content', 'icons', 'toolbar', 'editor_mode', 'media_buttons', 'row_label', 'collapsed', 'taxonomy_filters')) || self::advanced_conditions($field['condition'] ?? null)) { $version = 8; }
+            if (Alify_CF_Selector::supported($field)) { $version = max($version, 7); }
             if (Alify_CF_Reference_Settings::supported($field) && array_intersect(array_keys($field), array('post_types', 'post_statuses', 'multiple', 'min_items', 'max_items', 'return_format'))) { $version = max($version, 6); }
             if (array_intersect(array_keys($field), array('alpha', 'palette', 'allowed_mimes', 'preview_size', 'min_bytes', 'max_bytes', 'min_items', 'max_items')) || ((Alify_CF_Field_Settings::media($field) || $field['type'] === 'link') && array_key_exists('return_format', $field)) || ($field['type'] === 'link' && !empty($field['default']))) { $version = max($version, 5); }
             if (Alify_CF_Choice::supported($field['type']) && (array_key_exists('layout', $field) || array_key_exists('multiple', $field) || array_key_exists('searchable', $field) || array_key_exists('return_format', $field) || ($field['type'] === 'checkbox' && !empty($field['default'])))) { $version = max($version, 4); }
             if (Alify_CF_Temporal_Format::formats($field['type']) && (array_key_exists('display_format', $field) || array_key_exists('return_format', $field))) { $version = max($version, 3); }
             if ($field['type'] === 'repeater' && (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field))) { $version = max($version, 2); }
-            if (isset($field['sub_fields'])) { $version = max($version, self::version($field['sub_fields'])); }
-            foreach ($field['layouts'] ?? array() as $layout) { $version = max($version, self::version($layout['sub_fields'])); }
+            if (isset($field['sub_fields'])) { foreach ($field['sub_fields'] as $sub) { if ($sub['type'] === 'wysiwyg') { $version = 8; } } $version = max($version, self::version($field['sub_fields'])); }
+            foreach ($field['layouts'] ?? array() as $layout) { foreach ($layout['sub_fields'] as $sub) { if ($sub['type'] === 'wysiwyg') { $version = 8; } } $version = max($version, self::version($layout['sub_fields'])); }
         }
         return $version;
     }
@@ -64,7 +66,7 @@ final class Alify_CF_Transfer {
         if (is_wp_error($auth)) { return $auth; }
         if (!is_string($json) || strlen($json) > self::MAX_BYTES || trim($json) === '') { return new WP_Error('alify_transfer_size', 'Provide JSON no larger than 1 MiB.'); }
         $object = json_decode($json, false, 32);
-        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2, 3, 4, 5, 6, 7), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
+        if (json_last_error() !== JSON_ERROR_NONE || !is_object($object) || ($object->format ?? null) !== 'alify-custom-field' || !in_array(($object->version ?? null), array(1, 2, 3, 4, 5, 6, 7, 8), true) || !isset($object->group) || !is_object($object->group) || !isset($object->group->fields) || !is_array($object->group->fields)) {
             return new WP_Error('alify_transfer_format', 'Invalid Alify JSON or unsupported format version.');
         }
         $group = json_decode($json, true, 32)['group'];

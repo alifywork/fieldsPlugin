@@ -9,7 +9,7 @@
     }
     document.addEventListener('alify:visibility', () => document.querySelectorAll('.alify-post-object').forEach(pagination));
     function reset(event) {
-        if (!event.target.matches('[data-post-search], [data-post-type]')) return;
+        if (!event.target.matches('[data-post-search], [data-post-type], [data-post-term]')) return;
         const root = event.target.closest('.alify-post-object'), controller = requests.get(root);
         if (controller) controller.abort(); requests.delete(root);
         delete root.dataset.page; delete root.dataset.busy;
@@ -47,7 +47,8 @@
         try {
             const body = new URLSearchParams({action: 'alify_cf_search_posts', nonce: AlifyPostObject.nonce, search: root.querySelector('[data-post-search]').value, type: root.querySelector('[data-post-type]').value, page: String(page)});
             const settings = JSON.parse(root.dataset.referenceSettings || '{}');
-            Object.entries(settings).forEach(([key, values]) => { if (Array.isArray(values)) values.forEach(value => body.append('reference_settings[' + key + '][]', value)); });
+            body.set('reference_settings_json', JSON.stringify(settings));
+            body.set('reference_term', root.querySelector('[data-post-term]')?.value || '');
             const response = await fetch(AlifyPostObject.url, {method: 'POST', body, credentials: 'same-origin', signal: controller.signal});
             const json = await response.json();
             if (requests.get(root) !== controller) return;

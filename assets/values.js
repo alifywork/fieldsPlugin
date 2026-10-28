@@ -265,8 +265,15 @@
                 try { rule = JSON.parse(field.dataset.condition || 'null'); } catch (_) { rule = null; }
                 let visible = true;
                 if (rule) {
-                    const rawRules = rule.rules || [rule];
-                    const rules = Array.isArray(rawRules) && rawRules.length <= 10 ? rawRules : [];
+                    let validTree = true; const rules = [];
+                    function collect(node, depth = 0) {
+                        if (!node || typeof node !== 'object' || depth > 3) { validTree = false; return; }
+                        if ('rules' in node || 'relation' in node) {
+                            if (depth >= 3 || !['all', 'any'].includes(node.relation) || !Array.isArray(node.rules) || !node.rules.length || node.rules.length > 10 || 'field' in node) { validTree = false; return; }
+                            node.rules.forEach(child => collect(child, depth + 1));
+                        } else rules.push(node);
+                    }
+                    collect(rule); if (!rules.length || rules.length > 10) validTree = false;
                     const matches = rules.map(rule => {
                         if (!rule || typeof rule.field !== 'string' || typeof rule.value !== 'string') return false;
                         const source = fields.find(item => item.dataset.fieldKey === rule.field);
@@ -291,13 +298,14 @@
                             } else values = inputs.length ? [inputs[0].value] : [''];
                             const empty = !values.length || (values.length === 1 && (values[0] === '' || (source.dataset.fieldType === 'true_false' && values[0] === '0')));
                             const matches = values.includes(rule.value);
-                            matched = ({equals: matches, not_equals: !matches, empty, not_empty: !empty})[rule.operator] === true;
+                            matched = ({equals: matches, not_equals: !matches, empty, not_empty: !empty, contains: rule.value !== '' && values.some(value => value.includes(rule.value)), starts_with: rule.value !== '' && values.some(value => value.startsWith(rule.value)), ends_with: rule.value !== '' && values.some(value => value.endsWith(rule.value))})[rule.operator] === true;
                         }
                         return matched;
                     });
                     // Invalid references fail closed, including an ANY set containing one.
-                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && ['equals', 'not_equals', 'empty', 'not_empty'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'taxonomy', 'user', 'page_link'].includes(item.dataset.fieldType) && !JSON.parse(item.dataset.condition || 'null')));
-                    visible = !!rules.length && (!rule.rules || ['all', 'any'].includes(rule.relation)) && validSources && (rule.relation === 'any' ? matches.some(Boolean) : matches.every(Boolean));
+                    const validSources = rules.every(rule => rule && typeof rule.field === 'string' && typeof rule.value === 'string' && new Blob([rule.value]).size <= 1000 && ['equals', 'not_equals', 'empty', 'not_empty', 'contains', 'starts_with', 'ends_with'].includes(rule.operator) && fields.some(item => item.dataset.fieldKey === rule.field && item !== field && !['repeater', 'group', 'flexible', 'link', 'wysiwyg', 'relationship', 'password', 'taxonomy', 'user', 'page_link', 'tab', 'accordion', 'message'].includes(item.dataset.fieldType) && !item.dataset.fieldType.startsWith('x_') && !JSON.parse(item.dataset.condition || 'null')));
+                    function evaluate(node) { if (node.rules) { const children = node.rules.map(evaluate); return node.relation === 'any' ? children.some(Boolean) : children.every(Boolean); } return matches[rules.indexOf(node)]; }
+                    visible = validTree && validSources && evaluate(rule);
                 }
                 field.hidden = !visible;
                 field.querySelectorAll('input, select, textarea, button').forEach(input => {

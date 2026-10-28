@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {taxonomy: 'Taxonomy', user: 'User', page_link: 'Page Link', text: 'Text', date_time: 'Date Time', date: 'Date', time: 'Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
+    w.AlifyCF = {types: {tab: 'Tab', accordion: 'Accordion', message: 'Message', icon_picker: 'Icon Picker', taxonomy: 'Taxonomy', user: 'User', page_link: 'Page Link', text: 'Text', date_time: 'Date Time', date: 'Date', time: 'Time', password: 'Password', range: 'Range', relationship: 'Relationship', post_object: 'Post Object', wysiwyg: 'WYSIWYG Editor', link: 'Link', color: 'Color Picker', time: 'Time', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', radio: 'Radio Button', button_group: 'Button Group', repeater: 'Repeater', gallery: 'Gallery', group: 'Group', flexible: 'Flexible Content'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -582,11 +582,11 @@ test('Gutenberg payload flushes rich editors before serialization', async () => 
     assert.equal(sent.data.alify_fields.groups['7'].title, '<p>Latest Visual content</p>'); w.close();
 });
 
-test('WYSIWYG builder uses multiline defaults and excludes rich subfields', () => {
+test('WYSIWYG builder uses multiline defaults and supports lifecycle-managed rich subfields', () => {
     const w = builder(); w.document.getElementById('alify-add').click(); set(w, 'label', 'Copy'); set(w, 'type', 'wysiwyg');
     assert.equal(w.document.querySelector('[data-prop="default"]').tagName, 'TEXTAREA');
     set(w, 'type', 'repeater'); w.document.querySelector('[data-sub-action="add"]').click();
-    assert.equal(w.document.querySelector('[data-sub-prop="type"] option[value="wysiwyg"]'), null); w.close();
+    assert.ok(w.document.querySelector('[data-sub-prop="type"] option[value="wysiwyg"]')); w.close();
 });
 
 
@@ -926,4 +926,32 @@ test('Multiple selectors preserve order, prevent duplicates and submit explicit 
 test('Selector rejects stale AJAX results after search input changes', async () => {
     const w = selectorWindow(), d = w.document; let finish; w.fetch = () => new Promise(resolve => { finish = resolve; }); d.querySelector('[data-selector-find]').click(); d.querySelector('[data-selector-search]').dispatchEvent(new w.Event('input', {bubbles: true}));
     finish({ok: true, json: async () => ({success: true, data: {items: [{id: 1, title: 'Stale'}]}})}); await new Promise(resolve => setImmediate(resolve)); assert.equal(d.querySelector('[data-selector-pick]'), null); w.close();
+});
+
+test('layout fields expose safe builder settings and nested conditions use explicit JSON', () => {
+    const w = builder(), d = w.document; d.getElementById('alify-add').click(); set(w, 'label', 'Notice'); set(w, 'type', 'message');
+    assert.ok(d.querySelector('[data-prop="content"]')); assert.equal(d.querySelector('[data-prop="api_read"]'), null);
+    set(w, 'type', 'wysiwyg'); assert.ok(d.querySelector('[data-prop="toolbar"]')); assert.ok(d.querySelector('[data-prop="media_buttons"]'));
+    set(w, 'type', 'text'); const enabled = d.querySelector('[data-condition-prop="enabled"]'); enabled.checked = true; enabled.dispatchEvent(new w.Event('input', {bubbles: true}));
+    d.querySelector('[data-condition-action="nested"]').click(); assert.ok(d.querySelector('[data-condition-json]')); const json = d.querySelector('[data-condition-json]'); json.value = '{broken'; json.dispatchEvent(new w.Event('input', {bubbles: true})); assert.notEqual(json.validationMessage, ''); w.close();
+});
+
+test('row duplication uses fresh templates and preserves ordered selected IDs', () => {
+    const markup = token => `<div class="alify-row"><div class="alify-row-bar"><div></div></div><div class="alify-sub-value" data-subfield="heading" data-sub-type="text"><input name="v[rows][${token}][heading]" id="heading-${token}" value="Default"></div><textarea data-rich-editor name="v[rows][${token}][body]" id="body-${token}">Default copy</textarea><div class="alify-gallery-items"><input name="v[rows][${token}][photos][ids][]" value="11"><input name="v[rows][${token}][photos][ids][]" value="22"></div></div>`;
+    const dom = new JSDOM(`<div class="alify-repeater" data-limit="4" data-row-label="heading" data-collapsed="1"><div class="alify-rows">${markup('0')}</div><template class="alify-row-template">${markup('__ROW__')}</template></div>`, {runScripts: 'outside-only'}), w = dom.window, d = w.document;
+    let syncs = 0; w.AlifyRichText = {sync() { syncs++; }}; d.querySelector('input').value = 'Edited'; d.querySelector('textarea').value = '<p>Live copy</p>'; const wrapper = d.createElement('div'); wrapper.className = 'mce-tinymce'; d.querySelector('.alify-row').appendChild(wrapper);
+    w.eval(fs.readFileSync('assets/rows.js', 'utf8')); d.querySelector('[data-row-tool="clone"]').click(); const rows = d.querySelectorAll('.alify-row'); assert.equal(rows.length, 2); assert.equal(syncs, 1); assert.equal(rows[1].querySelector('input').value, 'Edited'); assert.equal(rows[1].querySelector('textarea').value, '<p>Live copy</p>'); assert.equal(rows[1].querySelector('.mce-tinymce'), null);
+    assert.notEqual(rows[1].querySelector('textarea').id, rows[0].querySelector('textarea').id); assert.equal(rows[1].querySelector('textarea').id.includes('__ROW__'), false); assert.deepEqual(Array.from(rows[1].querySelectorAll('.alify-gallery-items input'), input => input.value), ['11', '22']); assert.equal(rows[1].classList.contains('alify-row-collapsed'), true);
+    const collapse = rows[1].querySelector('[data-row-tool="collapse"]'); collapse.click(); assert.equal(collapse.getAttribute('aria-expanded'), 'true'); assert.ok(rows[1].querySelector('.alify-extra-row-label').textContent.includes('Edited')); w.close();
+});
+
+test('presentation tabs/accordions retain enabled values and reveal native invalid fields', () => {
+    const dom = new JSDOM('<div class="alify-values"><div class="alify-value" data-field-type="tab"><button id="tab-one" data-editor-tab>One</button></div><div class="alify-value" data-field-type="text"><input value="Keep"></div><div class="alify-value" data-field-type="tab"><button id="tab-two" data-editor-tab>Two</button></div><div class="alify-value" data-field-type="accordion"><button id="accordion-one" data-editor-accordion>Section</button></div><div class="alify-value" data-field-type="text"><input required value=""></div></div>', {runScripts: 'outside-only'}), w = dom.window, d = w.document;
+    w.eval(fs.readFileSync('assets/layout.js', 'utf8')); const panels = d.querySelectorAll('[role="tabpanel"]'); assert.equal(panels[0].hidden, false); assert.equal(panels[1].hidden, true); assert.equal(d.querySelector('input[required]').disabled, false); d.getElementById('tab-two').click(); assert.equal(panels[0].hidden, true); assert.equal(panels[1].hidden, false);
+    d.getElementById('accordion-one').click(); const section = d.querySelector('[data-editor-section="accordion"]'); assert.equal(section.hidden, true); d.getElementById('tab-one').click(); d.querySelector('input[required]').dispatchEvent(new w.Event('invalid')); assert.equal(section.hidden, false); assert.equal(panels[1].hidden, false); w.close();
+});
+
+test('rich editor presets and dynamic detach/restore preserve chosen editor state', () => {
+    const dom = new JSDOM('<div class="alify-row alify-rich"><button data-rich-enable>Enable</button><textarea id="preset-editor" data-rich-editor data-rich-toolbar="basic" data-rich-mode="text" data-rich-media="1">Copy</textarea></div>', {runScripts: 'outside-only'}), w = dom.window, d = w.document; const calls = []; w.wp = {editor: {initialize(id, settings) { calls.push({id, settings}); }, remove(id) { calls.push({remove: id}); }}};
+    w.eval(fs.readFileSync('assets/rich-text.js', 'utf8')); d.querySelector('button').click(); assert.equal(calls[0].settings.tinymce, false); assert.equal(calls[0].settings.quicktags, true); assert.equal(calls[0].settings.mediaButtons, true); w.AlifyRichText.detach(d.querySelector('.alify-row')); assert.equal(calls[1].remove, 'preset-editor'); w.AlifyRichText.restore(d.querySelector('.alify-row')); assert.equal(calls[2].id, 'preset-editor'); w.close();
 });

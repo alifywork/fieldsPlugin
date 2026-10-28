@@ -539,9 +539,9 @@ same(true, Alify_CF::visible($detail, $schema, array($toggle['key'] => '0', $cho
 same(false, Alify_CF::visible($detail, $schema, array($toggle['key'] => '0', $choice['key'] => 'b')), 'ANY false when neither matches');
 $legacy = $rules[0]; $errors = array();
 same($legacy, Alify_CF_Conditions::clean($legacy, $errors, 'detail'), 'Legacy single rule retains original shape');
-foreach (array(array('relation' => 'xor', 'rules' => $rules), array('relation' => 'all', 'rules' => array()), array('relation' => 'all', 'rules' => array_fill(0, 11, $rules[0])), array('relation' => 'any', 'rules' => array(array('relation' => 'all', 'rules' => $rules))), array('relation' => 'all', 'rules' => array('bad')), array('relation' => 'all', 'rules' => array(array('field' => array(), 'operator' => 'equals', 'value' => '1')))) as $invalid) {
+foreach (array(array('relation' => 'xor', 'rules' => $rules), array('relation' => 'all', 'rules' => array()), array('relation' => 'all', 'rules' => array_fill(0, 11, $rules[0])), array('relation' => 'any', 'rules' => array(array('relation' => 'all', 'field' => 'ambiguous', 'rules' => $rules))), array('relation' => 'all', 'rules' => array('bad')), array('relation' => 'all', 'rules' => array(array('field' => array(), 'operator' => 'equals', 'value' => '1')))) as $invalid) {
     $errors = array(); Alify_CF_Conditions::clean($invalid, $errors, 'detail');
-    same(true, (bool) $errors, 'Malformed, oversized or nested condition set rejected');
+    same(true, (bool) $errors, 'Malformed, oversized or ambiguous condition set rejected');
 }
 $bad_detail = $detail; $bad_detail['condition']['rules'][1]['field'] = 'missing'; $errors = array();
 Alify_CF::validate_schema(array($toggle, $choice, $bad_detail), 'page', 0, $errors);
@@ -686,7 +686,7 @@ $rich['required'] = true; $errors = array();
 same(array(), Alify_CF::validate_values(array($rich), array('copy' => '<p>&nbsp;</p>'), array('copy' => 'Old'), $errors), 'Required rich text rejects blank formatting');
 $rich['required'] = false; $errors = array();
 same(array(), Alify_CF::validate_values(array($rich), array('copy' => array()), array('copy' => 'Old'), $errors), 'Rich text rejects structured payloads even when optional');
-$errors = array(); Alify_CF_Repeater::schema(array($rich), $errors); same(true, (bool) $errors, 'Dynamic containers reject unsupported rich-text subfields');
+$errors = array(); Alify_CF_Repeater::schema(array($rich), $errors); same(false, (bool) $errors, 'Dynamic containers accept lifecycle-supported rich-text subfields');
 $target = field('conditional_copy'); $target['condition'] = array('field' => 'field_copy', 'operator' => 'not_empty', 'value' => ''); $errors = array();
 Alify_CF::validate_schema(array($rich, $target), 'post', 0, $errors); same(true, (bool) $errors, 'Rich text cannot be an ambiguous condition source');
 $posts[801] = (object) array('ID' => 801, 'post_type' => 'post', 'post_status' => 'publish');
