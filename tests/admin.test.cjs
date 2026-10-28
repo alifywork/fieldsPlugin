@@ -521,10 +521,12 @@ test('REST structured location targets Flexible subfield and ignores a stale res
 
 
 test('color picker keeps empty distinct from black, synchronizes text, and explicitly clears', () => {
-    const dom = new JSDOM('<div class="alify-value"><div class="alify-color"><input type="text" name="color" value=""><input type="color" data-color-picker value="#000000"><button type="button" data-color-clear>Clear</button></div></div>', {runScripts: 'outside-only'});
+    const dom = new JSDOM('<div class="alify-value"><div class="alify-color"><input type="text" name="color" value=""><input type="color" data-color-picker value="#000000"><button type="button" data-color-apply>Apply</button><button type="button" data-color-clear>Clear</button></div></div>', {runScripts: 'outside-only'});
     const w = dom.window, d = w.document; w.eval(fs.readFileSync('assets/values.js', 'utf8'));
     const text = d.querySelector('[name="color"]'), picker = d.querySelector('[data-color-picker]');
     assert.equal(text.value, ''); assert.equal(picker.hasAttribute('name'), false);
+    d.querySelector('[data-color-apply]').click(); assert.equal(text.value, '#000000');
+    d.querySelector('[data-color-clear]').click(); assert.equal(text.value, '');
     picker.value = '#2271b1'; picker.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(text.value, '#2271b1');
     text.value = '#AABBCC'; text.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(picker.value, '#aabbcc');
     text.value = 'bad'; text.dispatchEvent(new w.Event('input', {bubbles: true})); assert.equal(text.value, 'bad');

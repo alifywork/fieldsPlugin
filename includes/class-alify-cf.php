@@ -187,7 +187,7 @@ final class Alify_CF {
             case 'color':
                 $text = is_scalar($value) ? (string) $value : '';
                 $swatch = self::clean_value($field, $text) ?: '#000000';
-                echo '<div class="alify-color"><input type="text"' . $attrs . ' value="' . esc_attr($text) . '" placeholder="#rrggbb" pattern="#[0-9a-fA-F]{6}" maxlength="7" autocomplete="off" spellcheck="false"' . $required . '><input type="color" data-color-picker value="' . esc_attr($swatch) . '" aria-label="' . esc_attr($field['label'] . ': choose color') . '"><button type="button" class="button" data-color-clear>Clear color</button></div>'; break;
+                echo '<div class="alify-color"><input type="text"' . $attrs . ' value="' . esc_attr($text) . '" placeholder="#rrggbb" pattern="#[0-9a-fA-F]{6}" maxlength="7" autocomplete="off" spellcheck="false"' . $required . '><input type="color" data-color-picker value="' . esc_attr($swatch) . '" aria-label="' . esc_attr($field['label'] . ': choose color') . '"><button type="button" class="button" data-color-apply>Apply swatch</button><button type="button" class="button" data-color-clear>Clear color</button></div>'; break;
             case 'time':
                 echo '<input type="time"' . $attrs . ' value="' . esc_attr(is_scalar($value) ? $value : '') . '" step="60"' . $required . '>'; break;
             case 'true_false':

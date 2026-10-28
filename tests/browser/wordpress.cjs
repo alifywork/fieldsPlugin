@@ -23,6 +23,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await Promise.all([page.waitForURL('**/wp-admin/**'), page.locator('#wp-submit').click()]);
         await page.goto(`${base}/wp-admin/post.php?post=${fixture.classic}&action=edit&alify_classic=1`);
         check(await value('accent').inputValue(), '', 'Optional color starts empty rather than implicit black');
+        await page.locator('[data-color-apply]').click();
+        check(await value('accent').inputValue(), '#000000', 'Explicit Apply commits black even when native swatch has not changed');
         await page.locator('[data-color-picker]').evaluate(node => { node.value = '#2271b1'; node.dispatchEvent(new Event('input', {bubbles: true})); });
         check(await value('accent').inputValue(), '#2271b1', 'Native color picker updates submitted color text');
         await value('opens').fill('09:30');

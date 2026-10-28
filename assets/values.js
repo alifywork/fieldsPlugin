@@ -76,10 +76,12 @@
     document.addEventListener('input', syncColor);
     document.addEventListener('change', syncColor);
     document.addEventListener('click', event => {
-        const button = event.target.closest('[data-color-clear]');
+        const button = event.target.closest('[data-color-clear], [data-color-apply]');
         if (!button || button.disabled) return;
         const root = button.closest('.alify-color'), text = root.querySelector('input[type="text"]');
-        text.value = ''; root.querySelector('[data-color-picker]').value = '#000000';
+        const picker = root.querySelector('[data-color-picker]');
+        text.value = button.hasAttribute('data-color-apply') ? picker.value : '';
+        if (!text.value) picker.value = '#000000';
         text.dispatchEvent(new Event('input', {bubbles: true})); text.focus();
     });
     function refreshRows(repeater) {
