@@ -17,7 +17,8 @@
             mediaButtons: false,
             quicktags: true,
             tinymce: {
-                wpautop: true,
+                // Store explicit HTML paragraphs; the native post editor otherwise strips them on save.
+                wpautop: false,
                 toolbar1: 'formatselect,bold,italic,bullist,numlist,blockquote,link,unlink,undo,redo',
                 toolbar2: '',
                 setup: function (editor) {

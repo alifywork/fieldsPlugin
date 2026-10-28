@@ -567,7 +567,7 @@ test('rich editor synchronizes Visual before form saves but preserves active Tex
     w.tinymce = {get: () => active ? editor : null};
     w.wp = {editor: {initialize(id, config) { assert.equal(id, 'rich'); settings = config; active = true; }}};
     w.eval(fs.readFileSync('assets/rich-text.js', 'utf8'));
-    d.querySelector('button').click(); assert.equal(settings.mediaButtons, false); assert.equal(settings.quicktags, true);
+    d.querySelector('button').click(); assert.equal(settings.mediaButtons, false); assert.equal(settings.quicktags, true); assert.equal(settings.tinymce.wpautop, false);
     assert.equal(d.querySelector('button').hidden, true);
     d.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); assert.equal(textarea.value, '<p>Visual</p>');
     hidden = true; textarea.value = '<p>Text edit</p>'; w.AlifyRichText.sync(); assert.equal(textarea.value, '<p>Text edit</p>');

@@ -40,7 +40,9 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('.alify-link input[type="url"]').fill('https://example.com/path?q=1&b=2');
         await page.locator('.alify-link input[type="text"]').fill('Visit example');
         await page.locator('.alify-link select').selectOption('_blank');
-        await setRich('<p>Classic <strong>rich</strong></p>');
+        const classicRichId = await setRich('<p>Classic <strong>rich</strong></p>');
+        await page.locator(`[id="${classicRichId}-html"]`).click();
+        await page.locator('textarea[data-rich-editor]').fill('<p>Classic <strong>rich</strong> Text edit</p>');
         await value('opens').fill('09:30');
         await value('subtitle').fill('Classic subtitle');
         await page.locator('.alify-group [type="text"]').fill('Classic profile');
@@ -91,6 +93,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await value('accent').inputValue(), '#2271b1', 'Color survives Classic save/reload');
         check(await value('opens').inputValue(), '09:30', 'Time survives Classic save/reload without conversion');
         check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('<strong>rich</strong>'), true, 'Native Visual editor synchronizes HTML on Classic form save');
+        check((await page.locator('textarea[data-rich-editor]').inputValue()).includes('Text edit'), true, 'Active native Text-tab changes are not overwritten by Visual content');
         check(await page.locator('.alify-link input[type="url"]').inputValue(), 'https://example.com/path?q=1&b=2', 'Link URL survives actual Classic save/reload');
         check(await page.locator('.alify-link input[type="text"]').inputValue(), 'Visit example', 'Link title survives actual Classic save/reload');
         check(await page.locator('.alify-link select').inputValue(), '_blank', 'Link target survives actual Classic save/reload');
