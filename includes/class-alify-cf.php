@@ -239,6 +239,10 @@ final class Alify_CF {
             $keys[$key] = true;
             $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
             if ($type === 'flexible') { $clean['layouts'] = Alify_CF_Flexible::schema($field['layouts'] ?? null, $errors); }
+            if ($type === 'repeater') {
+                $limits = Alify_CF_Repeater::limits($field, $errors);
+                if (array_key_exists('min_rows', $field) || array_key_exists('max_rows', $field)) { $clean = array_merge($clean, $limits); }
+            }
             if (in_array($type, array('repeater', 'group'), true)) { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
             $clean['default'] = in_array($type, array('repeater', 'gallery', 'group', 'flexible'), true) ? array() : self::clean_value($clean, $field['default'] ?? '');
             $clean['condition'] = Alify_CF_Conditions::clean($field['condition'] ?? null, $errors, $name);

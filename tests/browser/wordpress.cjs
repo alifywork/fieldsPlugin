@@ -46,6 +46,7 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         await page.locator('[data-row-action="add"]').click();
         await page.locator('.alify-row').nth(1).locator('[type="text"]').fill('Second member');
         await page.locator('.alify-row').nth(1).locator('[data-row-action="up"]').click();
+        check(await page.locator('[data-row-action="add"]').isDisabled(), true, 'Configured maximum disables Add Row at two rows');
         await page.locator('.alify-flex-choice').selectOption('hero');
         await page.locator('[data-flex-action="add"]').click();
         await page.locator('.alify-flex-row [type="text"]').fill('Hero heading');
@@ -62,6 +63,13 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.locator('.alify-group .alify-media input[type="hidden"]').inputValue(), String(fixture.images[0]), 'Group native image selection persists');
         check(await page.locator('.alify-row [type="text"]').evaluateAll(nodes => nodes.map(node => node.value)), ['Second member', 'First member'], 'Repeater row order survives reload');
         check(await page.locator('.alify-gallery-item').evaluateAll(nodes => nodes.map(node => Number(node.dataset.imageId))), [fixture.images[1], fixture.images[0]], 'Gallery order survives real save');
+        page.once('dialog', dialog => dialog.accept());
+        await page.locator('.alify-row').nth(1).locator('[data-row-action="remove"]').click();
+        check(await page.locator('[data-row-action="remove"]').isDisabled(), true, 'Configured minimum disables removing last row');
+        await saveClassic();
+        check(await page.locator('.alify-row').count(), 1, 'Repeater minimum row count survives actual save/reload');
+        check(await page.locator('[data-row-action="remove"]').isDisabled(), true, 'Minimum remove boundary survives reload');
+        // Native confirmation is intentionally accepted for this explicit removal.
         await value('show_details').check();
         check(await value('details').isVisible(), true, 'ALL target appears when both sources match');
         check(await value('alternate').isVisible(), true, 'ANY target appears when one source matches');
@@ -84,6 +92,8 @@ const fixture = JSON.parse(fs.readFileSync(process.env.ALIFY_BROWSER_FIXTURE, 'u
         check(await page.evaluate(() => window.AlifyEditor.postId), String(fixture.block), 'Gutenberg bridge targets current post');
         await value('subtitle').fill('Block subtitle');
         await page.locator('.alify-group [type="text"]').fill('Block profile');
+        await page.locator('[data-row-action="add"]').click();
+        await page.locator('.alify-row [type="text"]').fill('Block member');
         await page.locator('.alify-flex-choice').selectOption('text');
         await page.locator('[data-flex-action="add"]').click();
         await page.locator('.alify-flex-row textarea').fill('Gutenberg flexible body');

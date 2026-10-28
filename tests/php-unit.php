@@ -559,4 +559,29 @@ same('Keep', $recovered['values']['compound_detail'], 'Compound hidden recovery 
 $gallery_source = field('condition_photos', 'gallery'); $checkbox_source = field('condition_tags', 'checkbox');
 $detail['condition'] = array('relation' => 'all', 'rules' => array(array('field' => $gallery_source['key'], 'operator' => 'equals', 'value' => '50'), array('field' => $checkbox_source['key'], 'operator' => 'not_empty', 'value' => '')));
 same(true, Alify_CF::visible($detail, array($gallery_source, $checkbox_source, $detail), array($gallery_source['key'] => array(50), $checkbox_source['key'] => array('a'))), 'Compound gallery membership and checkbox emptiness agree');
+// Configurable row bounds are enforced atomically and never migrate/truncate saved data.
+$limited = field('limited_rows', 'repeater'); $limited['sub_fields'] = array(field('name', 'text', true));
+$errors = array(); same(array('min_rows' => 0, 'max_rows' => 50), Alify_CF_Repeater::limits($limited, $errors), 'Legacy repeater limits default 0–50');
+$limited['min_rows'] = '1'; $limited['max_rows'] = '2'; $errors = array();
+$limited_schema = Alify_CF::validate_schema(array($limited), 'page', 0, $errors);
+same(1, $limited_schema[0]['min_rows'], 'Minimum normalized to integer'); same(2, $limited_schema[0]['max_rows'], 'Maximum normalized to integer');
+$one = array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'name' => 'One')));
+same('', Alify_CF_Repeater::clean($limited, array('__complete' => '1')), 'Below-minimum complete submission rejected');
+same(array(array('name' => 'One')), Alify_CF_Repeater::clean($limited, $one), 'Minimum row count accepted');
+$two = $one; $two['rows'][] = array('__row_complete' => '1', 'name' => 'Two');
+same(2, count(Alify_CF_Repeater::clean($limited, $two)), 'Maximum row count accepted');
+$three = $two; $three['rows'][] = array('__row_complete' => '1', 'name' => 'Three');
+same('', Alify_CF_Repeater::clean($limited, $three), 'Over-maximum submission rejected rather than truncated');
+foreach (array(array('min_rows' => -1), array('min_rows' => null), array('max_rows' => true), array('min_rows' => '1.5'), array('max_rows' => '1e1'), array('min_rows' => '01'), array('max_rows' => 51), array('max_rows' => 0), array('min_rows' => 3, 'max_rows' => 2), array('max_rows' => array())) as $bad) {
+    $errors = array(); Alify_CF_Repeater::limits(array_merge($limited, $bad), $errors); same(true, (bool) $errors, 'Invalid row bounds rejected');
+}
+$required_rows = $limited; $required_rows['min_rows'] = 0; $required_rows['required'] = true;
+same('', Alify_CF_Repeater::clean($required_rows, array('__complete' => '1')), 'Required repeater effective minimum is at least one');
+ob_start(); Alify_CF_Repeater::render($limited, array(array('name' => 'One'), array('name' => 'Two'), array('name' => 'Three')), 'limited', 'limited'); $bounds_html = ob_get_clean();
+same(true, strpos($bounds_html, 'data-min="1" data-limit="2"') !== false, 'Editor receives configured row bounds');
+same(3, substr_count($bounds_html, 'class="alify-row"') - 1, 'Existing out-of-bounds rows render without truncation (excluding template)');
+$hidden_rows = $limited; $hidden_rows['condition'] = array('field' => $toggle['key'], 'operator' => 'equals', 'value' => '1'); $errors = array();
+$updates = Alify_CF::validate_values(array($toggle, $hidden_rows), array('show_detail' => '0', 'limited_rows' => array('__complete' => '1')), array('limited_rows' => array(array('name' => 'Keep'))), $errors);
+same(false, array_key_exists('limited_rows', $updates), 'Hidden repeater ignores unmet row bounds and forged clearing');
+same(array(), $errors, 'Hidden below-minimum repeater does not block validation');
 echo "PASS: $count PHP contract assertions\n";

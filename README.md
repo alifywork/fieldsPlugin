@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.10.0 — compound conditional logic**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.11.0 — configurable Repeater row bounds**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -189,6 +189,13 @@ alify_the_option('footer_text', 'footer');
 
 Select **Repeater** as the field type, then add 1–20 subfields in its card. Each subfield has a local name, label, type, instructions, choices, default and required setting. All twelve basic/non-container types (including Image/File/Gallery) work as subfields. Add, remove and move subfields with the builder buttons.
 
+**Row limits:** configure **Minimum rows** (0–50) and **Maximum rows** (1–50), with minimum ≤ maximum. Legacy repeaters default to 0–50; a required repeater has an effective minimum of at least one. Limits apply on posts, options, Classic/core REST publication and JSON schema transfer (destination version 0.11.0+).
+
+The editor disables Add at the maximum and Remove at the effective minimum; keyboard move controls remain available. New rows are not automatically inserted. Server checks remain authoritative: forged or incomplete/below-minimum/above-maximum submissions retain the complete previous list, not a truncated subset. Hidden repeaters preserve values and do not enforce their bounds until visible.
+
+Changing limits never migrates or silently removes existing rows. Out-of-bounds saved/recovered lists remain rendered so editors can add/remove rows to fix them; publication/new saves can require correction. Parent required status and each subfield's requirements still apply. Limits are strict whole numbers; malformed bounds reject the entire schema change. Groups and Flexible layouts keep their own existing limits; this increment does not add nesting or alter storage/helper return types.
+
+
 In the post editor, use **Add Row**, **Remove row**, and the up/down buttons to manage row order. A repeater starts empty; subfield defaults apply to newly added rows, not retroactively to existing rows. Marking the repeater required means at least one valid row is required. JavaScript is required for row management.
 
 ```php
@@ -327,7 +334,7 @@ Autosaves and ordinary draft saves without a field payload remain available. Dir
 
 ## Verification
 
-Automated checks for 0.10.0:
+Automated checks for 0.11.0:
 
 ```sh
 npm ci

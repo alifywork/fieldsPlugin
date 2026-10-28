@@ -424,6 +424,50 @@ try {
     $bad_condition_fields = Alify_CF::schema($condition_group); $bad_condition_fields[2]['condition']['rules'][0]['field'] = 'missing';
     configure_group($condition_group, $bad_condition_fields);
     expect_same($all_target['condition'], Alify_CF::schema($condition_group)[2]['condition'], 'Invalid compound schema preserves previous complete configuration');
+    // Configurable repeater row bounds across Classic, REST, options and JSON.
+    $_POST = array(); wp_update_post(array('ID' => $condition_group, 'post_status' => 'draft'));
+    $limit_group = fixture_post(Alify_CF::GROUP); $limit_post = fixture_post();
+    $limited_rows = test_field('limited_team', 'repeater'); $limited_rows['sub_fields'] = array(test_field('name', 'text', true)); $limited_rows['min_rows'] = '1'; $limited_rows['max_rows'] = '2';
+    configure_group($limit_group, array($limited_rows));
+    expect_same(1, Alify_CF::schema($limit_group)[0]['min_rows'], 'Repeater minimum stored as integer');
+    expect_same(2, Alify_CF::schema($limit_group)[0]['max_rows'], 'Repeater maximum stored as integer');
+    $limit_one = array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'name' => 'First')));
+    $limit_two = $limit_one; $limit_two['rows'][] = array('__row_complete' => '1', 'name' => 'Second');
+    $limit_three = $limit_two; $limit_three['rows'][] = array('__row_complete' => '1', 'name' => 'Third');
+    save_values($limit_post, $limit_group, array('limited_team' => $limit_two));
+    $limit_saved = alify_get_rows('limited_team', $limit_post);
+    expect_same(2, count($limit_saved), 'Maximum valid row count stored');
+    save_values($limit_post, $limit_group, array('limited_team' => $limit_three), 'publish');
+    expect_same('draft', get_post_status($limit_post), 'Above-maximum Classic publish stays draft');
+    expect_same($limit_saved, alify_get_rows('limited_team', $limit_post), 'Above-maximum submission retains all prior rows');
+    save_values($limit_post, $limit_group, array('limited_team' => array('__complete' => '1')), 'publish');
+    expect_same('draft', get_post_status($limit_post), 'Below-minimum Classic publication blocked');
+    expect_same($limit_saved, alify_get_rows('limited_team', $limit_post), 'Below-minimum submission preserves rows');
+    save_values($limit_post, $limit_group, array('limited_team' => $limit_one), 'publish');
+    expect_same('publish', get_post_status($limit_post), 'Corrected minimum row count publishes');
+    $limit_rest = fixture_post(); $_POST = array();
+    $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $limit_rest); $request->set_param('status', 'publish');
+    expect_same(400, rest_do_request($request)->get_status(), 'Raw REST validates saved/default minimum row count');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($limit_group => array('__group_complete' => '1', 'limited_team' => $limit_three))));
+    expect_same(400, rest_do_request($request)->get_status(), 'REST cannot bypass maximum row count');
+    $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($limit_group => array('__group_complete' => '1', 'limited_team' => $limit_one))));
+    expect_same(200, rest_do_request($request)->get_status(), 'Valid bounded repeater accepted by REST');
+    expect_same(array(array('name' => 'First')), alify_get_rows('limited_team', $limit_rest), 'REST stores only complete validated row list');
+    $limit_json = Alify_CF_Transfer::export_json($limit_group, $export_nonce); $limit_doc = json_decode($limit_json, true); $limit_doc['group']['location'] = 'options:row-limits';
+    Alify_CF_Options::register('row-limits', 'Row limits');
+    $limit_options = Alify_CF_Transfer::import_json(wp_json_encode($limit_doc), $import_nonce); $fixtures[] = $limit_options;
+    expect_same(Alify_CF::schema($limit_group), Alify_CF::schema($limit_options), 'Configured repeater limits round trip through JSON');
+    $_POST = array(); wp_update_post(array('ID' => $limit_options, 'post_status' => 'publish'));
+    $limit_request = array('alify_options_nonce' => wp_create_nonce('alify_options_row-limits'), 'alify_options_complete' => '1', 'alify_values' => array($limit_options => array('__group_complete' => '1', 'limited_team' => $limit_one)));
+    $limit_errors = array(); expect_same(true, Alify_CF_Options::save('row-limits', $limit_request, $limit_errors), 'Bounded options repeater saves valid rows');
+    $limit_request['alify_values'][$limit_options]['limited_team'] = $limit_three;
+    expect_same(false, Alify_CF_Options::save('row-limits', $limit_request, $limit_errors), 'Options above-maximum list rejected atomically');
+    expect_same(array(array('name' => 'First')), alify_get_option('limited_team', 'row-limits'), 'Invalid bounded options retain prior list');
+    $bad_limits = Alify_CF::schema($limit_group); $bad_limits[0]['min_rows'] = 4;
+    configure_group($limit_group, $bad_limits);
+    expect_same(1, Alify_CF::schema($limit_group)[0]['min_rows'], 'Invalid bounds preserve previous schema');
+    $limit_doc['group']['fields'][0]['max_rows'] = 51;
+    expect_same('alify_transfer_schema', Alify_CF_Transfer::import_json(wp_json_encode($limit_doc), $import_nonce)->get_error_code(), 'Import rejects invalid row bounds before creation');
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');
@@ -438,6 +482,7 @@ try {
     delete_option('alify_cf_options_transfer-tests');
     delete_option('alify_cf_options_flex-tests');
     delete_option('alify_cf_options_condition-tests');
+    delete_option('alify_cf_options_row-limits');
     Alify_CF_Feedback::put('post_' . $initial_post_id, array()); Alify_CF_Feedback::put('options_site', array());
     if (isset($editor)) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user($editor); }
 }

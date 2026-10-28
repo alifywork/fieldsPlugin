@@ -433,3 +433,27 @@ test('compound live conditions enforce ALL/ANY, disable hidden required values a
     const missing = JSON.parse(rule('any')); missing.rules[1].field = 'missing'; target.dataset.condition = JSON.stringify(missing); choice.dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(target.hidden, true);
     assert.equal(target.querySelector('input').value, 'keep'); w.close();
 });
+
+
+test('repeater builder validates configured bounds without changing legacy defaults', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Team'); set(w, 'type', 'repeater');
+    assert.equal(d.querySelector('[data-prop="min_rows"]').value, '0'); assert.equal(d.querySelector('[data-prop="max_rows"]').value, '50');
+    d.querySelector('[data-sub-action="add"]').click(); const label = d.querySelector('[data-sub-prop="label"]'); label.value = 'Name'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
+    set(w, 'min_rows', '2'); set(w, 'max_rows', '1');
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), false);
+    set(w, 'max_rows', '3'); assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
+    assert.equal(schema(w)[0].min_rows, '2'); assert.equal(schema(w)[0].max_rows, '3');
+    w.close();
+});
+test('repeater remove/add limits survive conditional visibility refresh and never discard existing rows', () => {
+    const dom = new JSDOM('<div class="alify-values"><div class="alify-value"><div class="alify-repeater" data-min="1" data-limit="2"><div class="alify-rows"><div class="alify-row"><span class="alify-row-label"></span><input value="keep"><button data-row-action="up">Up</button><button data-row-action="down">Down</button><button data-row-action="remove">Remove</button></div></div><template class="alify-row-template"><div class="alify-row"><span class="alify-row-label"></span><input name="rows[__ROW__][name]"><button data-row-action="up">Up</button><button data-row-action="down">Down</button><button data-row-action="remove">Remove</button></div></template><button data-row-action="add">Add</button><span class="alify-row-count"></span></div></div></div>', {runScripts: 'outside-only'});
+    const w = dom.window, d = w.document; w.confirm = () => true; w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    assert.equal(d.querySelector('[data-row-action="remove"]').disabled, true);
+    d.querySelector('[data-row-action="add"]').click(); assert.equal(d.querySelector('[data-row-action="add"]').disabled, true);
+    assert.equal(d.querySelector('[data-row-action="remove"]').disabled, false);
+    d.querySelector('.alify-row input').dispatchEvent(new w.Event('change', {bubbles: true})); assert.equal(d.querySelector('[data-row-action="add"]').disabled, true);
+    d.querySelectorAll('[data-row-action="remove"]')[1].click(); assert.equal(d.querySelector('[data-row-action="remove"]').disabled, true);
+    assert.equal(d.querySelector('.alify-row input').value, 'keep');
+    w.close();
+});

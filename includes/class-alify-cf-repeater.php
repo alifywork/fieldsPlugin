@@ -6,6 +6,22 @@ final class Alify_CF_Repeater {
     const MAX_ROWS = 50;
     const MAX_FIELDS = 20;
 
+    /** Schema limits are strict integers, not silently clamped values. */
+    public static function limits($raw, &$errors) {
+        $limits = array();
+        foreach (array('min_rows' => 0, 'max_rows' => self::MAX_ROWS) as $name => $default) {
+            $value = array_key_exists($name, $raw) ? $raw[$name] : $default;
+            if ((!is_int($value) && !is_string($value)) || !preg_match('/^(0|[1-9][0-9]?)$/D', (string) $value) || (int) $value > self::MAX_ROWS) { $errors[] = 'Repeater row limits must be whole numbers from 0 to 50.'; return array(); }
+            $limits[$name] = (int) $value;
+        }
+        if ($limits['max_rows'] < 1 || $limits['min_rows'] > $limits['max_rows']) { $errors[] = 'Repeater limits require 0 ≤ minimum ≤ maximum and 1 ≤ maximum ≤ 50.'; return array(); }
+        return $limits;
+    }
+    private static function bounds($field) {
+        if (($field['type'] ?? '') !== 'repeater') { return array(0, self::MAX_ROWS); }
+        return array(max((int) ($field['min_rows'] ?? 0), !empty($field['required']) ? 1 : 0), (int) ($field['max_rows'] ?? self::MAX_ROWS));
+    }
+
     public static function schema($raw, &$errors) {
         if (!is_array($raw) || !$raw || count($raw) > self::MAX_FIELDS) {
             $errors[] = 'Groups and repeaters require between 1 and 20 subfields.'; return array();
@@ -33,7 +49,8 @@ final class Alify_CF_Repeater {
     public static function clean($field, $payload, $old = null, $permissions = false) {
         if (!is_array($payload) || ($payload['__complete'] ?? '') !== '1') { return ''; }
         $rows = $payload['rows'] ?? array();
-        if (!is_array($rows) || count($rows) > self::MAX_ROWS || empty($field['sub_fields'])) { return ''; }
+        list($minimum, $maximum) = self::bounds($field);
+        if (!is_array($rows) || count($rows) < $minimum || count($rows) > min($maximum, self::MAX_ROWS) || empty($field['sub_fields'])) { return ''; }
         $allowed_media = array();
         foreach ((array) $old as $row) {
             if (!is_array($row)) { continue; }
@@ -63,11 +80,12 @@ final class Alify_CF_Repeater {
 
     public static function render($field, $value, $id, $input) {
         $rows = is_array($value) ? $value : array();
-        echo '<div class="alify-repeater" data-base-id="' . esc_attr($id) . '" data-limit="50"><div class="alify-rows">';
+        list($minimum, $maximum) = self::bounds($field);
+        echo '<div class="alify-repeater" data-base-id="' . esc_attr($id) . '" data-min="' . esc_attr($minimum) . '" data-limit="' . esc_attr($maximum) . '"><div class="alify-rows">';
         foreach ($rows as $index => $row) { self::row($field, is_array($row) ? $row : array(), $id, $input, $index); }
         echo '</div><template class="alify-row-template">';
         self::row($field, null, $id, $input, '__ROW__');
-        echo '</template><input type="hidden" name="' . esc_attr($input . '[__complete]') . '" value="1"><div class="alify-repeater-footer"><button type="button" class="button" data-row-action="add">+ Add Row</button> <span class="alify-row-count" aria-live="polite">' . esc_html(count($rows)) . ' / 50 rows</span></div><p class="description">Maximum 50 rows. Invalid rows retain the entire previously saved repeater.</p></div>';
+        echo '</template><input type="hidden" name="' . esc_attr($input . '[__complete]') . '" value="1"><div class="alify-repeater-footer"><button type="button" class="button" data-row-action="add">+ Add Row</button> <span class="alify-row-count" aria-live="polite">' . esc_html(count($rows)) . ' / ' . esc_html($maximum) . ' rows</span></div><p class="description">Allowed rows: ' . esc_html($minimum) . '–' . esc_html($maximum) . '. Invalid rows retain the entire previously saved repeater.</p></div>';
     }
 
     private static function row($field, $row, $id, $input, $index) {

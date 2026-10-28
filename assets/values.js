@@ -8,6 +8,7 @@
             row.querySelector('.alify-row-label').textContent = 'Row ' + (index + 1);
             row.querySelector('[data-row-action="up"]').disabled = hidden || index === 0;
             row.querySelector('[data-row-action="down"]').disabled = hidden || index === rows.length - 1;
+            row.querySelector('[data-row-action="remove"]').disabled = hidden || rows.length <= Number(repeater.dataset.min || 0);
         });
         repeater.querySelector('[data-row-action="add"]').disabled = hidden || rows.length >= Number(repeater.dataset.limit);
         repeater.querySelector('.alify-row-count').textContent = rows.length + ' / ' + repeater.dataset.limit + ' rows';
@@ -33,7 +34,7 @@
             const input = rows.lastElementChild.querySelector('input:not([type="hidden"]), select, textarea');
             if (input) input.focus();
         }
-        if (action === 'remove' && window.confirm('Remove this row? Save the post to apply the change.')) { row.remove(); repeater.querySelector('[data-row-action="add"]').focus(); }
+        if (action === 'remove' && rows.children.length > Number(repeater.dataset.min || 0) && window.confirm('Remove this row? Save the post to apply the change.')) { row.remove(); repeater.querySelector('[data-row-action="add"]').focus(); }
         if (action === 'up' && row.previousElementSibling) rows.insertBefore(row, row.previousElementSibling);
         if (action === 'down' && row.nextElementSibling) rows.insertBefore(row.nextElementSibling, row);
         refreshRows(repeater);

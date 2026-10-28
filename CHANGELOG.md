@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0
+
+- Add configurable Repeater minimum/maximum row counts, with strict 0–50 / 1–50 schema validation and minimum ≤ maximum.
+- Preserve legacy 0–50 defaults and enforce an effective minimum of one for required repeaters.
+- Disable add/remove controls at configured bounds, including after visibility refresh, without automatically inserting or removing content.
+- Enforce bounds atomically across Classic/core REST publication, options and JSON schema transfer; retain complete previous row lists on invalid submissions.
+- Render existing out-of-bounds rows for explicit correction instead of silently truncating them. Hidden repeaters retain data without enforcing inactive bounds.
+- Expand isolated PHP, JS, real WordPress and browser coverage. Nested repeaters and data migration remain out of scope.
+
 ## 0.10.0
 
 - Add flat compound conditional logic with ALL/ANY matching and 1–10 rules per top-level field.
