@@ -2,6 +2,8 @@
 
 ## 0.17.0
 
+- Feature checks pass on all four existing native-PHP targets: 303 backend, 96 browser and 24 HTTP persistence assertions; 364 isolated PHP assertions and 46 JS tests also pass.
+
 - Add ordered multi-post/page Relationship fields, sharing permission-filtered search with Post Object, on posts/Options and basic container subfields.
 - Add move/remove/clear controls, duplicate prevention and a fixed 50-reference bound. Build dynamic row input names from each live completion marker, not template tokens.
 - Validate complete payloads and ordered canonical IDs atomically; preserve existing unreadable references without exposing titles and reject invalid/deleted/new unreadable targets.
