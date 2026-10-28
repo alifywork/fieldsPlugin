@@ -1,6 +1,10 @@
 /* global wp */
 (function () {
     'use strict';
+    window.AlifyCloneTemplate = window.AlifyCloneTemplate || ((template, placeholder, token) => {
+        const fragment = template.content.cloneNode(true);
+        const walk = root => { root.querySelectorAll('[name], [id], [for], [aria-describedby], [data-row-prefix], [data-row-id-prefix]').forEach(element => { ['name', 'id', 'for', 'aria-describedby', 'data-row-prefix', 'data-row-id-prefix'].forEach(attr => { if (element.hasAttribute(attr)) element.setAttribute(attr, element.getAttribute(attr).split(placeholder).join(token)); }); }); root.querySelectorAll('template').forEach(child => walk(child.content)); }; walk(fragment); return fragment;
+    });
     // Structured schema names + visual row ordinals; never parse translated labels or submitted tokens.
     function clearError(field) {
         const messages = Array.from(field.querySelectorAll('.alify-field-error, .alify-subfield-error'));
@@ -14,7 +18,7 @@
         field.querySelectorAll('[aria-invalid]').forEach(control => control.removeAttribute('aria-invalid'));
     }
     function focusError(target) {
-        if (!target || target.closest('.alify-value[hidden]')) return;
+        if (!target || target.closest('.alify-value[hidden], .alify-sub-value[hidden]')) return;
         for (let parent = target.parentElement; parent; parent = parent.parentElement) {
             if (parent.tagName === 'DETAILS') parent.open = true;
             if (parent.classList.contains('postbox')) {
@@ -218,17 +222,18 @@
         if (!text.value) picker.value = '#000000';
         text.dispatchEvent(new Event('input', {bubbles: true})); text.focus();
     });
+    const ownRowControl = (root, selector) => Array.from(root.querySelectorAll(selector)).find(item => item.closest('.alify-repeater') === root);
     function refreshRows(repeater) {
         const rows = Array.from(repeater.querySelector('.alify-rows').children);
-        const hidden = !!repeater.closest('.alify-value[hidden]');
+        const hidden = !!repeater.closest('.alify-value[hidden], .alify-sub-value[hidden]');
         rows.forEach((row, index) => {
             row.querySelector('.alify-row-label').textContent = 'Row ' + (index + 1);
             row.querySelector('[data-row-action="up"]').disabled = hidden || index === 0;
             row.querySelector('[data-row-action="down"]').disabled = hidden || index === rows.length - 1;
             row.querySelector('[data-row-action="remove"]').disabled = hidden || rows.length <= Number(repeater.dataset.min || 0);
         });
-        repeater.querySelector('[data-row-action="add"]').disabled = hidden || rows.length >= Number(repeater.dataset.limit);
-        repeater.querySelector('.alify-row-count').textContent = rows.length + ' / ' + repeater.dataset.limit + ' rows';
+        ownRowControl(repeater, '[data-row-action="add"]').disabled = hidden || rows.length >= Number(repeater.dataset.limit);
+        ownRowControl(repeater, '.alify-row-count').textContent = rows.length + ' / ' + repeater.dataset.limit + ' rows';
     }
     let rowSequence = 0;
     document.addEventListener('click', event => {
@@ -240,18 +245,13 @@
         const action = button.dataset.rowAction;
         if (action === 'add' && rows.children.length < Number(repeater.dataset.limit)) {
             const token = 'new_' + Date.now() + '_' + (++rowSequence);
-            const template = repeater.querySelector('.alify-row-template');
-            const fragment = template.content.cloneNode(true);
-            fragment.querySelectorAll('[name], [id], [for], [aria-describedby]').forEach(element => {
-                ['name', 'id', 'for', 'aria-describedby'].forEach(attr => {
-                    if (element.hasAttribute(attr)) element.setAttribute(attr, element.getAttribute(attr).replace(/__ROW__/g, token));
-                });
-            });
+            const template = ownRowControl(repeater, '.alify-row-template');
+            const fragment = window.AlifyCloneTemplate(template, template.dataset.rowToken || '__ROW__', token);
             rows.appendChild(fragment);
             const input = rows.lastElementChild.querySelector('input:not([type="hidden"]), select, textarea');
             if (input) input.focus();
         }
-        if (action === 'remove' && rows.children.length > Number(repeater.dataset.min || 0) && window.confirm('Remove this row? Save the post to apply the change.')) { row.remove(); repeater.querySelector('[data-row-action="add"]').focus(); }
+        if (action === 'remove' && rows.children.length > Number(repeater.dataset.min || 0) && window.confirm('Remove this row? Save the post to apply the change.')) { row.remove(); ownRowControl(repeater, '[data-row-action="add"]').focus(); }
         if (action === 'up' && row.previousElementSibling) rows.insertBefore(row, row.previousElementSibling);
         if (action === 'down' && row.nextElementSibling) rows.insertBefore(row.nextElementSibling, row);
         refreshRows(repeater);
@@ -334,7 +334,7 @@
                 memo.set(field, visible); return visible;
             }
             fields.forEach(field => {
-                const visible = !(scoped && group.closest('.alify-value[hidden]')) && (graphValid ? visibility(field) : !trees.get(field));
+                const visible = !(scoped && group.closest('.alify-value[hidden], .alify-sub-value[hidden]')) && (graphValid ? visibility(field) : !trees.get(field));
                 field.hidden = !visible;
                 field.querySelectorAll('input, select, textarea, button').forEach(input => {
                     if (field.dataset.fieldType === 'wysiwyg' && input.closest('.wp-editor-wrap')) {
@@ -366,7 +366,7 @@
         let location = null;
         try { location = JSON.parse(message.dataset.errorLocation || 'null'); } catch (_) { /* Legacy feedback has no target. */ }
         const target = showError(message.closest('.alify-value'), message, location);
-        if (!firstError && !message.closest('.alify-value[hidden]')) firstError = target;
+        if (!firstError && !message.closest('.alify-value[hidden], .alify-sub-value[hidden]')) firstError = target;
     });
     if (firstError) focusError(firstError);
     document.addEventListener('click', function (event) {

@@ -25,9 +25,9 @@ final class Alify_CF_Scoped_Conditions {
     public static function audit($field, $payload, $canonical) {
         if (!is_array($payload)) { return true; }
         if ($field['type'] === 'flexible') { foreach (array_values($payload['rows'] ?? array()) as $index => $row) { $layout = Alify_CF_Flexible::layout($field, $row['layout'] ?? ''); if ($layout && !self::audit(array('type' => 'group', 'sub_fields' => $layout['sub_fields']), array('fields' => $row['fields'] ?? array()), $canonical[$index]['fields'] ?? array())) { return false; } } return true; }
-        if (!in_array($field['type'], array('group', 'repeater'), true) || !self::enabled($field['sub_fields'])) { return true; }
+        if (!in_array($field['type'], array('group', 'repeater'), true)) { return true; }
         $rows = $field['type'] === 'group' ? array($payload['fields'] ?? array()) : array_values($payload['rows'] ?? array()); $clean = $field['type'] === 'group' ? array($canonical) : $canonical;
-        foreach ($rows as $index => $row) { $values = self::values($field['sub_fields'], $row); foreach ($field['sub_fields'] as $sub) { if (!Alify_CF_Conditions::visible($sub, $field['sub_fields'], $values) && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== Alify_CF_Publication::stored_payload($sub, $clean[$index][$sub['name']] ?? $sub['default'])) { return false; } } } return true;
+        foreach ($rows as $index => $row) { $values = self::values($field['sub_fields'], $row); foreach ($field['sub_fields'] as $sub) { if (!self::audit($sub, $row[$sub['name']] ?? '', $clean[$index][$sub['name']] ?? $sub['default'])) { return false; } if (!Alify_CF_Conditions::visible($sub, $field['sub_fields'], $values) && array_key_exists($sub['name'], $row) && $row[$sub['name']] !== Alify_CF_Publication::stored_payload($sub, $clean[$index][$sub['name']] ?? $sub['default'])) { return false; } } } return true;
     }
     public static function retained($sub, $row, $previous, $old, &$issue) {
         if (is_array($previous)) { return $previous[$sub['name']] ?? $sub['default']; }

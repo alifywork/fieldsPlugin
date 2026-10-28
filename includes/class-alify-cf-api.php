@@ -66,6 +66,7 @@ final class Alify_CF_API {
     }
     public static function write($values, $object, $options = false, $dry_run = false) {
         if (self::$writing) { return new WP_Error('alify_reentrant', 'Recursive Alify API writes are not permitted.'); }
+        if (!$options && !$dry_run && !Alify_CF_Bidirectional::active() && Alify_CF_Bidirectional::touches($values, $object)) { return Alify_CF_Bidirectional::write($values, $object); }
         if ($options) {
             if (!is_string($object) || !isset(Alify_CF_Options::pages()[$object]) || !current_user_can('manage_options')) { return new WP_Error('alify_forbidden', 'Options update not permitted.', array('status' => 403)); }
             $location = Alify_CF_Options::location($object); $previous = Alify_CF_Options::data($object);
@@ -142,7 +143,7 @@ final class Alify_CF_API {
         foreach (Alify_CF::groups($location, $object) as $group) { foreach (Alify_CF::schema($group->ID) as $field) {
             if (!empty($field['api_write'])) { $writable[$field['name']] = true; }
             if (!empty($field['api_read']) && !Alify_CF_Password::contains($field) && !self::contains_custom($field)) { $read[$field['name']] = $options ? alify_get_option($field['name'], $object) : alify_get_field($field['name'], $object); }
-            if (!empty($field['api_read']) || !empty($field['api_write'])) { $schema[$field['name']] = array('type' => $field['type'], 'required' => $field['required'], 'read' => array_key_exists($field['name'], $read), 'write' => isset($writable[$field['name']])); }
+            if (!empty($field['api_read']) || !empty($field['api_write'])) { $schema[$field['name']] = array('type' => $field['type'], 'required' => $field['required'], 'read' => array_key_exists($field['name'], $read), 'write' => isset($writable[$field['name']]), 'key' => $field['key'], 'label' => $field['label'], 'multiple' => !empty($field['multiple']), 'choices' => $field['type'] === 'select' ? Alify_CF::choices($field) : array()); }
         } }
         if ($request->get_method() === 'POST') { $values = $request->get_param('values'); if (!is_array($values) || !$values || array_diff_key($values, $writable)) { return new WP_Error('alify_exposure', 'Only opted-in fields are writable.', array('status' => 400)); } $result = self::write($values, $object, $options); if (is_wp_error($result)) { return $result; } return array('saved' => true); }
         return array('values' => $read, 'schema' => $schema);

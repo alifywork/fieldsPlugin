@@ -236,13 +236,13 @@ function esc_attr($s) { return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8'
 function esc_html($s) { return esc_attr($s); }
 function esc_textarea($s) { return esc_attr($s); }
 $render_field = field('team', 'repeater'); $render_field['sub_fields'] = array(field('name'));
-ob_start();
+Alify_CF_Composition::reset_render_budget(); ob_start();
 Alify_CF_Repeater::render($render_field, array(array('name' => '<script>bad()</script>')), 'team', 'values[team]');
 $html = ob_get_clean();
 same(false, strpos($html, '<script>') !== false, 'Row values escaped');
 same(true, strpos($html, 'values[team][rows][0][__row_complete]') !== false, 'Real row completion sentinel');
 same(true, strpos($html, 'values[team][__complete]') !== false, 'Repeater completion sentinel');
-same(true, strpos($html, 'values[team][rows][__ROW__][name]') !== false, 'Template row input names');
+same(true, strpos($html, 'values[team][rows][__ROW_' . substr(hash('sha256', 'team'), 0, 12) . '__][name]') !== false, 'Template row input names');
 // Options pages use a separate namespace and shared field validation.
 $options = array(); $autoload = array();
 function get_option($key, $default = false) { global $options; return $options[$key] ?? $default; }
@@ -316,13 +316,13 @@ same('Home', alify_get_option('links')[0]['label'], 'Hidden options rows retaine
 $request['alify_values'][1]['enabled'] = '1'; $errors = array();
 same(false, Alify_CF_Options::save('site', $request, $errors), 'Visible incomplete repeater rejects options save');
 // Render the real form to exercise the storage-independent field renderer.
-ob_start(); Alify_CF_Options::render('site'); $options_html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Options::render('site'); $options_html = ob_get_clean();
 same(true, strpos($options_html, 'alify_options_complete') !== false, 'Options form completion marker rendered');
 same(true, strpos($options_html, 'alify_values[1][__group_complete]') !== false, 'Options group completion marker rendered');
 same(false, strpos($options_html, 'alify_values_nonce_') !== false, 'Options form does not emit post nonces');
 same(true, strpos($options_html, 'action="https://example.test/wp-admin/admin-post.php"') !== false, 'Options form posts to admin handler');
 $options['alify_cf_options_site']['safe_output'] = '<b>hello</b>';
-ob_start(); alify_the_option('safe_output'); $output = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); alify_the_option('safe_output'); $output = ob_get_clean();
 same('&lt;b&gt;hello&lt;/b&gt;', $output, 'Option output helper escapes text');
 same(null, alify_get_option('../invalid'), 'Invalid option field name rejected');
 // Gallery: ordered image IDs, whole-value validation and all storage contexts.
@@ -391,7 +391,7 @@ $gallery_request['alify_values'][1]['photos']['ids'] = array(51); $gallery_reque
 same(false, Alify_CF_Options::save('site', $gallery_request, $errors), 'Invalid options gallery rejects page');
 same('old', alify_get_option('footer'), 'Other options remain unchanged');
 function wp_get_attachment_image_url($id, $size) { return 'https://example.test/image-' . $id . '.png'; }
-ob_start(); Alify_CF_Gallery::render($gallery, array(52), 'photos', 'values[photos]'); $html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Gallery::render($gallery, array(52), 'photos', 'values[photos]'); $html = ob_get_clean();
 same(false, strpos($html, '<b>Second</b>') !== false, 'Gallery attachment title escaped');
 same(true, strpos($html, 'values[photos][ids][]') !== false, 'Gallery ID inputs rendered');
 same(true, strpos($html, 'values[photos][__complete]') !== false, 'Gallery completion marker rendered');
@@ -468,12 +468,12 @@ foreach (array('repeater', 'group') as $nested) {
     Alify_CF::validate_schema(array($raw), 'page', 0, $errors);
     same(true, (bool) $errors, 'Nested container types rejected inside Group');
 }
-ob_start(); Alify_CF_Group::render($profile, $clean_profile, 'profile-id', 'alify_values[1][profile]'); $html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Group::render($profile, $clean_profile, 'profile-id', 'alify_values[1][profile]'); $html = ob_get_clean();
 same(true, strpos($html, '[fields][name]') !== false && strpos($html, '[__complete]') !== false, 'Group renders namespaced controls and completion marker');
 $flags = field('flags', 'group'); $flags['sub_fields'] = array(field('enabled', 'true_false'), field('tags', 'checkbox'));
 same(array('enabled' => '0', 'tags' => array()), Alify_CF_Group::clean($flags, array('__complete' => '1', 'fields' => array('__fields_complete' => '1'))), 'Checkbox/toggle-only Group clears all unchecked values');
 same('', Alify_CF_Group::clean($flags, array('__complete' => '1')), 'Missing Group field structure retains previous object');
-ob_start(); Alify_CF_Group::render($flags, array(), 'flags', 'flags'); $flags_html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Group::render($flags, array(), 'flags', 'flags'); $flags_html = ob_get_clean();
 same(true, strpos($flags_html, '[fields][__fields_complete]') !== false, 'Group renders structure marker even when no checkbox is checked');
 $conditional = field('dependent'); $conditional['condition'] = array('field' => $profile['key'], 'operator' => 'not_empty', 'value' => ''); $errors = array();
 Alify_CF::validate_schema(array($profile, $conditional), 'page', 0, $errors);
@@ -521,9 +521,9 @@ same($flex_saved, Alify_CF_Flexible::clean($flex, $payload_again), 'Publication 
 $meta[10]['_alify_cf_content'] = $flex_saved;
 same($flex_saved, alify_get_layouts('content', 10), 'Flexible frontend helper returns ordered persisted rows');
 same(array(), alify_get_layouts('unknown', 10), 'Missing Flexible helper returns empty list');
-ob_start(); Alify_CF_Flexible::render($flex, $flex_saved, 'flex', 'content'); $flex_html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Flexible::render($flex, $flex_saved, 'flex', 'content'); $flex_html = ob_get_clean();
 same(true, strpos($flex_html, 'data-flex-template="hero"') !== false && strpos($flex_html, '[rows][0][layout]') !== false, 'Flexible templates and row layout markers rendered');
-ob_start(); Alify_CF_Flexible::render($flex, array(array('layout' => 'removed', 'fields' => array())), 'flex', 'content'); $flex_html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Flexible::render($flex, array(array('layout' => 'removed', 'fields' => array())), 'flex', 'content'); $flex_html = ob_get_clean();
 same(true, strpos($flex_html, 'Unknown saved layout') !== false, 'Removed saved layouts never silently disappear');
 // Compound rules are flat, bounded and backward compatible with single rules.
 $toggle = field('show_detail', 'true_false'); $choice = field('kind', 'select'); $detail = field('compound_detail', 'text', true);
@@ -581,7 +581,7 @@ foreach (array(array('min_rows' => -1), array('min_rows' => null), array('max_ro
 }
 $required_rows = $limited; $required_rows['min_rows'] = 0; $required_rows['required'] = true;
 same('', Alify_CF_Repeater::clean($required_rows, array('__complete' => '1')), 'Required repeater effective minimum is at least one');
-ob_start(); Alify_CF_Repeater::render($limited, array(array('name' => 'One'), array('name' => 'Two'), array('name' => 'Three')), 'limited', 'limited'); $bounds_html = ob_get_clean();
+Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Repeater::render($limited, array(array('name' => 'One'), array('name' => 'Two'), array('name' => 'Three')), 'limited', 'limited'); $bounds_html = ob_get_clean();
 same(true, strpos($bounds_html, 'data-min="1" data-limit="2"') !== false, 'Editor receives configured row bounds');
 same(3, substr_count($bounds_html, 'class="alify-row"') - 1, 'Existing out-of-bounds rows render without truncation (excluding template)');
 $hidden_rows = $limited; $hidden_rows['condition'] = array('field' => $toggle['key'], 'operator' => 'equals', 'value' => '1'); $errors = array();

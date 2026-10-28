@@ -18,6 +18,7 @@ final class Alify_CF_Group {
         foreach ($field['sub_fields'] as $sub) {
             if (!Alify_CF_Conditions::visible($sub, $field['sub_fields'], $values)) { continue; }
             $item = $value[$sub['name']] ?? '';
+            if ($sub['type'] === 'group' && self::empty_value($sub, $item)) { continue; }
             if ($item !== '' && $item !== array() && !($sub['type'] === 'true_false' && $item !== '1')) { return false; }
         }
         return true;
@@ -30,7 +31,7 @@ final class Alify_CF_Group {
             Alify_CF::control($sub, is_array($value) && array_key_exists($sub['name'], $value) ? $value[$sub['name']] : $sub['default'], $sub_id, $input . '[fields][' . $sub['name'] . ']');
             echo '</div>';
         }
-        if (Alify_CF_Scoped_Conditions::enabled($field['sub_fields'])) { echo '<input type="hidden" name="' . esc_attr($input . '[fields][__row_origin]') . '" value="' . esc_attr(Alify_CF_Scoped_Conditions::origin($value)) . '">'; }
+        if (Alify_CF_Composition::needs_origin($field['sub_fields'])) { echo '<input type="hidden" name="' . esc_attr($input . '[fields][__row_origin]') . '" value="' . esc_attr(Alify_CF_Scoped_Conditions::origin($value)) . '">'; }
         echo '<input type="hidden" name="' . esc_attr($input . '[fields][__fields_complete]') . '" value="1"><input type="hidden" name="' . esc_attr($input . '[__complete]') . '" value="1"></fieldset>';
     }
 }

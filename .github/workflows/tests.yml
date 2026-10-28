@@ -79,3 +79,54 @@ jobs:
           node -e 'const http=require("http"); let tries=0; function ready(){http.get("http://127.0.0.1:8080/wp-login.php", r=>{r.resume(); if(r.statusCode!==200){console.log("::error::Browser server returned HTTP "+r.statusCode);process.exit(1)}}).on("error",()=>{if(++tries>30)process.exit(1);setTimeout(ready,1000)})} ready()'
           npm run test:browser
           test ! -s "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log" || { while IFS= read -r line; do printf '::error title=WordPress browser debug::%s\n' "$line"; done < "$(dirname "$ALIFY_BROWSER_FIXTURE")/debug.log"; exit 1; }
+  optional-adapters:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: alify-ci-root
+          MYSQL_DATABASE: alify_test_providers
+          MYSQL_USER: alify_test
+          MYSQL_PASSWORD: alify-ci-only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -palify-ci-root"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      DB_ENGINE: mysql
+      WP_VERSION: '6.9'
+      ALIFY_TEST_DIR: /home/runner/.cache/alify-cf-providers
+      ALIFY_WP_ROOT: /home/runner/.cache/alify-cf-providers/wordpress
+      ALIFY_ALLOW_MYSQL_TESTS: '1'
+      ALIFY_MYSQL_HOST: '127.0.0.1:3306'
+      ALIFY_MYSQL_DATABASE: alify_test_providers
+      ALIFY_MYSQL_USER: alify_test
+      ALIFY_MYSQL_PASSWORD: alify-ci-only
+      ALIFY_PROVIDER_VENDOR: /home/runner/.cache/alify-cf-vendor/vendor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, dom, mbstring, zip, intl, gd
+          tools: composer:v2
+          coverage: none
+      - name: Native WordPress 6.9 Abilities and core development contracts
+        run: bash tests/integration/run.sh
+      - name: Install pinned provider fixtures outside the checkout
+        run: |
+          curl --fail --location --retry 3 https://github.com/woocommerce/woocommerce/releases/download/10.3.6/woocommerce.zip -o /tmp/woocommerce.zip
+          echo '29c4998ee54bd1187f6038635924fca0cc8da3216e4a1c73876a49fc1e33347b  /tmp/woocommerce.zip' | sha256sum --check
+          unzip -q /tmp/woocommerce.zip -d "$ALIFY_WP_ROOT/wp-content/plugins"
+          git clone --depth 1 --branch 3.9.1 https://github.com/polylang/polylang.git "$ALIFY_WP_ROOT/wp-content/plugins/polylang"
+          composer install --working-dir="$ALIFY_WP_ROOT/wp-content/plugins/polylang" --no-dev --no-interaction --no-progress --no-scripts --prefer-dist
+          mkdir -p "$(dirname "$ALIFY_PROVIDER_VENDOR")"
+          composer require --working-dir="$(dirname "$ALIFY_PROVIDER_VENDOR")" timber/timber:2.3.3 --no-interaction --no-progress --no-scripts --prefer-dist
+      - name: Native HPOS, Polylang, Timber and Abilities contracts
+        env:
+          ALIFY_NATIVE_PROVIDERS: '1'
+        run: |
+          php tests/integration/provider-install.php
+          php tests/integration/providers.php
+          test ! -s "$ALIFY_TEST_DIR/debug.log" || { cat "$ALIFY_TEST_DIR/debug.log"; exit 1; }

@@ -29,6 +29,7 @@ final class Alify_CF_Objects {
     public static function locations() {
         $out = array('widget' => 'Classic widgets (existing instances)', 'user' => 'User profiles', 'comment' => 'Comments', 'menu' => 'Navigation menus', 'menu_item' => 'Navigation menu items');
         foreach (get_taxonomies(array('show_ui' => true), 'objects') as $name => $taxonomy) { $out['term:' . ($taxonomy->name ?? $name)] = 'Term: ' . ($taxonomy->labels->singular_name ?? $name); }
+        if (Alify_CF_WooCommerce::available()) { $out['woo_order'] = 'WooCommerce orders (CRUD / HPOS)'; }
         return $out;
     }
     public static function resolve($context, $authorize = true) {

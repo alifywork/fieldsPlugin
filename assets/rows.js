@@ -1,24 +1,40 @@
 /* global jQuery */
 (function () {
     'use strict';
+    window.AlifyCloneTemplate = window.AlifyCloneTemplate || ((template, placeholder, token) => {
+        const fragment = template.content.cloneNode(true);
+        const walk = root => { root.querySelectorAll('[name], [id], [for], [aria-describedby], [data-row-prefix], [data-row-id-prefix]').forEach(element => { ['name', 'id', 'for', 'aria-describedby', 'data-row-prefix', 'data-row-id-prefix'].forEach(attr => { if (element.hasAttribute(attr)) element.setAttribute(attr, element.getAttribute(attr).split(placeholder).join(token)); }); }); root.querySelectorAll('template').forEach(child => walk(child.content)); }; walk(fragment); return fragment;
+    });
     let sequence = 0;
     const rowSelector = '.alify-row, .alify-flex-row';
     function copy(source, template, placeholder) {
         if (window.AlifyRichText) window.AlifyRichText.sync();
-        const fragment = template.content.cloneNode(true), token = 'copy_' + Date.now() + '_' + (++sequence);
-        const normalize = name => name.replace(/(\[rows\])\[[^\]]+\]/, '$1[ROW]');
-        const oldName = source.querySelector('[name*="[rows]"]')?.name || '', oldToken = oldName.match(/\[rows\]\[([^\]]+)\]/)?.[1];
-        fragment.querySelectorAll('[name], [id], [for], [aria-describedby]').forEach(element => {
-            ['name', 'id', 'for', 'aria-describedby'].forEach(attr => { if (element.hasAttribute(attr)) element.setAttribute(attr, element.getAttribute(attr).split(placeholder).join(token)); });
+        const token = 'copy_' + Date.now() + '_' + (++sequence);
+        const fragment = window.AlifyCloneTemplate(template, template.dataset.rowToken || placeholder, token), destination = fragment.firstElementChild;
+        const firstName = source.querySelector('[name*="[rows]"]')?.name || '';
+        const oldPrefix = source.dataset.rowPrefix || firstName.match(/^(.*?\[rows\]\[[^\]]+\])/)?.[1] || '';
+        const newPrefix = destination.dataset.rowPrefix || oldPrefix.replace(/(\[rows\])\[[^\]]+\]$/, '$1[' + token + ']');
+        const oldToken = oldPrefix.match(/\[rows\]\[([^\]]+)\]$/)?.[1];
+        const normalize = name => name.replace(oldPrefix, '[ROW]').replace(newPrefix, '[ROW]');
+        const nested = row => Array.from(row.querySelectorAll('.alify-repeater, .alify-flexible')).filter(root => root.parentElement.closest('.alify-repeater, .alify-flexible') === row.closest('.alify-repeater, .alify-flexible'));
+        const targets = nested(destination);
+        nested(source).forEach((root, index) => {
+            const target = targets[index]; if (!target) return;
+            const flex = root.classList.contains('alify-flexible'), selector = flex ? '.alify-flex-rows' : '.alify-rows';
+            const list = target.querySelector(selector); list.replaceChildren();
+            Array.from(root.querySelector(selector).children).forEach(row => {
+                const layout = flex ? row.querySelector('input[name$="[layout]"]')?.value : null;
+                const childTemplate = Array.from(target.querySelectorAll(flex ? 'template[data-flex-template]' : '.alify-row-template')).find(item => item.closest('.alify-repeater, .alify-flexible') === target && (!flex || item.dataset.flexTemplate === layout));
+                if (childTemplate) list.appendChild(copy(row, childTemplate, flex ? '__FLEX_ROW__' : '__ROW__'));
+            });
         });
-        const destination = fragment.firstElementChild;
         for (const className of ['alify-gallery-items', 'alify-relation-items', 'alify-selector-selected', 'alify-media-preview', 'alify-post-selected']) {
-            const originals = source.querySelectorAll('.' + className), targets = destination.querySelectorAll('.' + className);
+            const originals = Array.from(source.querySelectorAll('.' + className)).filter(item => item.closest(rowSelector) === source), targets = Array.from(destination.querySelectorAll('.' + className)).filter(item => item.closest(rowSelector) === destination);
             originals.forEach((original, index) => { if (targets[index]) targets[index].replaceChildren(...Array.from(original.children).map(child => child.cloneNode(true))); });
         }
         // Selected-list clones still carry the old row token; rewrite every reference to it.
         if (oldToken) destination.querySelectorAll('[name], [id], [for], [aria-describedby]').forEach(element => {
-            ['name', 'id', 'for', 'aria-describedby'].forEach(attr => { if (!element.hasAttribute(attr)) return; let value = element.getAttribute(attr); if (attr === 'name') value = value.replace(/(\[rows\])\[[^\]]+\]/, '$1[' + token + ']'); else value = value.split('-' + oldToken + '-').join('-' + token + '-'); element.setAttribute(attr, value); });
+            ['name', 'id', 'for', 'aria-describedby'].forEach(attr => { if (!element.hasAttribute(attr)) return; let value = element.getAttribute(attr); if (attr === 'name') value = value.replace(oldPrefix, newPrefix); else value = source.dataset.rowIdPrefix ? value.split(source.dataset.rowIdPrefix).join(destination.dataset.rowIdPrefix) : value.split('-' + oldToken + '-').join('-' + token + '-'); element.setAttribute(attr, value); });
         });
         const inputs = Array.from(source.querySelectorAll('input[name], textarea[name], select[name]'));
         destination.querySelectorAll('input[name], textarea[name], select[name]').forEach(target => {
@@ -45,8 +61,8 @@
             const list = container.querySelector('.alify-rows, .alify-flex-rows'); if (!list) return;
             Array.from(list.children).forEach(row => {
                 const layoutName = row.querySelector('input[name$="[layout]"]')?.value, layoutSetting = JSON.parse(container.dataset.layoutLimits || '[]').find(item => item.name === layoutName);
-                const clone = row.querySelector('[data-row-tool="clone"]'); if (clone) clone.disabled = (!!layoutSetting && (layoutSetting.disabled || Array.from(list.children).filter(item => item.querySelector('input[name$="[layout]"]')?.value === layoutName).length >= layoutSetting.max)) || !!container.closest('.alify-value[hidden]') || list.children.length >= Number(container.dataset.limit);
-                const name = container.dataset.rowLabel, sub = name ? Array.from(row.querySelectorAll('[data-subfield]')).find(item => item.dataset.subfield === name) : null;
+                const clone = row.querySelector('[data-row-tool="clone"]'); if (clone) clone.disabled = (!!layoutSetting && (layoutSetting.disabled || Array.from(list.children).filter(item => item.querySelector('input[name$="[layout]"]')?.value === layoutName).length >= layoutSetting.max)) || !!container.closest('.alify-value[hidden], .alify-sub-value[hidden]') || list.children.length >= Number(container.dataset.limit);
+                const name = container.dataset.rowLabel, sub = name ? Array.from(row.querySelectorAll('[data-subfield]')).find(item => item.dataset.subfield === name && item.closest('[data-condition-scope]') === (row.matches('[data-condition-scope]') ? row : row.querySelector('.alify-layout-fields'))) : null;
                 let label = row.querySelector('.alify-extra-row-label');
                 if (!label) { label = document.createElement('span'); label.className = 'alify-extra-row-label'; row.querySelector('.alify-row-bar')?.appendChild(label); }
                 const input = sub && ['text', 'number', 'email', 'url', 'select', 'radio', 'checkbox', 'range', 'date', 'time', 'date_time', 'color', 'icon_picker'].includes(sub.dataset.subType) ? sub.querySelector('input:not([type="hidden"]):not([type="password"]), select') : null;
@@ -65,7 +81,7 @@
         if (button.dataset.rowTool === 'clone') {
             const flexible = row.classList.contains('alify-flex-row'), list = row.parentElement; if (list.children.length >= Number(container.dataset.limit)) return;
             const layout = flexible ? row.querySelector('input[name$="[layout]"]')?.value : '';
-            const template = flexible ? Array.from(container.querySelectorAll('template[data-flex-template]')).find(item => item.dataset.flexTemplate === layout) : container.querySelector('.alify-row-template');
+            const template = flexible ? Array.from(container.querySelectorAll('template[data-flex-template]')).find(item => item.dataset.flexTemplate === layout && item.closest('.alify-flexible') === container) : Array.from(container.querySelectorAll('.alify-row-template')).find(item => item.closest('.alify-repeater') === container);
             if (!template) return; list.insertBefore(copy(row, template, flexible ? '__FLEX_ROW__' : '__ROW__'), row.nextSibling); prepare(); container.dispatchEvent(new Event('change', {bubbles: true})); document.dispatchEvent(new Event('alify:visibility'));
         }
     });

@@ -153,7 +153,7 @@ test('repeater builder adds local subfields, validates names and deep-copies sch
     label.value = 'Member Name'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
     assert.equal(schema(w)[0].sub_fields[0].name, 'member_name');
     assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
-    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="repeater"]'), null);
+    assert.notEqual(d.querySelector('[data-sub-prop="type"] option[value="repeater"]'), null);
     d.querySelector('[data-action="duplicate"]').click();
     const subName = d.querySelector('[data-sub-prop="name"]');
     subName.value = 'changed'; subName.dispatchEvent(new w.Event('input', {bubbles: true}));
@@ -358,8 +358,8 @@ test('group builder provides basic subfields, excludes nested containers and cop
     d.querySelector('[data-sub-action="add"]').click();
     const label = d.querySelector('[data-sub-prop="label"]'); label.value = 'Name'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
     assert.equal(schema(w)[0].sub_fields[0].name, 'name');
-    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="group"]'), null);
-    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="repeater"]'), null);
+    assert.notEqual(d.querySelector('[data-sub-prop="type"] option[value="group"]'), null);
+    assert.notEqual(d.querySelector('[data-sub-prop="type"] option[value="repeater"]'), null);
     assert.equal(d.querySelector('[data-prop="default"]'), null);
     assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
     d.querySelector('[data-action="duplicate"]').click();
@@ -378,7 +378,7 @@ test('flexible builder creates named layouts and isolated basic subfields', () =
     const sub = d.querySelector('[data-sub-prop="label"]'); sub.value = 'Title'; sub.dispatchEvent(new w.Event('input', {bubbles: true}));
     assert.equal(schema(w)[0].layouts[0].name, 'hero');
     assert.equal(schema(w)[0].layouts[0].sub_fields[0].name, 'title');
-    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="flexible"]'), null);
+    assert.notEqual(d.querySelector('[data-sub-prop="type"] option[value="flexible"]'), null);
     assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
     d.querySelector('[data-action="duplicate"]').click();
     const copy = d.querySelectorAll('[data-sub-prop="label"]')[1]; copy.value = 'Changed'; copy.dispatchEvent(new w.Event('input', {bubbles: true}));

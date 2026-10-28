@@ -5,7 +5,7 @@ if (!defined('ABSPATH')) { exit; }
 final class Alify_CF_Flexible {
     const MAX_LAYOUTS = 10;
     const MAX_ROWS = 50;
-    public static function schema($raw, &$errors) {
+    public static function schema($raw, &$errors, $depth = 1) {
         if (!is_array($raw) || array_values($raw) !== $raw || !$raw || count($raw) > self::MAX_LAYOUTS) { $errors[] = 'Flexible Content needs 1–10 layouts.'; return array(); }
         $layouts = array(); $names = array(); $keys = array();
         foreach ($raw as $layout) {
@@ -13,7 +13,7 @@ final class Alify_CF_Flexible {
             $names[$layout['name']] = true; $keys[$layout['key']] = true;
             $settings = array(); foreach (array('min_rows' => 0, 'max_rows' => 50) as $key => $default) { if (!array_key_exists($key, $layout)) { continue; } $value = $layout[$key]; if ((!is_int($value) && !is_string($value)) || !preg_match('/^(?:0|[1-9]|[1-4][0-9]|50)$/D', (string) $value)) { $errors[] = 'Layout bounds need integers 0–50.'; } else { $settings[$key] = (int) $value; } } if (($settings['min_rows'] ?? 0) > ($settings['max_rows'] ?? 50)) { $errors[] = 'Layout minimum exceeds maximum.'; }
             if (array_key_exists('disabled', $layout)) { if (!in_array($layout['disabled'], array(true, false, 0, 1, '0', '1'), true)) { $errors[] = 'Layout disabled must be boolean.'; } else { $settings['disabled'] = (bool) $layout['disabled']; } }
-            $layouts[] = array_merge(array('name' => $layout['name'], 'key' => $layout['key'], 'label' => sanitize_text_field($layout['label']), 'sub_fields' => Alify_CF_Repeater::schema($layout['sub_fields'] ?? null, $errors)), $settings);
+            $layouts[] = array_merge(array('name' => $layout['name'], 'key' => $layout['key'], 'label' => sanitize_text_field($layout['label']), 'sub_fields' => Alify_CF_Repeater::schema($layout['sub_fields'] ?? null, $errors, $depth)), $settings);
         }
         return $layouts;
     }
@@ -53,18 +53,18 @@ final class Alify_CF_Flexible {
             $layout = self::layout($field, $row['layout'] ?? '');
             if ($layout) { self::row($layout, $row['fields'] ?? array(), $id, $input, $index); }
             else { // Never silently drop data when a saved layout was removed/renamed.
-                echo '<div class="alify-flex-row"><p role="alert">Unknown saved layout. Restore its schema or explicitly remove this row before saving.</p><input type="hidden" name="' . esc_attr($input . '[rows][' . $index . '][layout]') . '" value=""><span class="alify-flex-label"></span><button type="button" data-flex-action="up">Move up</button><button type="button" data-flex-action="down">Move down</button><button type="button" data-flex-action="remove">Remove row</button></div>';
+                echo '<div class="alify-flex-row" data-row-prefix="' . esc_attr($input . '[rows][' . $index . ']') . '" data-row-id-prefix="' . esc_attr($id . '-' . $index) . '"><p role="alert">Unknown saved layout. Restore its schema or explicitly remove this row before saving.</p><input type="hidden" name="' . esc_attr($input . '[rows][' . $index . '][layout]') . '" value=""><span class="alify-flex-label"></span><button type="button" data-flex-action="up">Move up</button><button type="button" data-flex-action="down">Move down</button><button type="button" data-flex-action="remove">Remove row</button></div>';
             }
         }
         echo '</div>';
-        foreach ($field['layouts'] as $layout) { echo '<template data-flex-template="' . esc_attr($layout['name']) . '">'; self::row($layout, null, $id, $input, '__FLEX_ROW__'); echo '</template>'; }
+        $token = '__FLEX_ROW_' . substr(hash('sha256', $id), 0, 12) . '__'; foreach ($field['layouts'] as $layout) { echo '<template data-row-token="' . esc_attr($token) . '" data-flex-template="' . esc_attr($layout['name']) . '">'; self::row($layout, null, $id, $input, $token); echo '</template>'; }
         echo '<label>Layout <select class="alify-flex-choice">';
         foreach ($field['layouts'] as $layout) { echo '<option value="' . esc_attr($layout['name']) . '">' . esc_html($layout['label']) . '</option>'; }
         echo '</select></label> <button type="button" class="button" data-flex-action="add">+ Add Layout</button><span class="alify-flex-count" aria-live="polite"></span><input type="hidden" name="' . esc_attr($input . '[__complete]') . '" value="1"></div>';
     }
     private static function row($layout, $values, $id, $input, $index) {
         $base = $input . '[rows][' . $index . ']';
-        echo '<div class="alify-flex-row"><div class="alify-row-bar"><strong>' . esc_html($layout['label']) . ' <span class="alify-flex-label"></span></strong><div><button type="button" class="button" data-flex-action="up">Move up</button><button type="button" class="button" data-flex-action="down">Move down</button><button type="button" class="button-link-delete" data-flex-action="remove">Remove row</button></div></div><input type="hidden" name="' . esc_attr($base . '[layout]') . '" value="' . esc_attr($layout['name']) . '">';
+        echo '<div class="alify-flex-row" data-row-prefix="' . esc_attr($base) . '" data-row-id-prefix="' . esc_attr($id . '-' . $index) . '"><div class="alify-row-bar"><strong>' . esc_html($layout['label']) . ' <span class="alify-flex-label"></span></strong><div><button type="button" class="button" data-flex-action="up">Move up</button><button type="button" class="button" data-flex-action="down">Move down</button><button type="button" class="button-link-delete" data-flex-action="remove">Remove row</button></div></div><input type="hidden" name="' . esc_attr($base . '[layout]') . '" value="' . esc_attr($layout['name']) . '">';
         Alify_CF_Group::render($layout, $values, $id . '-' . $index, $base, 'alify-layout-fields');
         echo '</div>';
     }

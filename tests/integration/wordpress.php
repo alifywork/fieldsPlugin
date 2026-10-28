@@ -85,12 +85,12 @@ try {
     $feedback = Alify_CF_Feedback::get('post_' . $post);
     expect_same('invalid', $feedback[$group]['values']['email'], 'Invalid email recovered for editing');
     expect_same(true, isset($feedback[$group]['errors']['email']), 'Field-level error recorded');
-    ob_start(); Alify_CF::values(get_post($post), get_post($group)); $form = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values(get_post($post), get_post($group)); $form = ob_get_clean();
     expect_same(true, strpos($form, 'aria-invalid="true"') !== false, 'Scalar errors marked accessibly');
     expect_same(true, strpos($form, 'value="invalid"') !== false, 'Rejected input shown without modifying saved data');
     expect_same(true, strpos($form, 'alify-field-error') !== false, 'Field-level error rendered');
     $stale = $feedback[$group]; $stale['schema'] = 'outdated';
-    ob_start(); Alify_CF::values(get_post($post), get_post($group), null, $stale); $stale_form = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values(get_post($post), get_post($group), null, $stale); $stale_form = ob_get_clean();
     expect_same(false, strpos($stale_form, 'value="invalid"') !== false, 'Stale schema recovery is ignored');
     expect_same(false, strpos($stale_form, 'alify-field-error') !== false, 'Stale schema errors are not rendered');
     unset($values['tags'], $values['enabled']);
@@ -141,7 +141,7 @@ try {
     $feedback = Alify_CF_Feedback::get('options_site');
     expect_same('invalid', $feedback[$group]['values']['contact'], 'Options rejected input recovered');
     expect_same(array(), $feedback[$group]['values']['team'], 'Options attempted row removal recovered without changing saved rows');
-    ob_start(); Alify_CF_Options::render('site'); $failed_form = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Options::render('site'); $failed_form = ob_get_clean();
     expect_same(true, strpos($failed_form, 'value="invalid"') !== false, 'Options render recovered input');
     expect_same(true, strpos($failed_form, 'alify-field-error') !== false, 'Options render inline errors');
     $request['alify_values'][$group]['contact'] = 'fixed@example.com'; $errors = array();
@@ -149,7 +149,7 @@ try {
     expect_same(array(), Alify_CF_Feedback::get('options_site'), 'Options success clears recovery');
     $autoload = $wpdb->get_var($wpdb->prepare("SELECT autoload FROM {$wpdb->options} WHERE option_name = %s", 'alify_cf_options_site'));
     expect_same(true, in_array($autoload, array('no', 'off', 'auto-off'), true), 'Options not autoloaded');
-    ob_start(); Alify_CF_Options::render('site'); $html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Options::render('site'); $html = ob_get_clean();
     expect_same(true, strpos($html, 'alify_options_complete') !== false, 'Real options screen render');
     // Drafting a group removes it from its assigned screen.
     $_POST = array(); wp_update_post(array('ID' => $group, 'post_status' => 'draft'));
@@ -277,7 +277,7 @@ try {
     expect_same('alify_transfer_forbidden', Alify_CF_Transfer::import_json(wp_json_encode($valid_document), $import_nonce)->get_error_code(), 'Anonymous import denied');
     wp_set_current_user($admin->ID);
     expect_same($before_import_count, (int) wp_count_posts(Alify_CF::GROUP)->draft, 'Rejected imports leave no partial draft groups');
-    ob_start(); Alify_CF_Transfer::render(); $transfer_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Transfer::render(); $transfer_html = ob_get_clean();
     expect_same(true, strpos($transfer_html, 'multipart/form-data') !== false && strpos($transfer_html, 'alify_transfer_nonce') !== false, 'Transfer UI provides nonce-protected upload form');
     // Fixed Group objects across Classic, REST, options and configuration transfer.
     $_POST = array(); wp_update_post(array('ID' => $group, 'post_status' => 'draft'));
@@ -325,7 +325,7 @@ try {
     $option_request['alify_values'][$options_group]['profile'] = $bad_profile;
     expect_same(false, Alify_CF_Options::save('transfer-tests', $option_request, $object_errors), 'Options invalid Group rejected atomically');
     expect_same($saved_profile, alify_get_option('profile', 'transfer-tests'), 'Invalid options Group leaves prior object');
-    ob_start(); Alify_CF::values(get_post($object_post), get_post($object_group)); $object_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values(get_post($object_post), get_post($object_group)); $object_html = ob_get_clean();
     expect_same(true, strpos($object_html, '[profile][fields][name]') !== false && strpos($object_html, 'class="alify-group"') !== false, 'Native Group rendering namespaces subfields');
     foreach (array('group', 'repeater') as $nested_type) {
         $bad_schema = $profile; $bad_schema['sub_fields'][0]['type'] = $nested_type; $object_errors = array();
@@ -488,7 +488,7 @@ try {
     expect_same('Row 1 (Contact) → Body: A valid value is required. Previous saved value retained.', $diagnostic_feedback['diagnostic_blocks'], 'Classic Flexible error names layout and subfield');
     expect_same($diagnostic_old, array(alify_get_group('diagnostic_profile', $diagnostic_post), alify_get_rows('diagnostic_people', $diagnostic_post), alify_get_layouts('diagnostic_blocks', $diagnostic_post)), 'Detailed errors do not partially replace container values');
     expect_same('draft', get_post_status($diagnostic_post), 'Detailed validation still blocks publication');
-    ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $diagnostic_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $diagnostic_html = ob_get_clean();
     expect_same(true, strpos($diagnostic_html, 'class="alify-container-error" role="group" aria-invalid="true" aria-describedby=') !== false, 'Classic container error is accessibly described');
     $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $diagnostic_post); $request->set_param('status', 'publish');
     $diagnostic_bad['__group_complete'] = '1';
@@ -569,7 +569,7 @@ try {
     save_values($diagnostic_post, $diagnostic_group, $link_bad);
     expect_same($link_value, alify_get_link('cta', $diagnostic_post), 'Invalid Link retains entire previous record');
     expect_same(array(array('cta' => $link_value)), alify_get_rows('link_rows', $diagnostic_post), 'Invalid Link subfield retains whole previous repeater');
-    ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $link_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $link_html = ob_get_clean();
     expect_same(true, strpos($link_html, 'class="alify-link"') !== false, 'Recovery renders Link controls without array-to-string warnings');
     $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $diagnostic_post); $request->set_param('status', 'publish');
     $link_bad['__group_complete'] = '1'; $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $link_bad)));
@@ -593,7 +593,7 @@ try {
     expect_same('<p>Default <strong>text</strong></p>', Alify_CF::schema($diagnostic_group)[0]['default'], 'Rich defaults preserve safe post HTML');
     $rich_raw = '<p onclick="alert(1)">Hello <strong>world</strong> <a href="javascript:alert(1)">link</a></p><script>alert(1)</script>';
     $rich_safe = wp_kses_post($rich_raw);
-    ob_start(); Alify_CF::control($rich_field, $rich_raw, 'rich-legacy', 'legacy-rich'); $legacy_rich_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($rich_field, $rich_raw, 'rich-legacy', 'legacy-rich'); $legacy_rich_html = ob_get_clean();
     expect_same(false, strpos($legacy_rich_html, 'onclick') !== false || strpos($legacy_rich_html, '&lt;script') !== false, 'Rich renderer sanitizes legacy stored HTML before it can enter a Visual iframe');
     $rich_data = array('rich_copy' => $rich_raw, 'rich_optional' => '<p>Optional</p>');
     save_values($diagnostic_post, $diagnostic_group, $rich_data);
@@ -605,7 +605,7 @@ try {
     save_values($diagnostic_post, $diagnostic_group, $rich_bad);
     expect_same($rich_safe, alify_get_field('rich_copy', $diagnostic_post), 'Blank formatted required rich content retains prior saved value');
     expect_same('', alify_get_field('rich_optional', $diagnostic_post), 'Blank formatting explicitly clears optional rich content');
-    ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $rich_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values(get_post($diagnostic_post), get_post($diagnostic_group)); $rich_html = ob_get_clean();
     expect_same(true, strpos($rich_html, 'data-rich-editor') !== false, 'Rich recovery renders an escaped textarea fallback');
     expect_same(0, preg_match('/<textarea[^>]*\srequired(?:\s|=|>)/i', $rich_html), 'Hidden rich textarea avoids native required-not-focusable failures');
     $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $diagnostic_post); $request->set_param('status', 'publish');
@@ -651,7 +651,7 @@ try {
     wp_set_current_user($reference_author); $author_nonce = wp_create_nonce('alify_cf_search_posts');
     $author_search = Alify_CF_Post_Object::search('Alify Reference target', 'page', 1, $author_nonce);
     expect_same(array($reference_public), array_column($author_search['items'], 'id'), 'Author search omits unreadable private/password-protected page identities');
-    ob_start(); Alify_CF_Post_Object::render($reference_field, $reference_private, 'private-reference', 'related'); $reference_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Post_Object::render($reference_field, $reference_private, 'private-reference', 'related'); $reference_html = ob_get_clean();
     expect_same(false, strpos($reference_html, 'Alify Reference target Secret') !== false, 'Unavailable saved selection never exposes private title');
     $reference_errors = array(); $ref_updates = Alify_CF::validate_values(array($reference_field), array('related' => (string) $reference_private), array(), $reference_errors);
     expect_same(array(), $ref_updates, 'Forged new unreadable post ID rejected with real permissions');
@@ -691,7 +691,7 @@ try {
     wp_set_current_user($reference_author); $rel_errors = array();
     expect_same(array(), Alify_CF::validate_values(array($relation_field), array('related_many' => $relation_payload), array(), $rel_errors), 'New private target rejects whole Relationship with real permissions');
     $rel_errors = array(); expect_same(array('related_many' => $relation_value), Alify_CF::validate_values(array($relation_field), array('related_many' => $relation_payload), array('related_many' => $relation_value), $rel_errors), 'Existing private Relationship reference retained after permission loss');
-    ob_start(); Alify_CF_Relationship::render($relation_field, $relation_value, 'private-relations', 'relations'); $relation_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Relationship::render($relation_field, $relation_value, 'private-relations', 'relations'); $relation_html = ob_get_clean();
     expect_same(false, strpos($relation_html, 'Alify Reference target Secret') !== false, 'Saved Relationship renderer redacts unreadable titles');
     expect_same(array($reference_public), array_map(function($post) { return $post->ID; }, alify_get_relationship('related_many', $diagnostic_post)), 'Typed Relationship getter filters unreadable objects in order');
     expect_same($relation_value, alify_get_field('related_many', $diagnostic_post), 'Typed Relationship getter does not rewrite raw references');
@@ -737,13 +737,13 @@ try {
     expect_same(array(array('radio_mode' => 'a')), alify_get_rows('radio_rows', $diagnostic_post), 'Malformed Radio subfield retains entire Repeater');
     $radio_bad = $radio_data; $radio_bad['radio_mode'] = ''; save_values($diagnostic_post, $diagnostic_group, $radio_bad);
     expect_same('0', alify_get_field('radio_mode', $diagnostic_post), 'Required Radio rejects clear');
-    ob_start(); Alify_CF::control($radio, '0', 'radio-test', 'mode', 'radio-error'); $radio_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($radio, '0', 'radio-test', 'mode', 'radio-error'); $radio_html = ob_get_clean();
     expect_same(3, substr_count($radio_html, 'type="radio"'), 'Radio renders configured options');
     expect_same(true, strpos($radio_html, '&lt;Unsafe&gt;') !== false && strpos($radio_html, '<Unsafe>') === false, 'Radio labels escape HTML');
     expect_same(true, strpos($radio_html, 'aria-invalid="true"') !== false, 'Radio exposes accessible validation error');
     expect_same(false, strpos($radio_html, 'data-radio-clear') !== false, 'Required Radio has no clear button');
     $optional_radio = $radio; $optional_radio['required'] = false;
-    ob_start(); Alify_CF::control($optional_radio, '', 'radio-optional', 'optional'); $radio_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($optional_radio, '', 'radio-optional', 'optional'); $radio_html = ob_get_clean();
     expect_same(true, strpos($radio_html, 'data-radio-clear') !== false, 'Optional Radio provides clear button');
     configure_group($diagnostic_group, array($optional_radio)); save_values($diagnostic_post, $diagnostic_group, array('radio_mode' => ''));
     expect_same('', alify_get_field('radio_mode', $diagnostic_post), 'Optional Radio clears explicitly');
@@ -786,7 +786,7 @@ try {
     expect_same(array(array('buttons_mode' => 'a')), alify_get_rows('buttons_rows', $diagnostic_post), 'Malformed Button Group subfield retains entire Repeater');
     $buttons_bad = $buttons_data; $buttons_bad['buttons_mode'] = ''; save_values($diagnostic_post, $diagnostic_group, $buttons_bad);
     expect_same('0', alify_get_field('buttons_mode', $diagnostic_post), 'Required Button Group rejects clear');
-    ob_start(); Alify_CF::control($buttons, '0', 'buttons-test', 'mode', 'buttons-error'); $buttons_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($buttons, '0', 'buttons-test', 'mode', 'buttons-error'); $buttons_html = ob_get_clean();
     expect_same(true, strpos($buttons_html, 'alify-button-group') !== false, 'Button Group renders segmented fieldset');
     expect_same(true, strpos($buttons_html, 'alify-button-options') !== false && substr_count($buttons_html, '<span>') === 3, 'Button Group renders label spans for native checked/focus styling');
     expect_same(3, substr_count($buttons_html, 'type="radio"'), 'Button Group renders configured options');
@@ -794,7 +794,7 @@ try {
     expect_same(true, strpos($buttons_html, 'aria-invalid="true"') !== false, 'Button Group exposes accessible validation error');
     expect_same(false, strpos($buttons_html, 'data-radio-clear') !== false, 'Required Button Group has no clear button');
     $optional_buttons = $buttons; $optional_buttons['required'] = false;
-    ob_start(); Alify_CF::control($optional_buttons, '', 'buttons-optional', 'optional'); $buttons_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($optional_buttons, '', 'buttons-optional', 'optional'); $buttons_html = ob_get_clean();
     expect_same(true, strpos($buttons_html, 'data-radio-clear') !== false, 'Optional Button Group provides clear button');
     configure_group($diagnostic_group, array($optional_buttons)); save_values($diagnostic_post, $diagnostic_group, array('buttons_mode' => ''));
     expect_same('', alify_get_field('buttons_mode', $diagnostic_post), 'Optional Button Group clears explicitly');
@@ -837,14 +837,14 @@ try {
     expect_same(array(array('range_mode' => '0.5')), alify_get_rows('range_rows', $diagnostic_post), 'Malformed Range subfield retains entire Repeater');
     $range_bad = $range_data; $range_bad['range_mode'] = ''; save_values($diagnostic_post, $diagnostic_group, $range_bad);
     expect_same('0', alify_get_field('range_mode', $diagnostic_post), 'Required Range rejects clear');
-    ob_start(); Alify_CF::control($range, '0', 'range-test', 'mode', 'range-error'); $range_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($range, '0', 'range-test', 'mode', 'range-error'); $range_html = ob_get_clean();
     expect_same(true, strpos($range_html, 'data-range-slider') !== false && strpos($range_html, 'data-range-number') !== false, 'Range renders paired controls');
     expect_same(1, substr_count($range_html, 'name="mode"'), 'Only numeric Range input is submitted');
     expect_same(true, strpos($range_html, 'min="-1"') !== false && strpos($range_html, 'step="0.125"') !== false, 'Range renders exact bounds and step');
     expect_same(true, strpos($range_html, 'aria-invalid="true"') !== false, 'Range exposes validation error');
     expect_same(false, strpos($range_html, 'data-range-clear') !== false, 'Required Range has no clear button');
     $optional_range = $range; $optional_range['required'] = false;
-    ob_start(); Alify_CF::control($optional_range, '', 'range-optional', 'optional'); $range_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($optional_range, '', 'range-optional', 'optional'); $range_html = ob_get_clean();
     expect_same(true, strpos($range_html, 'data-range-clear') !== false, 'Optional Range provides clear button');
     configure_group($diagnostic_group, array($optional_range)); save_values($diagnostic_post, $diagnostic_group, array('range_mode' => ''));
     expect_same('', alify_get_field('range_mode', $diagnostic_post), 'Optional Range clears explicitly');
@@ -896,7 +896,7 @@ try {
     expect_same(array(array('password_value' => $password_value)), alify_get_rows('password_rows', $diagnostic_post), 'Malformed Password retains whole container');
     $password_hidden = $password_data; $password_hidden['show_password_field'] = '0'; $password_hidden['password_value'] = 'forged-hidden'; save_values($diagnostic_post, $diagnostic_group, $password_hidden);
     expect_same($password_value, alify_get_field('password_value', $diagnostic_post), 'Hidden Password ignores forged values');
-    ob_start(); Alify_CF::control($password, $password_value, 'password-test', 'masked', 'password-error'); $password_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($password, $password_value, 'password-test', 'masked', 'password-error'); $password_html = ob_get_clean();
     expect_same(true, strpos($password_html, 'type="password"') !== false && strpos($password_html, 'data-password-toggle') !== false, 'Password renders masked input and reveal control');
     expect_same(true, strpos($password_html, '&lt;b&gt;') !== false && strpos($password_html, '<b>') === false, 'Password value escaped in HTML attribute, not sanitized in storage');
     expect_same(true, strpos($password_html, 'autocomplete="new-password"') !== false && strpos($password_html, 'plaintext') !== false, 'Password discourages autofill and warns about plaintext');
@@ -927,7 +927,7 @@ try {
     expect_same(false, strpos($password_feedback_json, 'only-value-marker') !== false || strpos($password_feedback_json, 'attempt-password-marker') !== false, 'Feedback transient has neither saved nor attempted Password values');
     expect_same(true, $password_feedback[$diagnostic_options]['password_omitted'], 'Feedback reports Password recovery omission');
     expect_same(false, isset($password_feedback[$diagnostic_options]['values']['password_rows']), 'Password containers are entirely omitted from recovery');
-    ob_start(); Alify_CF::values((object) array('ID' => 0), get_post($diagnostic_options), $password_saved, $password_feedback[$diagnostic_options]); $password_options_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::values((object) array('ID' => 0), get_post($diagnostic_options), $password_saved, $password_feedback[$diagnostic_options]); $password_options_html = ob_get_clean();
     expect_same(true, strpos($password_options_html, 'only-value-marker') !== false && strpos($password_options_html, 'attempt-password-marker') === false, 'Recovery editor uses saved Password, not attempted plaintext');
     $password_json_string = Alify_CF_Transfer::export_json($diagnostic_group, $export_nonce);
     expect_same(false, strpos($password_json_string, 'only-value-marker') !== false, 'Schema JSON excludes stored Password values');
@@ -963,13 +963,13 @@ try {
     expect_same(array(array('date_time_mode' => '2024-02-29 09:30:45')), alify_get_rows('date_time_rows', $diagnostic_post), 'Malformed Date Time subfield retains entire Repeater');
     $date_time_bad = $date_time_data; $date_time_bad['date_time_mode'] = ''; save_values($diagnostic_post, $diagnostic_group, $date_time_bad);
     expect_same('2024-02-29 09:30:00', alify_get_field('date_time_mode', $diagnostic_post), 'Required Date Time rejects clear');
-    ob_start(); Alify_CF::control($date_time, '2024-02-29 09:30:45', 'date-time-test', 'meeting', 'date-time-error'); $date_time_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($date_time, '2024-02-29 09:30:45', 'date-time-test', 'meeting', 'date-time-error'); $date_time_html = ob_get_clean();
     expect_same(true, strpos($date_time_html, 'type="datetime-local"') !== false && strpos($date_time_html, 'value="2024-02-29T09:30:45"') !== false, 'Date Time renders native value with seconds');
     expect_same(true, strpos($date_time_html, 'step="1"') !== false && strpos($date_time_html, 'no timezone') !== false, 'Date Time communicates seconds and floating timezone contract');
     expect_same(true, strpos($date_time_html, 'aria-invalid="true"') !== false, 'Date Time exposes accessible validation error');
     expect_same(false, strpos($date_time_html, 'data-date-time-clear') !== false, 'Required Date Time has no clear button');
     $optional_date_time = $date_time; $optional_date_time['required'] = false;
-    ob_start(); Alify_CF::control($optional_date_time, '', 'date_time-optional', 'optional'); $date_time_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($optional_date_time, '', 'date_time-optional', 'optional'); $date_time_html = ob_get_clean();
     expect_same(true, strpos($date_time_html, 'data-date-time-clear') !== false, 'Optional Date Time provides clear button');
     configure_group($diagnostic_group, array($optional_date_time)); save_values($diagnostic_post, $diagnostic_group, array('date_time_mode' => ''));
     expect_same('', alify_get_field('date_time_mode', $diagnostic_post), 'Optional Date Time clears explicitly');
@@ -1024,7 +1024,7 @@ try {
     expect_same('2024-02-29 13:05:09', alify_get_field('fmt_stamp', $diagnostic_post), 'Native zero fractions normalize without fractional storage');
     expect_same('Canonical condition matched', alify_get_field('fmt_detail', $diagnostic_post), 'Conditions use canonical values, not display format');
     expect_same(null, alify_get_formatted_field('does_not_exist', $diagnostic_post), 'Missing formatted value stays null');
-    ob_start(); Alify_CF::control($fmt_day, '2024-02-29', 'format-day', 'day'); $fmt_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($fmt_day, '2024-02-29', 'format-day', 'day'); $fmt_html = ob_get_clean();
     expect_same(true, strpos($fmt_html, 'February 29, 2024') !== false && strpos($fmt_html, 'value="2024-02-29"') !== false, 'Display preview does not rewrite native input');
     $fmt_snapshot = Alify_CF::schema($diagnostic_group); $fmt_bad = $fmt_schema; $fmt_bad[0]['return_format'] = 'U'; configure_group($diagnostic_group, $fmt_bad);
     expect_same($fmt_snapshot, Alify_CF::schema($diagnostic_group), 'Unsupported return format retains schema');
@@ -1084,7 +1084,7 @@ try {
     // Recovery renders validated selected keys, never a composite array as an option value.
     $choice_feedback = Alify_CF_Feedback::group(array(Alify_CF::schema($diagnostic_group)[0]), array('choice_multi' => $choice_selection), array('choice_multi' => array('a')), array())['values']['choice_multi']; expect_same(array('0', 'a', 'b'), $choice_feedback, 'Recovery converts complete selection into safe native selected options');
     expect_same(array('a'), Alify_CF_Feedback::group(array(Alify_CF::schema($diagnostic_group)[0]), array('choice_multi' => array()), array('choice_multi' => array('a')), array())['values']['choice_multi'], 'Incomplete selection recovery falls back to stored keys');
-    ob_start(); Alify_CF::control(Alify_CF::schema($diagnostic_group)[0], array('0', 'b'), 'choice-native', 'choices'); $choice_html = ob_get_clean();
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control(Alify_CF::schema($diagnostic_group)[0], array('0', 'b'), 'choice-native', 'choices'); $choice_html = ob_get_clean();
     expect_same(true, strpos($choice_html, ' multiple size="6"') !== false, 'Renderer emits native multi Select'); expect_same(true, strpos($choice_html, 'data-select-search') !== false, 'Renderer emits unnamed local search'); expect_same(true, strpos($choice_html, 'choices[__complete]') !== false, 'Renderer includes explicit clear/completeness marker');
     $_POST = array(); $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $diagnostic_post); $request->set_param('status', 'draft'); $bad_choice_data = $choice_data; $bad_choice_data['choice_multi'] = array('a'); $bad_choice_data['__group_complete'] = '1'; $request->set_param('alify_fields', array('complete' => '1', 'groups' => array($diagnostic_group => $bad_choice_data)));
     expect_same(400, rest_do_request($request)->get_status(), 'REST rejects naked key list instead of complete multi selection'); expect_same(array('0', 'a', 'b'), alify_get_field('choice_multi', $diagnostic_post), 'Rejected REST request retains stored list');
@@ -1262,8 +1262,8 @@ try {
     $layout_schema[2]['content'] = '<p onclick="bad()">Notice <a href="javascript:bad()">safe link</a><script>bad()</script></p>'; $layout_schema[3]['icons'] = array('heart', 'star-filled'); $layout_schema[4]['toolbar'] = 'basic'; $layout_schema[4]['editor_mode'] = 'text'; $layout_schema[4]['media_buttons'] = true;
     configure_group($diagnostic_group, $layout_schema); $layout_saved = Alify_CF::schema($diagnostic_group); expect_same('icon_picker', $layout_saved[3]['type'], 'Editor field schemas accepted'); expect_same(false, strpos($layout_saved[2]['content'], 'onclick') !== false, 'Message event handlers stripped'); expect_same(false, strpos($layout_saved[2]['content'], 'javascript:') !== false, 'Message URL protocols bounded'); expect_same(false, strpos($layout_saved[2]['content'], '<script') !== false, 'Message scripts stripped');
     expect_same('dashicons-heart', Alify_CF::clean_value($layout_saved[3], 'dashicons-heart'), 'Allowed icon identifier stored'); expect_same('', Alify_CF::clean_value($layout_saved[3], 'dashicons-admin-home'), 'Unconfigured icon rejected');
-    ob_start(); Alify_CF::control($layout_saved[4], '<p>Copy</p>', 'layout-editor', 'layout-editor'); $layout_html = ob_get_clean(); expect_same(true, strpos($layout_html, 'data-rich-mode="text"') !== false, 'Rich mode emitted'); expect_same(true, strpos($layout_html, 'data-rich-media="1"') !== false, 'Upload-capable administrator receives media buttons');
-    wp_set_current_user($editor); $editor_role = get_role('editor'); $had_upload = $editor_role->has_cap('upload_files'); $editor_role->remove_cap('upload_files'); wp_set_current_user(0); wp_set_current_user($editor); ob_start(); Alify_CF::control($layout_saved[4], '', 'layout-editor', 'layout-editor'); $layout_html = ob_get_clean(); expect_same(true, strpos($layout_html, 'data-rich-media="0"') !== false, 'Media buttons require upload permission'); if ($had_upload) { $editor_role->add_cap('upload_files'); } wp_set_current_user($admin->ID);
+    Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($layout_saved[4], '<p>Copy</p>', 'layout-editor', 'layout-editor'); $layout_html = ob_get_clean(); expect_same(true, strpos($layout_html, 'data-rich-mode="text"') !== false, 'Rich mode emitted'); expect_same(true, strpos($layout_html, 'data-rich-media="1"') !== false, 'Upload-capable administrator receives media buttons');
+    wp_set_current_user($editor); $editor_role = get_role('editor'); $had_upload = $editor_role->has_cap('upload_files'); $editor_role->remove_cap('upload_files'); wp_set_current_user(0); wp_set_current_user($editor); Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF::control($layout_saved[4], '', 'layout-editor', 'layout-editor'); $layout_html = ob_get_clean(); expect_same(true, strpos($layout_html, 'data-rich-media="0"') !== false, 'Media buttons require upload permission'); if ($had_upload) { $editor_role->add_cap('upload_files'); } wp_set_current_user($admin->ID);
     $layout_json = json_decode(Alify_CF_Transfer::export_json($diagnostic_group, $export_nonce), true); expect_same(8, $layout_json['version'], 'New editor settings require JSON v8'); $layout_json['group']['location'] = 'options:color-transfer'; $layout_import = Alify_CF_Transfer::import_json(wp_json_encode($layout_json), $import_nonce); $fixtures[] = $layout_import; expect_same($layout_saved, Alify_CF::schema($layout_import), 'JSON v8 retains safe editor settings');
     $condition_source = test_field('nested_source'); $condition_target = test_field('nested_target'); $condition_target['condition'] = array('relation' => 'all', 'rules' => array(array('relation' => 'any', 'rules' => array(array('field' => 'field_nested_source', 'operator' => 'contains', 'value' => 'World'), array('field' => 'field_nested_source', 'operator' => 'starts_with', 'value' => 'Hi'))), array('field' => 'field_nested_source', 'operator' => 'ends_with', 'value' => '!')));
     $condition_errors = array(); $nested_schema = Alify_CF::validate_schema(array($condition_source, $condition_target), 'post', $diagnostic_group, $condition_errors); expect_same(array(), $condition_errors, 'Nested mixed conditions validate'); expect_same(true, Alify_CF::visible($nested_schema[1], $nested_schema, array('field_nested_source' => 'Hello World!')), 'Nested condition true'); expect_same(false, Alify_CF::visible($nested_schema[1], $nested_schema, array('field_nested_source' => 'Hello World')), 'Nested condition false');
@@ -1289,7 +1289,7 @@ try {
         expect_same(true, is_wp_error(alify_update_object_fields(array('native_value' => ''), $context)), 'Object required validation: ' . $location); expect_same('Native\path', alify_get_object_field('native_value', $context), 'Invalid native field retains value: ' . $location);
         $object_group = Alify_CF_API::groups($location)[0]['id']; $_POST = wp_slash(array('alify_object_nonce' => array($context => wp_create_nonce('alify_object_' . $context)), 'alify_object_values' => array($context => array($object_group => array('__group_complete' => '1', 'native_value' => 'Native form')))));
         expect_same(true, Alify_CF_Objects::save_request($context), 'Nonce-checked native object form saves: ' . $location); $_POST['alify_object_nonce'][$context] = 'invalid'; expect_same(true, is_wp_error(Alify_CF_Objects::save_request($context)), 'Native context CSRF rejection: ' . $location);
-        ob_start(); Alify_CF_Objects::render($context); $object_html = ob_get_clean(); expect_same(true, strpos($object_html, 'alify_object_values[' . esc_attr($context) . ']') !== false, 'Native form emits context-scoped names: ' . $location);
+        Alify_CF_Composition::reset_render_budget(); ob_start(); Alify_CF_Objects::render($context); $object_html = ob_get_clean(); expect_same(true, strpos($object_html, 'alify_object_values[' . esc_attr($context) . ']') !== false, 'Native form emits context-scoped names: ' . $location);
         $object_route = '/alify/v1/objects/' . str_replace(':', '/', $context); $_POST = array(); $object_read = rest_do_request(new WP_REST_Request('GET', $object_route)); expect_same(200, $object_read->get_status(), 'Object REST authenticates: ' . $location); expect_same('Native form', $object_read->get_data()['values']['native_value'], 'Object REST explicitly opted-in raw value: ' . $location);
         $object_write = new WP_REST_Request('POST', $object_route); $object_write->set_param('values', array('native_value' => 'Native REST')); expect_same(200, rest_do_request($object_write)->get_status(), 'Object REST writes: ' . $location);
         wp_set_current_user(0); expect_same(true, is_wp_error(alify_update_object_fields(array('native_value' => 'Denied'), $context)), 'Anonymous native write denied: ' . $location); expect_same(401, rest_do_request(new WP_REST_Request('GET', $object_route))->get_status(), 'Anonymous native REST denied: ' . $location); wp_set_current_user($admin->ID);
@@ -1308,9 +1308,9 @@ try {
     expect_same(true, alify_register_location_rule('x_fixture', function($value, $location, $object) use ($advanced_post) { return $value === 'yes' && (int) $object === $advanced_post; }, function($value) { return in_array($value, array('yes', 'no'), true); }), 'Public predicate extension registers');
     $predicate_errors = array(); $predicate_rules = Alify_CF_Location_Rules::clean(array(array(array('param' => 'x_fixture', 'operator' => '==', 'value' => 'yes'), array('param' => 'status', 'operator' => '==', 'value' => 'draft')), array(array('param' => 'post_id', 'operator' => '==', 'value' => (string) $advanced_other))), $predicate_errors); expect_same(array(), $predicate_errors, 'OR/AND location rule set validates'); expect_same(true, Alify_CF_Location_Rules::matches($predicate_rules, 'alify_advanced', $advanced_post), 'AND custom/status group matches'); expect_same(true, Alify_CF_Location_Rules::matches($predicate_rules, 'alify_advanced', $advanced_other), 'Alternative OR group matches'); expect_same(false, Alify_CF_Location_Rules::matches($predicate_rules, 'user', 'user:' . $admin->ID), 'Post predicates cannot match nonpost object IDs');
     $predicate_errors = array(); Alify_CF_Location_Rules::clean(array(array(array('param' => 'x_missing', 'operator' => '==', 'value' => 'yes'))), $predicate_errors); expect_same(true, (bool) $predicate_errors, 'Missing custom predicate fails closed');
-    ob_start(); expect_same(true, alify_form($advanced_post), 'Authenticated frontend form renders'); $frontend_html = ob_get_clean(); expect_same(true, strpos($frontend_html, 'alify_frontend_nonce') !== false, 'Frontend CSRF token is present');
+    Alify_CF_Composition::reset_render_budget(); ob_start(); expect_same(true, alify_form($advanced_post), 'Authenticated frontend form renders'); $frontend_html = ob_get_clean(); expect_same(true, strpos($frontend_html, 'alify_frontend_nonce') !== false, 'Frontend CSRF token is present');
     $frontend_request = array('alify_frontend_nonce' => wp_create_nonce('alify_frontend_' . $advanced_post), 'alify_values' => array($advanced_id => array('__group_complete' => '1', 'advanced_value' => 'Frontend value'))); expect_same(true, Alify_CF_Forms::submit($advanced_post, $frontend_request), 'Frontend uses authorized validated write API'); expect_same('Frontend value', alify_get_field('advanced_value', $advanced_post), 'Frontend persists fields'); $frontend_request['alify_frontend_nonce'] = 'bad'; expect_same(true, is_wp_error(Alify_CF_Forms::submit($advanced_post, $frontend_request)), 'Frontend rejects CSRF'); expect_same('Frontend value', alify_get_field('advanced_value', $advanced_post), 'Bad frontend submission retains fields');
-    wp_set_current_user(0); ob_start(); $frontend_denied = alify_form($advanced_post); $frontend_denied_html = ob_get_clean(); expect_same(true, is_wp_error($frontend_denied), 'Anonymous frontend form denied'); expect_same('', $frontend_denied_html, 'Anonymous frontend form exposes no stored data'); wp_set_current_user($admin->ID);
+    wp_set_current_user(0); Alify_CF_Composition::reset_render_budget(); ob_start(); $frontend_denied = alify_form($advanced_post); $frontend_denied_html = ob_get_clean(); expect_same(true, is_wp_error($frontend_denied), 'Anonymous frontend form denied'); expect_same('', $frontend_denied_html, 'Anonymous frontend form exposes no stored data'); wp_set_current_user($admin->ID);
     $advanced_revision = Alify_CF_Revisions::capture($advanced_post); expect_same(true, is_int($advanced_revision) && $advanced_revision > 0, 'Native field revision captured'); expect_same('Frontend value', alify_get_revision_field('advanced_value', $advanced_revision), 'Authorized field revision getter'); expect_same(false, metadata_exists('post', $advanced_post, '_alify_cf_revision_data'), 'Revision metadata never redirects onto parent'); expect_same(false, strpos(wp_json_encode(get_post_meta($advanced_revision, '_alify_cf_revision_data', true)), 'DO_NOT_SNAPSHOT') !== false, 'Password values omitted from revision snapshots');
     alify_update_field('advanced_value', 'Changed', $advanced_post); expect_same(true, alify_restore_field_revision($advanced_post, $advanced_revision), 'Validated revision restore'); expect_same('Frontend value', alify_get_field('advanced_value', $advanced_post), 'Field revision restores canonical value'); wp_set_current_user(0); expect_same(null, alify_get_revision_field('advanced_value', $advanced_revision), 'Anonymous private snapshot denied'); wp_set_current_user($admin->ID);
     $advanced_changed = $advanced_definition; $advanced_changed['fields'][0]['instructions'] = 'Changed schema'; alify_register_field_group($advanced_changed); expect_same(true, is_wp_error(alify_restore_field_revision($advanced_post, $advanced_revision)), 'Schema drift blocks field revision restore'); alify_register_field_group($advanced_definition);
@@ -1415,6 +1415,7 @@ try {
     $flex_hidden = array('__complete' => '1', 'rows' => array(array('layout' => 'hero', '__complete' => '1', 'fields' => array('__row_origin' => Alify_CF_Scoped_Conditions::origin($row_a), 'local_toggle' => '0')))); expect_same(true, alify_update_field('scoped_flex', $flex_hidden, $scoped_post), 'Flexible layout uses independent row-local scope'); expect_same('Keep A', alify_get_field('scoped_flex', $scoped_post)[0]['fields']['local_detail'], 'Flexible hidden child retained');
     $cross_local = $local_detail; $cross_local['condition']['field'] = 'field_scoped_group'; $bad_scope_errors = array(); Alify_CF_Repeater::schema(array($local_toggle, $cross_local), $bad_scope_errors); expect_same(true, (bool) $bad_scope_errors, 'Cross-container/root references reject'); $cyclic_toggle = $local_toggle; $cyclic_toggle['condition'] = array('field' => $local_detail['key'], 'operator' => 'not_empty', 'value' => ''); $bad_scope_errors = array(); Alify_CF_Repeater::schema(array($cyclic_toggle, $local_detail), $bad_scope_errors); expect_same(true, (bool) $bad_scope_errors, 'Scoped cycles reject before save');
     expect_same(11, Alify_CF_Transfer::minimum_version(array($scoped_group), 'alify_scoped'), 'Conditional Group children require JSON v11'); expect_same(11, Alify_CF_Transfer::minimum_version(array($scoped_flex), 'alify_scoped'), 'Conditional Flexible children require JSON v11'); $scoped_transfer = array('format' => 'alify-custom-field', 'version' => 10, 'group' => array('title' => 'Scoped transfer', 'location' => 'alify_scoped', 'fields' => array($scoped_group))); Alify_CF_API::unregister_group('scoped_suite'); expect_same(true, is_wp_error(Alify_CF_Transfer::import_json(wp_json_encode($scoped_transfer), wp_create_nonce('alify_cf_import'))), 'Downgraded scoped JSON rejects instead of stripping conditions'); $scoped_transfer['version'] = 11; $scoped_imported = Alify_CF_Transfer::import_json(wp_json_encode($scoped_transfer), wp_create_nonce('alify_cf_import')); expect_same(true, is_int($scoped_imported), 'Scoped schema imports as new draft through v11'); $fixtures[] = $scoped_imported;
+    require __DIR__ . '/development.php';
     // Core defines DOING_AUTOSAVE for the rest of this PHP process: keep this last.
     $autosave_post = fixture_post(); $_POST = array();
     $request = new WP_REST_Request('POST', '/wp/v2/posts/' . $autosave_post . '/autosaves'); $request->set_param('title', 'Autosaved content');

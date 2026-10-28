@@ -1,5 +1,11 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
+require_once __DIR__ . '/class-alify-cf-composition.php';
+require_once __DIR__ . '/class-alify-cf-integrations.php';
+require_once __DIR__ . '/class-alify-cf-bidirectional.php';
+require_once __DIR__ . '/class-alify-cf-translation.php';
+require_once __DIR__ . '/class-alify-cf-woocommerce.php';
+require_once __DIR__ . '/class-alify-cf-updates.php';
 require_once __DIR__ . '/class-alify-cf-choice.php';
 require_once __DIR__ . '/class-alify-cf-selector.php';
 require_once __DIR__ . '/class-alify-cf-library.php';
@@ -44,6 +50,7 @@ final class Alify_CF {
     const LOCATION = '_alify_cf_location';
 
     public static function boot() {
+        Alify_CF_Integrations::boot(); Alify_CF_Translation::boot(); Alify_CF_WooCommerce::boot(); Alify_CF_Updates::boot();
         Alify_CF_API::boot();
         Alify_CF_Library::boot();
         Alify_CF_Migrations::boot();
@@ -181,6 +188,7 @@ final class Alify_CF {
             $feedback = $all_feedback[$group->ID] ?? array();
         }
         if (isset($feedback['schema']) && $feedback['schema'] !== hash('sha256', wp_json_encode($schema))) { $feedback = array(); }
+        $schema = Alify_CF_Translation::display($schema);
         $current = array();
         foreach ($schema as $field) {
             $current[$field['key']] = $option_values !== null ? ($option_values[$field['name']] ?? $field['default']) : (metadata_exists('post', $post->ID, '_alify_cf_' . $field['name']) ? alify_get_field($field['name'], $post->ID) : $field['default']);
@@ -188,6 +196,7 @@ final class Alify_CF {
         foreach (($feedback['values'] ?? array()) as $name => $attempt) {
             foreach ($schema as $field) { if ($field['name'] === $name) { $current[$field['key']] = $attempt; } }
         }
+        if (!Alify_CF_Composition::renderable($schema, $current)) { echo '<p role="alert">This field group exceeds the safe form/input budget. Values are retained. Edit a smaller definition or use bounded PHP/REST updates; no incomplete group will be saved.</p>'; return; }
         echo '<div class="alify-values">';
         if ($feedback) { echo '<p class="alify-recovery-note" role="status">' . (!empty($feedback['omitted']) ? 'The attempted form was too large to recover. Review the field errors and enter corrections again.' : 'Unsaved input is shown below for correction. Saved values have not been replaced by rejected input.') . '</p>'; }
         if (!empty($feedback['password_omitted'])) { echo '<p class="description">Password fields and containers containing them show saved values, not recovered attempts. Re-enter unsaved changes in those fields.</p>'; }
@@ -336,6 +345,7 @@ final class Alify_CF {
 
     /** Shared editor/import validation. No writes occur here. */
     public static function validate_schema($raw, $location, $id, &$errors) {
+        if (!Alify_CF_Composition::budget($raw, true)) { $errors[] = 'Schema exceeds the 1 MiB / structural-node budget.'; return array(); }
         if (!is_string($location)) { $errors[] = 'Choose a valid location.'; return array(); }
         if ((!isset(self::post_types()[$location]) && !Alify_CF_Options::is_location($location) && !isset(Alify_CF_Objects::locations()[$location])) || $location === self::GROUP) { $errors[] = 'Choose a valid post type or registered options page.'; }
         if (!is_array($raw) || array_values($raw) !== $raw || count($raw) > 200) { $errors[] = 'Invalid field schema. A maximum of 200 fields is supported.'; return array(); }
@@ -431,7 +441,8 @@ final class Alify_CF {
             $updates = self::validate_values($schema, $values, $previous, $errors, $field_errors, $locations);
             if ($field_errors) { $feedback[$group->ID] = Alify_CF_Feedback::group($schema, $values, $previous, $field_errors, $locations); }
             else { unset($feedback[$group->ID]); }
-            foreach ($updates as $name => $value) { update_post_meta($id, '_alify_cf_' . $name, wp_slash($value)); }
+            if ($updates && Alify_CF_Bidirectional::touches($updates, $id)) { $paired = Alify_CF_Bidirectional::editor($updates, $id); if (is_wp_error($paired)) { $errors[] = $paired->get_error_message(); } }
+            else { foreach ($updates as $name => $value) { update_post_meta($id, '_alify_cf_' . $name, wp_slash($value)); } }
         }
         Alify_CF_Feedback::put('post_' . $id, $feedback);
         if ($errors) { self::error($id, $errors); }
@@ -439,10 +450,11 @@ final class Alify_CF {
 
     public static function validate_values($schema, $values, $previous, &$errors, &$field_errors = null, &$locations = null) {
         $field_errors = array(); $locations = array();
+        if (!Alify_CF_Composition::budget($values)) { $errors[] = 'Values exceed the 1 MiB / 20,000-node structural budget.'; return array(); }
         $updates = array();
         $submitted_values = array();
         foreach ($schema as $field) {
-            $submitted_values[$field['key']] = self::clean_value($field, $values[$field['name']] ?? '');
+            $submitted_values[$field['key']] = Alify_CF_Conditions::source($field) ? self::clean_value($field, $values[$field['name']] ?? '') : '';
         }
         foreach ($schema as $field) {
             if (Alify_CF_Editor_Fields::presentation($field['type'])) { continue; }

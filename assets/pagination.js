@@ -4,7 +4,7 @@
         const size = Number(root.dataset.pageSize || 0), list = root.querySelector('.alify-rows'); if (!size || !list) return;
         const rows = Array.from(list.children), pages = Math.max(1, Math.ceil(rows.length / size)); let page = Math.min(Math.max(Number(root.dataset.page || 1), 1), pages); root.dataset.page = String(page);
         rows.forEach((row, index) => { row.hidden = Math.floor(index / size) + 1 !== page; });
-        let navigation = root.querySelector('[data-pagination]');
+        let navigation = Array.from(root.querySelectorAll('[data-pagination]')).find(item => item.closest('.alify-repeater') === root);
         if (!navigation) { navigation = document.createElement('div'); navigation.dataset.pagination = '1'; navigation.setAttribute('role', 'group'); navigation.setAttribute('aria-label', 'Repeater pages'); root.appendChild(navigation); for (const [action, label] of [['previous', 'Previous page'], ['next', 'Next page']]) { const button = document.createElement('button'); button.type = 'button'; button.className = 'button'; button.dataset.pageAction = action; button.textContent = label; navigation.appendChild(button); } const status = document.createElement('span'); status.setAttribute('aria-live', 'polite'); navigation.appendChild(status); }
         navigation.querySelector('[data-page-action="previous"]').disabled = page <= 1; navigation.querySelector('[data-page-action="next"]').disabled = page >= pages; navigation.querySelector('span').textContent = ` Page ${page} of ${pages}; all ${rows.length} rows remain in this form.`;
     }

@@ -143,3 +143,13 @@ function alify_plan_acf_content_migration($post_ids, $mappings, $overwrite = fal
 
 function alify_register_field_library($key, $title, $fields) { return Alify_CF_Library::register($key, $title, $fields); }
 function alify_clone_fields($key, $prefix = '') { return Alify_CF_Library::expand(array(array('clone' => $key, 'prefix' => $prefix))); }
+
+/** Register explicit paired top-level post relationship lists on init after definitions. */
+function alify_register_bidirectional_pair($key, $left, $right) { return Alify_CF_Bidirectional::register($key, $left, $right); }
+function alify_register_translation_policy($name, $mode) { return Alify_CF_Translation::policy($name, $mode); }
+function alify_get_translated_field($name, $source, $language) { return Alify_CF_Translation::get($name, $source, $language); }
+function alify_copy_translation_fields($source, $target, $names) { return Alify_CF_Translation::copy($source, $target, $names); }
+function alify_get_order_field($name, $id) { return Alify_CF_WooCommerce::get($name, $id); }
+function alify_update_order_fields($values, $id) { return Alify_CF_WooCommerce::write($values, $id); }
+/** Explicit local diagnostics only: never includes values, keys, paths, accounts or identifiers. */
+function alify_support_snapshot() { global $wp_version; if (!current_user_can('manage_options')) { return new WP_Error('alify_forbidden', 'Administrator permission required.'); } return array('plugin' => ALIFY_CF_VERSION, 'wordpress' => $wp_version, 'php' => PHP_VERSION, 'multisite' => is_multisite(), 'composition_depth' => Alify_CF_Composition::DEPTH, 'integrations' => array_filter(array('sidebar' => Alify_CF_Integrations::enabled('SIDEBAR'), 'abilities' => Alify_CF_Integrations::enabled('ABILITIES'), 'timber' => Alify_CF_Integrations::enabled('TIMBER'), 'woocommerce' => Alify_CF_WooCommerce::available(), 'polylang' => Alify_CF_Integrations::enabled('POLYLANG'), 'updates' => Alify_CF_Integrations::enabled('GITHUB_UPDATES')))); }

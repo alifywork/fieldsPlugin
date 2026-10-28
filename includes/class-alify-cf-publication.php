@@ -138,7 +138,8 @@ final class Alify_CF_Publication {
         if (!current_user_can('edit_post', $post->ID)) { return new WP_Error('alify_forbidden', 'You cannot edit these fields.', array('status' => 403)); }
         $key = spl_object_hash($request);
         if (!isset(self::$updates[$key])) { return new WP_Error('alify_unvalidated_fields', 'Alify fields were not validated.', array('status' => 400)); }
-        foreach (self::$updates[$key] as $name => $value) { update_post_meta($post->ID, '_alify_cf_' . $name, wp_slash($value)); }
+        if (self::$updates[$key] && Alify_CF_Bidirectional::touches(self::$updates[$key], $post->ID)) { $paired = Alify_CF_Bidirectional::editor(self::$updates[$key], $post->ID); if (is_wp_error($paired)) { return $paired; } }
+        else foreach (self::$updates[$key] as $name => $value) { update_post_meta($post->ID, '_alify_cf_' . $name, wp_slash($value)); }
         Alify_CF_Feedback::put('post_' . $post->ID, array());
         return true;
     }
