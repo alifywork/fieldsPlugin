@@ -1,6 +1,7 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 require_once __DIR__ . '/class-alify-cf-repeater.php';
+require_once __DIR__ . '/class-alify-cf-options.php';
 
 final class Alify_CF {
     const GROUP = 'alify_field_group';
@@ -8,6 +9,7 @@ final class Alify_CF {
     const LOCATION = '_alify_cf_location';
 
     public static function boot() {
+        Alify_CF_Options::boot();
         add_action('init', array(__CLASS__, 'register'));
         add_action('admin_notices', array(__CLASS__, 'notices'));
         add_action('add_meta_boxes', array(__CLASS__, 'boxes'));
@@ -80,10 +82,13 @@ final class Alify_CF {
 
     public static function location($post) {
         $location = get_post_meta($post->ID, self::LOCATION, true) ?: 'post';
-        echo '<div class="alify-location"><div><strong>Show this field group when</strong><p>Published groups appear on the selected content type.</p></div><label>Post Type <select name="alify_location">';
+        echo '<div class="alify-location"><div><strong>Show this field group when</strong><p>Published groups appear on the selected post type or options page.</p></div><label>Location <select name="alify_location">';
         foreach (self::post_types() as $type) {
             if (in_array($type->name, array(self::GROUP, 'attachment'), true)) { continue; }
             echo '<option value="' . esc_attr($type->name) . '" ' . selected($location, $type->name, false) . '>' . esc_html($type->labels->singular_name) . '</option>';
+        }
+        foreach (Alify_CF_Options::pages() as $slug => $title) {
+            echo '<option value="' . esc_attr(Alify_CF_Options::location($slug)) . '" ' . selected($location, Alify_CF_Options::location($slug), false) . '>Options Page: ' . esc_html($title) . '</option>';
         }
         echo '</select></label></div>';
     }
@@ -120,17 +125,17 @@ final class Alify_CF {
         }
     }
 
-    public static function values($post, $group) {
-        wp_nonce_field('alify_values_' . $post->ID . '_' . $group->ID, 'alify_values_nonce_' . $group->ID);
+    public static function values($post, $group, $option_values = null) {
+        if ($option_values === null) { wp_nonce_field('alify_values_' . $post->ID . '_' . $group->ID, 'alify_values_nonce_' . $group->ID); }
         $schema = self::schema($group->ID);
         $current = array();
         foreach ($schema as $field) {
-            $current[$field['key']] = metadata_exists('post', $post->ID, '_alify_cf_' . $field['name']) ? alify_get_field($field['name'], $post->ID) : $field['default'];
+            $current[$field['key']] = $option_values !== null ? ($option_values[$field['name']] ?? $field['default']) : (metadata_exists('post', $post->ID, '_alify_cf_' . $field['name']) ? alify_get_field($field['name'], $post->ID) : $field['default']);
         }
         echo '<div class="alify-values">';
         foreach ($schema as $field) {
             $name = $field['name'];
-            $value = metadata_exists('post', $post->ID, '_alify_cf_' . $name) ? alify_get_field($name, $post->ID) : $field['default'];
+            $value = $current[$field['key']];
             $id = 'alify-' . $group->ID . '-' . $field['key'];
             $input = 'alify_values[' . $group->ID . '][' . $name . ']';
             $required = $field['required'] ? ' required' : '';
@@ -201,9 +206,10 @@ final class Alify_CF {
             if (!current_user_can('manage_options') || !isset($_POST['alify_schema_nonce'], $_POST['alify_schema']) || !is_string($_POST['alify_schema_nonce']) || !is_string($_POST['alify_schema']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['alify_schema_nonce'])), 'alify_schema_' . $id)) { return; }
             $raw = json_decode(wp_unslash($_POST['alify_schema']), true);
             $location_raw = $_POST['alify_location'] ?? 'post';
-            $location = is_string($location_raw) ? sanitize_key(wp_unslash($location_raw)) : '';
+            $location_raw = is_string($location_raw) ? wp_unslash($location_raw) : '';
+            $location = strpos($location_raw, 'options:') === 0 ? $location_raw : sanitize_key($location_raw);
             $errors = array();
-            if (!isset(self::post_types()[$location]) || in_array($location, array(self::GROUP, 'attachment'), true)) { $errors[] = 'Choose a valid post type.'; }
+            if ((!isset(self::post_types()[$location]) && !Alify_CF_Options::is_location($location)) || in_array($location, array(self::GROUP, 'attachment'), true)) { $errors[] = 'Choose a valid post type or registered options page.'; }
             if (!is_array($raw) || count($raw) > 200) { self::error($id, array('Invalid field schema. A maximum of 200 fields is supported. Existing configuration was retained.')); return; }
             $fields = array(); $names = array(); $keys = array();
             foreach ($raw as $field) {
@@ -260,29 +266,38 @@ final class Alify_CF {
             if (!is_string($nonce) || !wp_verify_nonce(sanitize_text_field(wp_unslash($nonce)), 'alify_values_' . $id . '_' . $group->ID)) { continue; }
             $values = isset($_POST['alify_values'][$group->ID]) && is_array($_POST['alify_values'][$group->ID]) ? wp_unslash($_POST['alify_values'][$group->ID]) : array();
             $schema = self::schema($group->ID);
-            $submitted_values = array();
-            foreach ($schema as $field) {
-                $submitted_values[$field['key']] = self::clean_value($field, $values[$field['name']] ?? '');
-            }
-            foreach ($schema as $field) {
-                // Hidden values are preserved, even if a forged request supplies them.
-                if (!self::visible($field, $schema, $submitted_values)) { continue; }
-                $value = $field['type'] === 'repeater' ? Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', alify_get_field($field['name'], $id), true) : self::clean_value($field, $values[$field['name']] ?? '');
-                $submitted = $values[$field['name']] ?? '';
-                $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1');
-                $invalid = ($field['type'] === 'repeater' && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
-                if (($field['required'] && $empty) || $invalid) {
-                    $errors[] = $field['label'] . ': ' . ($field['required'] && $empty ? 'a valid value is required.' : 'invalid value.') . ' Previous value retained.';
-                    continue;
-                }
-                if (in_array($field['type'], array('image', 'file'), true) && $value !== '' && (string) alify_get_field($field['name'], $id) !== (string) $value && !current_user_can('edit_post', $value)) {
-                    $errors[] = $field['label'] . ': you cannot select this attachment. Previous value retained.';
-                    continue;
-                }
-                update_post_meta($id, '_alify_cf_' . $field['name'], wp_slash($value));
-            }
+            $previous = array();
+            foreach ($schema as $field) { $previous[$field['name']] = alify_get_field($field['name'], $id); }
+            $updates = self::validate_values($schema, $values, $previous, $errors);
+            foreach ($updates as $name => $value) { update_post_meta($id, '_alify_cf_' . $name, wp_slash($value)); }
         }
         if ($errors) { self::error($id, $errors); }
+    }
+
+    public static function validate_values($schema, $values, $previous, &$errors) {
+        $updates = array();
+        $submitted_values = array();
+        foreach ($schema as $field) {
+            $submitted_values[$field['key']] = self::clean_value($field, $values[$field['name']] ?? '');
+        }
+        foreach ($schema as $field) {
+            // Hidden values are preserved, even if a forged request supplies them.
+            if (!self::visible($field, $schema, $submitted_values)) { continue; }
+            $value = $field['type'] === 'repeater' ? Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', ($previous[$field['name']] ?? null), true) : self::clean_value($field, $values[$field['name']] ?? '');
+            $submitted = $values[$field['name']] ?? '';
+            $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1');
+            $invalid = ($field['type'] === 'repeater' && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
+            if (($field['required'] && $empty) || $invalid) {
+                $errors[] = $field['label'] . ': ' . ($field['required'] && $empty ? 'a valid value is required.' : 'invalid value.') . ' Previous value retained.';
+                continue;
+            }
+            if (in_array($field['type'], array('image', 'file'), true) && $value !== '' && (string) ($previous[$field['name']] ?? null) !== (string) $value && !current_user_can('edit_post', $value)) {
+                $errors[] = $field['label'] . ': you cannot select this attachment. Previous value retained.';
+                continue;
+            }
+            $updates[$field['name']] = $value;
+        }
+        return $updates;
     }
 
     private static function error($id, $messages) {
@@ -317,10 +332,16 @@ final class Alify_CF {
     }
     public static function column($column, $id) {
         if ($column === 'alify_fields') { echo esc_html(count(self::schema($id))); }
-        if ($column === 'alify_location') { $type = get_post_type_object(get_post_meta($id, self::LOCATION, true)); echo esc_html($type ? $type->labels->singular_name : 'Not configured'); }
+        if ($column === 'alify_location') {
+            $location = get_post_meta($id, self::LOCATION, true);
+            foreach (Alify_CF_Options::pages() as $slug => $title) {
+                if ($location === Alify_CF_Options::location($slug)) { echo esc_html('Options Page: ' . $title); return; }
+            }
+            $type = get_post_type_object($location); echo esc_html($type ? $type->labels->singular_name : 'Not configured');
+        }
     }
     public static function messages($messages) {
-        $messages[self::GROUP] = array(1 => 'Field group updated.', 6 => 'Field group published. Your fields are now available on the selected post type.', 7 => 'Field group saved.', 10 => 'Field group draft updated. Publish it to activate its fields.');
+        $messages[self::GROUP] = array(1 => 'Field group updated.', 6 => 'Field group published. Your fields are now available at the selected location.', 7 => 'Field group saved.', 10 => 'Field group draft updated. Publish it to activate its fields.');
         return $messages;
     }
 }

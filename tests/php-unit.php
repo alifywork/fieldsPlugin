@@ -233,4 +233,86 @@ same(false, strpos($html, '<script>') !== false, 'Row values escaped');
 same(true, strpos($html, 'values[team][rows][0][__row_complete]') !== false, 'Real row completion sentinel');
 same(true, strpos($html, 'values[team][__complete]') !== false, 'Repeater completion sentinel');
 same(true, strpos($html, 'values[team][rows][__ROW__][name]') !== false, 'Template row input names');
+// Options pages use a separate namespace and shared field validation.
+$options = array(); $autoload = array();
+function get_option($key, $default = false) { global $options; return $options[$key] ?? $default; }
+function update_option($key, $value, $load = null) { global $options, $autoload; $options[$key] = $value; $autoload[$key] = $load; return true; }
+function delete_transient($key) { global $transients; unset($transients[$key]); }
+function get_transient($key) { global $transients; return $transients[$key] ?? false; }
+function wp_json_encode($value) { return json_encode($value); }
+function wp_nonce_field($action, $name) { echo '<input type="hidden" name="' . esc_attr($name) . '" value="valid">'; }
+function admin_url($path) { return 'https://example.test/wp-admin/' . $path; }
+function esc_url($url) { return esc_attr($url); }
+function submit_button($text) { echo '<button type="submit">' . esc_html($text) . '</button>'; }
+function selected($left, $right, $echo = true) { return $left === $right ? 'selected' : ''; }
+function checked($left, $right, $echo = true) { return $left === $right ? 'checked' : ''; }
+same(true, alify_add_options_page('footer', 'Footer Settings'), 'Register additional page');
+same(false, alify_add_options_page('footer', 'Duplicate'), 'Duplicate registration rejected');
+same(false, alify_add_options_page('../bad', 'Bad'), 'Unsafe page slug rejected');
+same(false, alify_add_options_page('empty', ''), 'Empty title rejected');
+same(null, alify_get_option('contact_email'), 'Missing option is null');
+$option_email = field('contact_email', 'email', true);
+$option_text = field('copyright');
+configure(1, array($option_email, $option_text), 'options:site');
+same('options:site', get_post_meta(1, Alify_CF::LOCATION, true), 'Options location stored without stripping colon');
+$old_schema = Alify_CF::schema(1);
+configure(1, array($option_email), 'options:unknown');
+same($old_schema, Alify_CF::schema(1), 'Unknown options location rejected');
+$errors = array();
+$request = array('alify_options_nonce' => 'valid', 'alify_options_complete' => '1', 'alify_values' => array(1 => array('__group_complete' => '1', 'contact_email' => 'hello@example.com', 'copyright' => 'C:\\site')));
+same(true, Alify_CF_Options::save('site', $request, $errors), 'Options save succeeds');
+same(array(), $errors, 'Valid options have no errors');
+same('hello@example.com', alify_get_option('contact_email'), 'Options helper reads value');
+same('C:\\site', alify_get_option('copyright'), 'Options preserve backslashes without extra slashing');
+same(false, $autoload['alify_cf_options_site'], 'Options autoload disabled');
+same(null, alify_get_field('contact_email', 10), 'Options do not leak into post storage');
+$old_options = $options;
+$invalid_request = $request; $invalid_request['alify_values'][1]['contact_email'] = 'bad-email'; $invalid_request['alify_values'][1]['copyright'] = 'Should not save';
+$errors = array();
+same(false, Alify_CF_Options::save('site', $invalid_request, $errors), 'Invalid required option rejects page');
+same($old_options, $options, 'Entire page retained atomically');
+$errors = array(); $invalid_request = $request; $invalid_request['alify_options_nonce'] = 'invalid';
+same(false, Alify_CF_Options::save('site', $invalid_request, $errors), 'Invalid nonce rejected');
+$errors = array(); $invalid_request = $request; unset($invalid_request['alify_options_complete']);
+same(false, Alify_CF_Options::save('site', $invalid_request, $errors), 'Truncated page rejected');
+$errors = array(); $invalid_request = $request; unset($invalid_request['alify_values'][1]['__group_complete']);
+same(false, Alify_CF_Options::save('site', $invalid_request, $errors), 'Missing group marker rejected');
+$errors = array(); $allowed = false;
+same(false, Alify_CF_Options::save('site', $request, $errors), 'Options capability enforced');
+$allowed = true; $errors = array();
+same(false, Alify_CF_Options::save('unknown', $request, $errors), 'Unknown page rejected');
+same($old_options, $options, 'Failed security checks never change options');
+// Same names can be used on separate pages, but not two groups on one page.
+configure(2, array($option_email), 'options:site');
+same('page', get_post_meta(2, Alify_CF::LOCATION, true), 'Collision rejects options group assignment');
+configure(2, array($option_email), 'options:footer');
+same('options:footer', get_post_meta(2, Alify_CF::LOCATION, true), 'Different pages can reuse names');
+$errors = array(); $footer_request = $request; $footer_request['alify_values'] = array(2 => array('__group_complete' => '1', 'contact_email' => 'footer@example.com'));
+$posts[2]->post_status = 'publish';
+same(true, Alify_CF_Options::save('footer', $footer_request, $errors), 'Second page saves independently');
+same('footer@example.com', alify_get_option('contact_email', 'footer'), 'Named page helper');
+same('hello@example.com', alify_get_option('contact_email'), 'Default page untouched');
+// Conditional and repeater validation works for options as it does for posts.
+$option_toggle = field('enabled', 'true_false');
+$option_repeater = field('links', 'repeater'); $option_repeater['sub_fields'] = array(field('label', 'text', true), field('url', 'url'));
+$option_repeater['condition'] = array('field' => $option_toggle['key'], 'operator' => 'equals', 'value' => '1');
+configure(1, array($option_toggle, $option_repeater), 'options:site');
+$errors = array(); $request['alify_values'][1] = array('__group_complete' => '1', 'enabled' => '1', 'links' => array('__complete' => '1', 'rows' => array(array('__row_complete' => '1', 'label' => 'Home', 'url' => 'https://example.test'))));
+same(true, Alify_CF_Options::save('site', $request, $errors), 'Options repeater saves');
+same('Home', alify_get_option('links')[0]['label'], 'Options repeater retrieval');
+$request['alify_values'][1] = array('__group_complete' => '1'); $errors = array();
+same(true, Alify_CF_Options::save('site', $request, $errors), 'Hidden options repeater skipped');
+same('Home', alify_get_option('links')[0]['label'], 'Hidden options rows retained');
+$request['alify_values'][1]['enabled'] = '1'; $errors = array();
+same(false, Alify_CF_Options::save('site', $request, $errors), 'Visible incomplete repeater rejects options save');
+// Render the real form to exercise the storage-independent field renderer.
+ob_start(); Alify_CF_Options::render('site'); $options_html = ob_get_clean();
+same(true, strpos($options_html, 'alify_options_complete') !== false, 'Options form completion marker rendered');
+same(true, strpos($options_html, 'alify_values[1][__group_complete]') !== false, 'Options group completion marker rendered');
+same(false, strpos($options_html, 'alify_values_nonce_') !== false, 'Options form does not emit post nonces');
+same(true, strpos($options_html, 'action="https://example.test/wp-admin/admin-post.php"') !== false, 'Options form posts to admin handler');
+$options['alify_cf_options_site']['safe_output'] = '<b>hello</b>';
+ob_start(); alify_the_option('safe_output'); $output = ob_get_clean();
+same('&lt;b&gt;hello&lt;/b&gt;', $output, 'Option output helper escapes text');
+same(null, alify_get_option('../invalid'), 'Invalid option field name rejected');
 echo "PASS: $count PHP contract assertions\n";

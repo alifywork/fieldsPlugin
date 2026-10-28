@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Alify Custom Field
- * Description: Build custom field groups with a clean editor and display their values in your theme.
- * Version: 0.4.0
+ * Description: Build custom field groups, repeatable content and global site settings with a clean editor.
+ * Version: 0.5.0
  * Requires at least: 6.2
  * Requires PHP: 7.4
  * Author: Alify
@@ -10,7 +10,7 @@
  * Text Domain: alify-custom-field
  */
 if (!defined('ABSPATH')) { exit; }
-define('ALIFY_CF_VERSION', '0.4.0');
+define('ALIFY_CF_VERSION', '0.5.0');
 define('ALIFY_CF_FILE', __FILE__);
 require_once __DIR__ . '/includes/class-alify-cf.php';
 require_once __DIR__ . '/includes/functions.php';

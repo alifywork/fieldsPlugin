@@ -21,3 +21,21 @@ function alify_get_rows($name, $post_id = 0) {
     if (!is_array($rows)) { return array(); }
     return array_values(array_filter($rows, 'is_array'));
 }
+
+/** Register an additional options page on init, before admin_menu runs. */
+function alify_add_options_page($slug, $title) {
+    return Alify_CF_Options::register($slug, $title);
+}
+
+/** Retrieve a site-scoped option value. Escape for its eventual output context. */
+function alify_get_option($name, $page = 'site') {
+    if (!is_string($name) || !preg_match('/^[a-z][a-z0-9_]*$/', $name)) { return null; }
+    $data = Alify_CF_Options::data($page);
+    return array_key_exists($name, $data) ? $data[$name] : null;
+}
+
+/** Output scalar option values as escaped plain text; arrays are not printed. */
+function alify_the_option($name, $page = 'site') {
+    $value = alify_get_option($name, $page);
+    if (is_scalar($value)) { echo esc_html((string) $value); }
+}

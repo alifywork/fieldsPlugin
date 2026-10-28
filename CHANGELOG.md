@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+- Add built-in Site Settings and `alify_add_options_page()` for additional global settings pages.
+- Extend group location choices and listing labels to registered options pages.
+- Add separate per-page site-option storage (autoload disabled), plus `alify_get_option()` and escaped `alify_the_option()` helpers.
+- Reuse field rendering and validation for options, including media, conditional logic and repeaters.
+- Add capability/nonce-protected admin-post saves, redirect notices and whole-page atomic validation with completion guards.
+- Preserve stale/hidden option values and isolate data from posts and other pages.
+- Expand isolated PHP coverage to 113 assertions, including actual options form rendering.
+
 ## 0.4.0
 
 - Add single-level Repeater fields with 1–20 local subfields and up to 50 content rows.

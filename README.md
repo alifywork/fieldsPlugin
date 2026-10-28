@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.4.0 — repeater release**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.5.0 — options pages release**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -22,7 +22,8 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Labels, stable field keys, field names, instructions, defaults, and required settings.
 - Conditional show/hide rules with live editor updates and server-side enforcement.
 - Expandable cards, drag sorting, keyboard-accessible move buttons, duplication and deletion confirmation.
-- One post-type location rule per group, including custom post types with an admin UI.
+- One location per group: a post type (including UI-enabled custom types) or registered Options Page.
+- Built-in Site Settings and developer-registered additional options pages, with separate site-scoped storage.
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
 - Values stored with a private `_alify_cf_` meta prefix, separate from group schemas.
@@ -75,6 +76,70 @@ if ($url) {
 ```
 
 On staging, select/upload an image and a PDF; save and reload, replace and remove them, then test a required empty media field. Attempt to submit a PDF ID for an Image field or a non-attachment post ID for either field. Confirm the previous value survives with an error notice. Verify media selection as administrator and editor, and clearing as a custom role without upload permission.
+
+## Options Pages
+
+A built-in **Site Settings** submenu is available under **Alify Custom Field**. To populate it:
+
+1. Create a field group (or edit an existing one).
+2. Set its **Location** to **Options Page: Site Settings**.
+3. Publish the group, then visit **Alify Custom Field → Site Settings**.
+4. Enter global values and click **Save Settings**.
+
+All twelve field types, including media and repeaters, use the same editing controls as post fields. Conditional logic remains scoped to a single field group. The options screen and its save handler require `manage_options`.
+
+```php
+// Read from the built-in 'site' page (not from a post).
+$email = alify_get_option('contact_email');
+if ($email) {
+    echo '<span>' . esc_html($email) . '</span>';
+}
+
+// Escaped plain-text output for scalars only.
+alify_the_option('footer_text');
+
+// Repeater values are ordered arrays. alify_get_rows() is for post fields only.
+foreach ((array) alify_get_option('social_links') as $link) {
+    echo '<a href="' . esc_url($link['url'] ?? '') . '">'
+        . esc_html($link['label'] ?? '') . '</a>';
+}
+```
+
+### Additional pages (developer API)
+
+Register pages on every request, on `init`, before `admin_menu` runs:
+
+```php
+add_action('init', function () {
+    alify_add_options_page('footer', 'Footer Settings');
+});
+
+// Once its published field group has been filled and saved:
+$footer_text = alify_get_option('footer_text', 'footer');
+alify_the_option('footer_text', 'footer');
+```
+
+`alify_add_options_page($slug, $title)` returns `true` on successful registration, `false` for invalid/duplicate registration. Slugs must start with a lowercase letter, contain only lowercase letters, numbers, underscores or hyphens, and be at most 50 characters. The built-in `site` page cannot be overridden. Additional-page creation through an admin UI, custom capabilities, nesting and menu customization are not implemented yet.
+
+### Options storage and validation
+
+- Each page uses one namespaced WordPress option (`alify_cf_options_{slug}`), with autoload disabled. Values are **site-scoped**, not multisite network settings, and are isolated from post metadata and other options pages.
+- Field names must be unique across groups on the same options page; different pages/posts may reuse a name. Only published groups assigned to the submitted, registered page are accepted.
+- Saves use a page-bound nonce, capability checks and completion markers. Successful and failed saves redirect back with a short-lived per-user/page notice.
+- Options saves are **all-or-nothing for the whole page**: any invalid field, media permission failure, incomplete group, truncated form or conflicting legacy names retains all previous settings. This is deliberately stricter than post saves, which allow other valid fields to save.
+- Hidden fields preserve old values, optional unchecked toggles/checkboxes clear normally, and repeaters retain their existing bounds and validation rules. Host input limits still apply.
+- Helpers return `null` before a value has been saved. Defaults populate the editor, not the read API. Helpers are not an authorization boundary: don't expose private settings through an endpoint without permission checks, and escape values in templates.
+- Removing a registration/group/field does not automatically delete its stored option values. Renaming a page slug or moving a field group between post and options locations does not migrate data. No reset/delete UI or programmatic option-update helper is included yet.
+
+### Options staging checks
+
+1. Open empty Site Settings and verify its setup instructions. Assign/publish a group and verify its fields appear there, not in post editors.
+2. Save text, multiline text, backslashes, checkbox/toggle values, media and repeaters; reload and verify helper output.
+3. Try invalid required/email/media values; confirm **no** settings on the page change. Test a missing/incomplete form marker and an expired nonce.
+4. Hide a required field/repeater with conditional logic; save and reveal it, verifying stored values survive.
+5. Register a second page, use the same field name on each, and verify isolation. Attempt conflicting names within one page and verify group-schema rejection.
+6. As an editor/subscriber, verify the menu and direct page/save URLs do not grant access. Test administrator media selection and real WordPress redirect notices.
+7. Test both small/mobile admin layouts and large repeaters near the host's input-variable limit.
 
 ## Repeater fields
 
@@ -140,18 +205,18 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Rejected input is not repopulated.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No nested repeaters, Gallery, Flexible Content, Options Pages, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
+- No nested repeaters, Gallery, Flexible Content, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Verification
 
-Automated checks for 0.4.0:
+Automated checks for 0.5.0:
 
 ```sh
 npm ci
 npm test       # 13 jsdom tests for builder, media, conditions and repeaters
 npm run check # JavaScript syntax
-php tests/php-unit.php # 76 assertions with isolated WordPress stubs
+php tests/php-unit.php # 113 assertions with isolated WordPress stubs
 ```
 
 PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP files were also parsed against PHP 7.4 grammar. Tests use stubs for WordPress and the media frame, not a live WordPress database or browser. Activation, real media uploads, native sorting and editor integration still require staging checks below.
