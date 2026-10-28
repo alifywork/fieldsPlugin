@@ -6,6 +6,10 @@
     Object.entries(AlifyBlocks).forEach(([name, definition]) => {
         if (wp.blocks.getBlockType(name)) return;
         function Edit({attributes, setAttributes}) {
+            // Keep an immutable, debounced snapshot: native preview must never compare a mutated attribute reference.
+            const signature = JSON.stringify(Object.fromEntries(definition.fields.map(field => [field.name, attributes[field.name] ?? field.default])));
+            const [preview, setPreview] = wp.element.useState(() => JSON.parse(signature));
+            wp.element.useEffect(() => { const timer = setTimeout(() => setPreview(JSON.parse(signature)), 350); return () => clearTimeout(timer); }, [signature]);
             const controls = definition.fields.map(field => {
                 const value = attributes[field.name] ?? field.default;
                 const change = next => setAttributes({[field.name]: next});
@@ -20,7 +24,7 @@
             const props = wp.blockEditor.useBlockProps({'data-alify-block': name});
             return h(Fragment, null,
                 h(wp.blockEditor.InspectorControls, null, h(wp.components.PanelBody, {title: definition.title}, ...controls)),
-                h('div', props, h('p', null, definition.title), h(Preview, {block: name, attributes, httpMethod: 'POST'})));
+                h('div', props, h('p', null, definition.title), h(Preview, {key: JSON.stringify(preview), block: name, attributes: preview, httpMethod: 'POST'})));
         }
         wp.blocks.registerBlockType(name, {apiVersion: 2, title: definition.title, description: definition.description, icon: 'layout', category: 'design', attributes: definition.attributes, usesContext: ['postId', 'postType'], supports: {html: false, customClassName: false}, edit: Edit, save: () => null});
     });
