@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.29.0
+
+- Add existing-user/term/comment/menu/menu-item editors and capability-checked object metadata APIs, opt-in authenticated REST routes, attachment `edit_attachment` persistence and classic saved-widget adapters. Block widgets/Customizer remain unsupported.
+- Add OR-of-AND location predicates, specific-post/status/template/term/current-role matching and trusted `x_` extension registration; enforce predicates throughout applicable reads/writes/forms/revisions.
+- Add opt-in Local JSON automatic exports/runtime loading, deployment-key ownership, hash-guarded sync UI, attempted rollback and deletion/trash tombstones. No ACF import or content migration.
+- Add schema-hashed private post-field revisions, validated restore, own-user autosave previews and WordPress 6.2 revision-hook compatibility. Secret/custom-containing fields are omitted; autosaves never write parent field metadata.
+- Add nonce-/capability-checked authenticated existing-post frontend forms, shared validated writes and safe redirects; no anonymous/create/custom-upload endpoint.
+- Add value-preserving presentation repeater pagination and Flexible per-layout bounds/disabled-count-growth policy; existing disabled layouts remain editable. Fixed row bounds and single-level containers remain.
+- Add bounded literal ASCII `glob` conditions with at most four `*` wildcards, shared PHP/JS semantics and no user-regex execution.
+- Add fixed-provider HTTPS YouTube/Vimeo oEmbed validation/cached safe output; add manual map coordinate storage and explicitly keyed Google Maps Embed output. Interactive map/search picking remains pending.
+- Gate new schemas with JSON v9; reject downgraded explicit features in schema import and Local JSON load/sync, and restore runtime definitions after failed database inserts. Widget getters require an active matching registered field rather than exposing orphan metadata. Necessary native browser flows identified/fixed an attachment lifecycle gap and a taxonomy-editor fixture selector.
+- Local checks: 783 PHP contracts, 81 JS tests and 854 real WordPress 6.8.3/PHP 8.3 SQLite assertions. All four native PHP/SQLite/MySQL targets pass, including real Chromium flows and clean WordPress debug logs ([CI 40754083740](https://github.com/alifywork/fieldsPlugin/actions/runs/40754083740)). Roadmap: 16 newly completed within declared scopes, 58 complete / 19 pending; not all remaining work is delivered.
+
 ## 0.28.0
 
 - Bundle Icon Picker, root Tab/Accordion/Message layouts, safe message HTML and upload-capability-gated WYSIWYG toolbar/mode/media presets.

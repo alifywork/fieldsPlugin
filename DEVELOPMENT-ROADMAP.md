@@ -36,8 +36,8 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 18. [x] **Relationship min/max cardinality** — v0.26.0: shared multiple-reference bounds, maximum 50, optional empty versus Required semantics, no truncation.
 19. [x] **Reference return formats** — v0.26.0: opt-in ID/object returns recursively across containers/Options; unavailable or unreadable objects omitted/null; raw IDs unchanged.
 20. [ ] Bidirectional relationships — dependency on supported object locations and safe write APIs; avoid recursive writes and partial updates.
-21. [ ] oEmbed — bounded remote provider handling and rendering contract.
-22. [ ] Google Map — provider/key configuration, location storage and external-service constraints.
+21. [x] oEmbed — **v0.29.0:** canonical HTTPS YouTube/Vimeo, fixed provider requests with timeout/size/call limits, success cache and reconstructed validated iframe output. Explicit output API only; no arbitrary-host discovery. HTTP mocks cover provider responses, not live-service certification.
+22. [ ] Google Map — **partial v0.29.0:** manual coordinate/address/zoom storage and explicitly keyed Google Maps Embed output; interactive map/search picker remains unimplemented.
 23. [x] Icon Picker — supported libraries and safe identifier output. — **v0.28.0: 40 bundled Dashicons, optional allowlist, safe stored identifiers and preview; no arbitrary SVG.**
 
 ## C. Content-editor layout and rich text
@@ -51,15 +51,15 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 
 ## D. Location rules and content-model registration
 
-30. [ ] Taxonomy-term edit locations and storage/getters.
-31. [ ] User-profile locations and storage/getters.
-32. [ ] Attachment edit locations.
-33. [ ] Comment locations.
-34. [ ] Navigation-menu/menu-item locations.
-35. [ ] Widget locations with clearly defined supported widget editors.
-36. [ ] Specific post/page, template, taxonomy and other location predicates.
-37. [ ] Multiple location-rule groups with AND/OR evaluation and conflict handling.
-38. [ ] Public custom location-rule extension API.
+30. [x] Taxonomy-term edit locations and storage/getters. — **v0.29.0:** registered `term:<taxonomy>` groups, native edit hooks and authorized `term:ID` APIs/REST.
+31. [x] User-profile locations and storage/getters. — **v0.29.0:** native existing-profile fields and authorized `user:ID` metadata APIs/REST; no user creation.
+32. [x] Attachment edit locations. — **v0.29.0:** attachment metaboxes and native `edit_attachment` persistence with ordinary post getters/nonces; not attachment-modal fields.
+33. [x] Comment locations. — **v0.29.0:** native existing-comment metaboxes, dedicated object editor and authorized `comment:ID` metadata APIs; backend adapter coverage.
+34. [x] Navigation-menu/menu-item locations. — **v0.29.0:** dedicated menu editor, native menu-item fields and authorized metadata APIs. Native menu UI requires a theme supporting classic menus; plugin does not change theme support.
+35. [x] Widget locations with clearly defined supported widget editors. — **v0.29.0:** existing classic instances only, native update/filter integration, nonce/capability checks and active-schema raw getter. Block widgets/Customizer unsupported; real WordPress backend adapter coverage only.
+36. [x] Specific post/page, template, taxonomy and other location predicates. — **v0.29.0:** post_id/status/template/term/current_user_role narrowing; no permission escalation.
+37. [x] Multiple location-rule groups with AND/OR evaluation and conflict handling. — **v0.29.0:** OR-of-AND JSON, maximum 10 groups/10 predicates per group/50 total; shared schema/location collision checks and fail-closed unavailable rules.
+38. [x] Public custom location-rule extension API. — **v0.29.0:** unique trusted `x_` matcher and optional validator; rendering/read/write/form/revision enforcement where applicable.
 39. [x] Options-page creation/configuration UI, beyond built-in Site Settings and PHP registration. — **v0.28.0 Content Models UI: managed Options definitions, bounded portable JSON and dependency-aware unregistering.**
 40. [x] CPT registration UI and portable configuration. — **v0.28.0 Content Models UI: bounded managed definitions, standard WP capabilities and portable new-only JSON import/export.**
 41. [x] Taxonomy registration UI and portable configuration. — **v0.28.0 Content Models UI: target types, public/REST/hierarchical flags, portable JSON and term/dependency safeguards.**
@@ -71,15 +71,15 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 44. [x] Repeater/Flexible drag sorting, with keyboard alternatives. — **v0.28.0: native jQuery UI handles plus existing keyboard move buttons; rich editor teardown/recreation.**
 45. [x] Content-row duplication with fresh names/IDs and safe editor state. — **v0.28.0: pristine-template clones with fresh IDs/names, synchronized HTML and ordered selected IDs.**
 46. [x] Container presentation settings and collapsible row labels. — **v0.28.0: initially collapsed rows and safe direct-scalar labels; no layout/display-mode redesign.**
-47. [ ] Repeater pagination/large-content workflow; do not silently discard unloaded rows.
-48. [ ] Flexible layout-specific limits, configuration and richer layout-management controls.
+47. [x] Repeater pagination/large-content workflow; do not silently discard unloaded rows. — **v0.29.0:** page_size 0 or 1–50, all DOM rows remain submitted, invalid controls reveal all rows. Presentation only, not lazy loading or increased bounds.
+48. [x] Flexible layout-specific limits, configuration and richer layout-management controls. — **v0.29.0:** per-layout min/max (0–50), disabled count-growth policy and corresponding picker/Add/Clone/Remove controls; existing disabled rows stay editable. No layout rename/content migration.
 49. [ ] Clone/reusable field definitions with collision and recursion protection.
 50. [ ] Review fixed field/subfield/layout/row bounds after scalable editing support; no unbounded payload promise.
 
 ## F. Conditional logic
 
 51. [x] Nested/mixed AND/OR rule groups. — **v0.28.0: mixed ALL/ANY advanced JSON, at most three group levels and ten total leaves; no conditional sources/chains.**
-52. [ ] Contains/pattern and other appropriate type-specific operators with bounded evaluation. **Partial v0.28.0:** literal contains/starts_with/ends_with and 1,000-byte comparison limits implemented; arbitrary patterns/regex remain unimplemented, so this item stays open.
+52. [x] Contains/pattern and other appropriate type-specific operators with bounded evaluation. — **v0.29.0:** literal contains/prefix/suffix plus anchored case-sensitive ASCII `glob` (only * special, at most four stars, 256-character pattern/4,096-character source); bounded literal searches in PHP/JS, no regex evaluation. Unicode still works for the existing literal operators; glob rejects non-ASCII/over-budget values. Arbitrary regex/PCRE is deliberately excluded.
 53. [ ] Subfield/container-scoped conditions and correct dynamic-row context.
 54. [ ] Conditional chains with cycle detection and deterministic server/client parity.
 55. [ ] Richer eligible condition sources (e.g. Relationship/structured fields), with explicit comparison semantics.
@@ -90,7 +90,7 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 57. [x] General field/Options write APIs with validation and authorization contracts. — **v0.28.0: edit_post/manage_options authorization, editor payloads and prevalidated writes; best-effort post rollback, not transactions.**
 58. [x] Row/subfield iteration and mutation helpers. — **v0.28.0: explicit row-context getter/generator and zero-based post row append/update/delete helpers; full-container validation.**
 59. [x] Documented lifecycle hooks, filters and custom field-type extension API. — **v0.28.0: validated registration filter, registration/API-write actions and trusted scalar custom-type callbacks.**
-60. [ ] Automatic Local JSON save/load and synchronization UI.
+60. [x] Automatic Local JSON save/load and synchronization UI. — **v0.29.0:** opt-in trusted directory, automatic atomic file exports/runtime definitions, deployment ownership/hash guards, database sync with attempted snapshot rollback, draft/trash precedence and tombstones. Up to 100 files/1 MiB each; not ACF JSON.
 61. [x] PHP configuration export and version-controlled deployment workflow. — **v0.28.0: administrator PHP configuration export, reviewed manual version-controlled deployment; no automatic sync.**
 62. [ ] Explicit rename/type-change/container-layout migration tools; schema transfer is not content migration.
 63. [ ] ACF schema importer with declared supported types/settings and rejection reporting.
@@ -99,9 +99,9 @@ Requested scope: all missing (❌) and partial capabilities identified in the AC
 ## H. REST, revisions and frontend editing
 
 65. [x] General opt-in REST read/schema API with field-level exposure decisions. — **v0.28.0: authenticated opt-in raw read/minimal schema routes for posts and registered Options; Password/custom-containing reads blocked.**
-66. [x] General authenticated REST write API across supported object locations, beyond the current core-post save bridge. — **v0.28.0: authenticated opt-in writes for currently supported post/Options locations; other object locations remain pending.**
-67. [ ] Custom-field revision capture/restore and autosave previews with permissions and validation.
-68. [ ] Frontend forms API with CSRF protection, object authorization, uploads and safe validation.
+66. [x] General authenticated REST write API across supported object locations, beyond the current core-post save bridge. — **v0.28.0:** authenticated opt-in post/Options writes; **v0.29.0:** explicit authorized term/user/comment/menu/menu-item object routes. Classic widget storage remains a separate native instance adapter.
+67. [x] Custom-field revision capture/restore and autosave previews with permissions and validation. — **v0.29.0:** private schema-hashed post snapshots, authorized validated restore, own-user pending autosave getter and parent-metadata retention. Password/custom-containing fields omitted; no all-or-nothing core-content restore guarantee.
+68. [x] Frontend forms API with CSRF protection, object authorization, uploads and safe validation. — **v0.29.0:** authenticated existing-post forms, complete-group/post nonce/capability enforcement, shared validation and safe redirects; native media assets reuse WordPress upload capabilities/handling, no custom upload endpoint. No anonymous/new-post flow or client draft-recovery UI.
 69. [x] Optional safe shortcode/output integration with explicit exposure/escaping policy. — **v0.28.0: explicitly exposed public scalar shortcode, escaped output; no protected/private/rich/secret values.**
 70. [ ] Custom blocks framework — registration, rendering, schema and editor integration.
 71. [ ] Native Gutenberg sidebar/datastore integration and appropriate inline editing.
@@ -143,6 +143,8 @@ These were comparison uncertainties, **not ❌ feature implementations**. Keep t
 
 - **v0.28.0 — Large editor/developer bundle:** 24 previously open items implemented together (16, 23–29, 39–41, 44–46, 51, 56–59, 61, 65–66, 69, 72), within the explicit scopes above. Item 52 is partial and remains unchecked. Local: 783 PHP contracts on both runtimes / 78 JS tests / 694 backend on WordPress 6.2 and 697 on 6.8.3 (three additional native Block Binding callback checks) using SQLite. Implementation verified in [CI run 40716485422](https://github.com/alifywork/fieldsPlugin/actions/runs/40716485422): all four native PHP/SQLite/MySQL targets green with 694 backend, 204 browser and 24 HTTP persistence checks before the three extra version-gated binding assertions. Roadmap: **42 complete / 35 pending**; the user's request for all 59 remaining items is **not fully delivered**.
 
+- **v0.29.0 — Native contexts/deployment/editing bundle:** 16 previously open items implemented within the scopes above (21, 30–38, 47–48, 52, 60, 67–68). Local checks: 783 PHP contracts on both runtimes, 81 JS tests, 851 backend assertions on WordPress 6.2/PHP 7.4 and 854 on WordPress 6.8.3/PHP 8.3. Verified in [CI run 40754083740](https://github.com/alifywork/fieldsPlugin/actions/runs/40754083740): all four native PHP/SQLite/MySQL targets pass, including Chromium profile, term, attachment, menu/menu-item and authenticated frontend-form flows with clean WordPress debug logs. Roadmap: **58 complete within declared scopes / 19 pending**. This does **not** finish the user's request for all remaining features.
+
 ### Remaining development, not hidden completion claims
 
-Object editors/locations and richer location rules, bidirectional updates, bounded remote embeds/maps, deeper/nested containers, pagination/reuse/migration tooling, automatic Local JSON synchronization, ACF schema/content migration, revisions/frontend forms, custom-block/datastore work and external ecosystem integrations are still development work. Google Map production use needs provider/key configuration; Abilities/MCP needs an appropriate WordPress/server/client environment; WooCommerce, multilingual and builder integrations need declared installed integration targets. These prerequisites do not make all remaining work externally blocked. No pricing/distribution decision is represented as a finished code feature. Continue development in combined batches without per-item approval requests.
+The 19 open items are **20, 22, 42–43, 49–50, 53–55, 62–64, 70–71 and 73–77**: bidirectional relationships, interactive maps, recursive containers, Clone/reuse, a post-scalability bound review, row-scoped conditions/chains/richer sources, explicit content migrations/ACF import, custom blocks/sidebar, and declared ecosystem/distribution integrations. Manual map coordinates are not an interactive picker. Classic widgets are not block-widget support. Existing-post authenticated forms are not anonymous/create flows. Provider credentials, integration environments and product decisions need explicit contracts, but are not a blanket excuse that all remaining work is externally blocked. Continue combined development batches without per-item approval requests.

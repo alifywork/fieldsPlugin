@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.28.0 — bundled editor and developer APIs**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.29.0 — native contexts, deployment and editing**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Icon Picker, Tab, Accordion, Message, Taxonomy, User, Page Link, Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
+- oEmbed, manual Google Map coordinates, Icon Picker, Tab, Accordion, Message, Taxonomy, User, Page Link, Text, Password, Text Area, WYSIWYG Editor, Number, Range, Email, URL, Link, Post Object, Relationship, Select, Radio Button, Button Group, Checkbox, True / False, Date, Date Time, Color Picker, Time, Image, File, Repeater, Gallery, Group and Flexible Content.
 - Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Multi-image galleries with ordered, deduplicated attachment IDs and move/remove controls.
@@ -23,7 +23,7 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 - Labels, stable field keys, field names, instructions, defaults, and required settings.
 - Conditional show/hide rules with live editor updates and server-side enforcement.
 - Expandable cards, drag sorting, keyboard-accessible move buttons, duplication and deletion confirmation.
-- One location per group: a post type (including UI-enabled custom types) or registered Options Page.
+- One base location per group (post/CPT, Options or supported native object/widget context), narrowed by optional OR/AND predicates.
 - Built-in Site Settings and developer-registered additional options pages, with separate site-scoped storage.
 - Custom metaboxes in classic and block post editors (not native block-editor sidebar controls).
 - Nonces, edit permissions, autosave/revision guards, allowlisted types, value sanitization and escaped admin output.
@@ -31,7 +31,59 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 
 ## Development queue
 
-See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the sequential missing/partial-feature backlog from the ACF comparison. Current completed increment: **Date/Time display and return formats**. Next: **Richer choice-field settings**. Features are delivered individually with their save/validation/integration checks; this is not an ACF compatibility promise.
+See [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md) for the missing/partial-feature backlog. Work proceeds in large related-feature batches without per-item approval pauses. Version 0.29.0 adds native contexts, Local JSON, revisions/forms, location rules, pagination/layout limits and bounded literal patterns. See the roadmap for exact completion status and unresolved work; this is not an ACF compatibility promise.
+
+## Native contexts, deployment and editing (0.29.0)
+
+### Locations and permissions
+
+Field-group Location now includes **Attachment**, **User**, **Comment**, **Menu**, **Menu item**, **Classic widget**, and `term:<taxonomy>` alongside posts/CPTs and Options. Existing user profiles, term edit screens, comment metaboxes, attachment edit screens and navigation-menu items use native WordPress hooks. **Object Fields** also edits existing authorized `user:ID`, `term:ID`, `comment:ID`, `menu:ID` and `menu_item:ID` contexts. There is no anonymous object editing or object creation API.
+
+```php
+$value = alify_get_object_field('profile_note', 'user:123');
+$result = alify_update_object_fields(['profile_note' => 'Updated'], 'user:123');
+```
+
+Object APIs require the corresponding WordPress edit capability, validate complete configured values and retain prior values on malformed submissions. Authenticated `/alify/v1/objects/<kind>/<id>` GET/POST routes use per-field `api_read`/`api_write` opt-ins; they are not anonymous public-data endpoints. Password/custom-containing reads remain excluded. Attachments use the ordinary post getter and the native `edit_attachment` save hook, not a hypothetical `save_post` attachment event.
+
+Classic widgets support **existing saved instances only**, through `in_widget_form`/`widget_update_callback`. Block widgets and Customizer editing are not implemented. Missing plugin nonce retains prior custom values; invalid fields reject the instance update. `alify_get_widget_field('field_name', 'text-2')` reads raw values only for an existing registered widget and active matching field definition. Widget adapter behavior is covered in real WordPress backend checks; no native widgets-browser claim is made.
+
+The optional **Location rules JSON** setting is an OR list of AND lists, with at most 10 groups, 10 predicates per group and 50 total predicates. Each predicate has `param`, `operator` (`==`/`!=`) and string `value`. Built-ins: `post_id`, `status`, `template`, `term` (`taxonomy:ID`), and `current_user_role`. They narrow the group's base location; they never grant object permissions. For example:
+
+```json
+[[{"param":"status","operator":"==","value":"publish"}],[{"param":"post_id","operator":"==","value":"123"}]]
+```
+
+Trusted extensions register a unique `x_` predicate using `alify_register_location_rule($name, $matcher, $validator = null)`. Matcher arguments are value, base location and object context; return a boolean. Validators accept one value and must return true. Unknown/unavailable predicates fail closed. Location predicates apply to rendering, reads, writes, forms and applicable revision snapshots, not just builder display.
+
+### Automatic Local JSON
+
+Create a trusted deployment directory and define `ALIFY_CF_JSON_DIR` before plugin initialization (for example, an existing `WP_CONTENT_DIR . '/alify-json'`). This is opt-in: no directory is silently created, and no HTTP request can select a filesystem path. Administrator group saves atomically replace their deployment-key JSON file when writable. Files include location predicates and schema version; draft/trash database definitions take precedence over runtime files. Deleting/trashing a deployed definition writes a tombstone, so it cannot silently reappear on another deployment.
+
+**Local JSON** lists files and offers capability-/nonce-checked, hash-guarded database synchronization. Published file-only definitions load automatically as runtime groups. Sync checks key ownership and conflicting definitions and attempts snapshot rollback on failed persistence; it is not a transactional database guarantee. Bounds: 100 files, 1 MiB each, supported schema versions 1–9; symlink files/directories are rejected. This is Alify's own format, not ACF JSON import or content migration.
+
+### Revisions, autosaves and frontend forms
+
+Post field snapshots have a 1 MiB ceiling and schema hashes, with explicit permission-checked `alify_get_revision_field($name, $revision_id)` / `alify_restore_field_revision($post_id, $revision_id)` APIs. Password/custom-containing fields are omitted. Changed schemas or invalid data reject field restore without replacing current field metadata. Core post-content restoration is not part of an all-or-nothing custom-field transaction.
+
+Authenticated own-post REST autosaves validate complete groups and preserve parent field metadata. Pending values use private revision storage or a one-hour per-user/post fallback; `alify_get_autosave_field($name, $post_id)` explicitly reads that pending state. Ordinary raw getters still read saved parent values. WordPress 6.2's revision hook is supported without assuming the second hook argument added in 6.4.
+
+For authenticated **existing-post** editing, call `alify_form_head()` before theme output/`wp_head()`, then `alify_form($post_id)` in the page, and keep `wp_footer()`. The API returns `WP_Error` on denial; callers should handle it. Forms use complete-group markers, a post-bound nonce, edit authorization, shared validated writes and a safe redirect. Native media/editor assets reuse WordPress capabilities and upload handling; there is no custom upload endpoint, anonymous submission or new-post creation flow. A failed POST renders an error and retains saved values, not a client-side draft/recovery UI. Never nest the generated form in another form.
+
+### Containers and bounded patterns
+
+Repeater `page_size` is 0 (off) or 1–50. Pagination hides existing DOM rows but **never disables or drops their inputs**: all rows remain in submission. Required-field validation reveals all rows. This is presentation pagination, not lazy loading or an increased 50-row bound.
+
+Flexible layouts support `min_rows`/`max_rows` (0–50) and `disabled`. Limits are validated on the server before cleaning; disabled layouts prohibit row-count growth while existing rows remain editable. Picker/Add/Clone/Remove controls reflect those limits. No nested containers, layout renaming/migration or unlimited content promise is implied.
+
+Conditional operators now include **`glob`**, alongside literal contains/prefix/suffix. This is an anchored, case-sensitive, literal ASCII pattern, **not regex/PCRE**: only `*` is special (zero or more characters); `.`, `?`, brackets and backslashes are literal. Pattern: 1–256 printable ASCII characters and at most four stars. Source: at most 4,096 ASCII characters (tabs/CR/LF allowed). Non-ASCII/over-budget inputs do not match. Matching uses bounded literal searches on both PHP and JavaScript, never evaluates user-supplied regex, and supports selected scalar lists with ANY-item semantics. Conditional chains, conditional sources and dynamic subfield conditions remain pending.
+
+### Explicit remote output
+
+`oembed` stores only canonical HTTPS YouTube/Vimeo video URLs. `alify_get_oembed($name, $post_id)` explicitly fetches a fixed approved provider (3-second timeout, 128 KiB, no redirects, five calls/request, one-hour success cache) and reconstructs an origin/video-validated iframe; it never trusts arbitrary provider HTML or runs discovery against a supplied host. Network/provider failures return an error; schema saves do not fetch embeds. Provider responses were exercised using WordPress HTTP mocks, not live external-service certification.
+
+`google_map` currently stores **manual** latitude/longitude/zoom/address with complete-marker and bounds validation. `alify_get_google_map_html()` emits an explicitly requested Google Maps Embed iframe only when `ALIFY_CF_GOOGLE_MAPS_KEY` is configured. Restrict that browser-visible key at the provider. An interactive map/search picker is **not implemented**, so roadmap item 22 remains open. New contexts/settings/types and glob conditions require schema JSON **v9**; earlier versions remain accepted within their declared gates.
+
 
 ## Date/Time display and return formats
 
@@ -376,7 +428,7 @@ foreach (alify_get_rows('team_members', get_the_ID()) as $member) {
 }
 ```
 
-Rows are stored as a single ordered array in the repeater's post-meta value, using subfield names as array keys. `alify_get_rows()` returns an empty array for missing values; `alify_the_field()` does not print repeater arrays. There is no ACF-style `have_rows()` cursor or per-row update API yet.
+Rows are stored as a single ordered array in the repeater's post-meta value, using subfield names as array keys. `alify_get_rows()` returns an empty array for missing values; `alify_the_field()` does not print repeater arrays. There is no ACF-style `have_rows()` cursor. Explicit `alify_update_row()` / `alify_delete_row()` helpers are available; see the developer API section.
 
 ### Repeater limits and save behavior
 
@@ -635,7 +687,7 @@ npm run check # JavaScript syntax
 php tests/php-unit.php # 783 assertions with isolated WordPress stubs
 ```
 
-**Current bundle:** 783 PHP contracts on both runtimes, 78 JavaScript tests, and clean-debug-log SQLite integration runs with 694 assertions on WordPress 6.2 / PHP 7.4 and 697 on WordPress 6.8.3 / PHP 8.3 (three extra version-gated Block Binding callback checks). All four native targets passed the bundled implementation in [CI run 40716485422](https://github.com/alifywork/fieldsPlugin/actions/runs/40716485422), including 694 backend / 204 browser / 24 HTTP persistence checks before those extra callback assertions were added. The matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite and MySQL 8.
+**Current bundle (0.29.0):** 783 PHP contracts on PHP 7.4/8.3, 81 JavaScript tests, and clean-debug-log SQLite runs with 851 assertions on WordPress 6.2/PHP 7.4 and 854 on WordPress 6.8.3/PHP 8.3. All four native PHP/SQLite/MySQL targets and Chromium flows pass in [CI run 40754083740](https://github.com/alifywork/fieldsPlugin/actions/runs/40754083740), including the new profile/term/attachment/menu/frontend scenarios and clean WordPress debug logs. The declared native matrix remains WordPress 6.2/PHP 7.4 and WordPress 6.8.3/PHP 8.3, each on SQLite/MySQL 8; this is not a latest-version certification.
 
 Historical selector-batch baseline follows for comparison, not the current test count.
 
