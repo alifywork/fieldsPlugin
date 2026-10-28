@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- Add single-level Repeater fields with 1–20 local subfields and up to 50 content rows.
+- Add subfield schema controls, row add/remove and accessible move-up/down controls.
+- Reuse all eleven basic field renderers, sanitizers and media picker inside rows.
+- Validate repeaters atomically; retain prior rows on invalid, incomplete or truncated submissions.
+- Support whole-repeater conditional visibility; reject repeaters as condition sources.
+- Add `alify_get_rows()` for ordered frontend access.
+- Expand tests to 13 admin interaction cases and 76 PHP contract assertions, including real row-template rendering.
+
 ## 0.3.0
 
 - Add one-rule-per-field conditional logic with equal, not-equal, empty and not-empty comparisons.

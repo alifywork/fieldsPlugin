@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 function builder() {
     const dom = new JSDOM('<form id="post"><input id="alify-schema" value="[]"><div id="alify-fields"></div><div id="alify-empty"></div><span id="alify-count"></span><button type="button" id="alify-add"></button></form>', {runScripts: 'outside-only'});
     const w = dom.window;
-    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select'}};
+    w.AlifyCF = {types: {text: 'Text', image: 'Image', file: 'File', checkbox: 'Checkbox', select: 'Select', repeater: 'Repeater'}};
     w.jQuery = () => ({sortable() {}});
     w.confirm = () => true;
     w.alert = message => { w.lastAlert = message; };
@@ -142,4 +142,69 @@ test('conditions are scoped to their own group', () => {
     d.body.prepend(other);
     other.querySelector('input').dispatchEvent(new w.Event('change', {bubbles: true}));
     assert.equal(d.querySelector('[data-field-key="target"]').hidden, true); w.close();
+});
+
+test('repeater builder adds local subfields, validates names and deep-copies schema', () => {
+    const w = builder(), d = w.document;
+    d.getElementById('alify-add').click(); set(w, 'label', 'Team'); set(w, 'type', 'repeater');
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), false);
+    d.querySelector('[data-sub-action="add"]').click();
+    const label = d.querySelector('[data-sub-prop="label"]');
+    label.value = 'Member Name'; label.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[0].sub_fields[0].name, 'member_name');
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), true);
+    assert.equal(d.querySelector('[data-sub-prop="type"] option[value="repeater"]'), null);
+    d.querySelector('[data-action="duplicate"]').click();
+    const subName = d.querySelector('[data-sub-prop="name"]');
+    subName.value = 'changed'; subName.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(schema(w)[1].sub_fields[0].name, 'member_name');
+    d.querySelector('[data-sub-action="add"]').click();
+    const second = d.querySelectorAll('[data-sub-prop="label"]')[1];
+    second.value = 'Member Name'; second.dispatchEvent(new w.Event('input', {bubbles: true}));
+    // Rename first back so both local names conflict.
+    const first = d.querySelector('[data-sub-prop="name"]'); first.value = 'member_name'; first.dispatchEvent(new w.Event('input', {bubbles: true}));
+    assert.equal(d.getElementById('post').dispatchEvent(new w.Event('submit', {cancelable: true})), false);
+    w.close();
+});
+function repeaterEditor(conditional = false) {
+    const rule = conditional ? ' data-condition="{&quot;field&quot;:&quot;toggle&quot;,&quot;operator&quot;:&quot;equals&quot;,&quot;value&quot;:&quot;1&quot;}"' : '';
+    const dom = new JSDOM(`<div class="alify-values"><div class="alify-value" data-field-key="toggle" data-field-type="true_false"><input type="checkbox" value="1" checked></div><div class="alify-value" data-field-key="team" data-field-type="repeater"${rule}><div class="alify-repeater" data-limit="3"><div class="alify-rows"></div><template class="alify-row-template"><div class="alify-row"><div class="alify-row-bar"><strong class="alify-row-label">Row</strong><button type="button" data-row-action="up">Up</button><button type="button" data-row-action="down">Down</button><button type="button" data-row-action="remove">Remove</button></div><label for="team-__ROW__-name">Name</label><input required id="team-__ROW__-name" name="values[team][rows][__ROW__][name]" value="__ROW__"><input type="hidden" name="values[team][rows][__ROW__][__row_complete]" value="1"></div></template><input type="hidden" name="values[team][__complete]" value="1"><button type="button" data-row-action="add">Add</button><span class="alify-row-count"></span></div></div></div>`, {runScripts: 'outside-only'});
+    const w = dom.window; w.confirm = () => true;
+    w.eval(fs.readFileSync('assets/values.js', 'utf8'));
+    return w;
+}
+test('repeater rows add with unique IDs and defaults, reorder without data loss, and remove', () => {
+    const w = repeaterEditor(), d = w.document;
+    const add = d.querySelector('[data-row-action="add"]');
+    add.click(); add.click();
+    const rows = () => Array.from(d.querySelector('.alify-rows').children);
+    const inputs = rows().map(row => row.querySelector('input'));
+    assert.notEqual(inputs[0].id, inputs[1].id);
+    assert.equal(inputs[0].value, '__ROW__', 'Template substitution must not mutate defaults');
+    assert.equal(rows()[0].querySelector('label').htmlFor, inputs[0].id);
+    inputs[0].value = 'A'; inputs[1].value = 'B';
+    rows()[1].querySelector('[data-row-action="up"]').click();
+    assert.deepEqual(rows().map(row => row.querySelector('input').value), ['B', 'A']);
+    rows()[0].querySelector('[data-row-action="down"]').click();
+    assert.deepEqual(rows().map(row => row.querySelector('input').value), ['A', 'B']);
+    rows()[0].querySelector('[data-row-action="remove"]').click();
+    assert.equal(rows().length, 1); assert.equal(rows()[0].querySelector('input').value, 'B');
+    assert.match(d.querySelector('.alify-row-count').textContent, /1 \/ 3/);
+    w.close();
+});
+test('repeater row cap and move boundaries survive conditional refresh', () => {
+    const w = repeaterEditor(true), d = w.document;
+    const add = d.querySelector('[data-row-action="add"]');
+    add.click(); add.click(); add.click(); add.click();
+    assert.equal(d.querySelectorAll('.alify-row').length, 3);
+    assert.equal(add.disabled, true);
+    d.querySelector('[data-field-key="toggle"] input').click();
+    assert.equal(d.querySelector('[data-field-key="team"]').hidden, true);
+    assert.equal(d.querySelector('.alify-row input').disabled, true);
+    d.querySelector('[data-field-key="toggle"] input').click();
+    assert.equal(d.querySelector('.alify-row input').disabled, false);
+    assert.equal(add.disabled, true);
+    assert.equal(d.querySelector('[data-row-action="up"]').disabled, true);
+    d.querySelector('[data-row-action="remove"]').click();
+    assert.equal(add.disabled, false); w.close();
 });

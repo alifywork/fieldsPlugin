@@ -1,6 +1,6 @@
 # Alify Custom Field
 
-An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.3.0 — conditional logic release**, not an ACF drop-in replacement.
+An independent WordPress custom-fields plugin with a modern, WordPress-native field-group editor. **Version 0.4.0 — repeater release**, not an ACF drop-in replacement.
 
 ## Requirements and installation
 
@@ -13,7 +13,8 @@ An independent WordPress custom-fields plugin with a modern, WordPress-native fi
 ## Included
 
 - Administrator-only field-group management using WordPress's native publish/draft/trash workflow.
-- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image and File.
+- Text, Text Area, Number, Email, URL, Select, Checkbox, True / False, Date, Image, File and Repeater.
+- Single-level repeaters with a subfield builder, row add/remove/move controls and atomic value validation.
 - Native WordPress media picker, image thumbnails, file labels and remove controls.
 - Attachment IDs validated by type and attachment edit permissions on selection.
 - Atomic schema validation and duplicate-name protection across active/draft groups on the same post type.
@@ -75,11 +76,47 @@ if ($url) {
 
 On staging, select/upload an image and a PDF; save and reload, replace and remove them, then test a required empty media field. Attempt to submit a PDF ID for an Image field or a non-attachment post ID for either field. Confirm the previous value survives with an error notice. Verify media selection as administrator and editor, and clearing as a custom role without upload permission.
 
+## Repeater fields
+
+Select **Repeater** as the field type, then add 1–20 subfields in its card. Each subfield has a local name, label, type, instructions, choices, default and required setting. All eleven basic types (including Image/File) work as subfields. Add, remove and move subfields with the builder buttons.
+
+In the post editor, use **Add Row**, **Remove row**, and the up/down buttons to manage row order. A repeater starts empty; subfield defaults apply to newly added rows, not retroactively to existing rows. Marking the repeater required means at least one valid row is required. JavaScript is required for row management.
+
+```php
+// Same rows are also returned by alify_get_field('team_members').
+foreach (alify_get_rows('team_members', get_the_ID()) as $member) {
+    echo '<h3>' . esc_html($member['name'] ?? '') . '</h3>';
+    if (!empty($member['photo'])) {
+        echo wp_get_attachment_image((int) $member['photo'], 'thumbnail');
+    }
+}
+```
+
+Rows are stored as a single ordered array in the repeater's post-meta value, using subfield names as array keys. `alify_get_rows()` returns an empty array for missing values; `alify_the_field()` does not print repeater arrays. There is no ACF-style `have_rows()` cursor or per-row update API yet.
+
+### Repeater limits and save behavior
+
+- **Single level only**, maximum **20 subfields** and **50 rows** per repeater. No pagination, row duplication, drag sorting, nested repeaters or subfield conditional rules yet; row ordering uses accessible move buttons.
+- A whole repeater can be a conditional target. It cannot be a condition source. Hidden repeaters preserve all saved rows and skip validation.
+- Each row is sanitized against its schema, including required and media checks. A newly selected media ID requires attachment edit permission; existing repeater attachment IDs may survive reordering without that permission.
+- If any row is invalid, **all previous rows for that repeater are retained** and the existing save-error notice identifies the repeater. Other valid fields may still save. Row-level error highlighting and rejected-input repopulation are not implemented.
+- Completion markers detect missing/truncated repeater submissions (including common PHP `max_input_vars` truncation) and preserve previous rows. Your host's input limits may be reached before the plugin's row cap; test realistic forms and adjust limits or reduce fields/rows. Explicitly removing every optional row and saving clears its value to `[]`.
+- Subfield names need only be unique within their repeater. Renaming/removing subfields does **not** migrate content. On the next post save, unknown/removed subfield values are dropped and renamed fields receive the currently submitted value. Back up content before structural changes. Changing an existing scalar field to Repeater is not a data migration.
+
+### Repeater staging checks
+
+1. Create a `team_members` repeater with required `name`, optional `email`, checkbox `roles`, and image `photo`. Add three rows, save/reload, reorder, remove and save again. Check template output order.
+2. Test all eleven subfield types, Unicode, quotes and backslashes. Confirm choice arrays, unchecked toggles and cleared media round-trip correctly.
+3. Try invalid email, a PDF in an Image subfield and a missing required name. Verify the entire previous repeater is retained with a notice.
+4. Remove every optional row; confirm it stays empty after reload. Mark the repeater required and try saving zero rows.
+5. Add a top-level toggle condition to the repeater; hide it, save, reveal it and verify rows survive and hidden required subfields do not block saving.
+6. Test the row cap, large forms near `max_input_vars`, and both classic/block editors. Verify media selection works inside newly added rows. Test keyboard moves and narrow screens.
+
 ## Conditional Logic
 
 Expand a field card and enable **Conditional Logic**, then select a source field, comparison and value. Example: a True / False field named `show_cta`, followed by a required `cta_text` field shown when `show_cta` **Is equal to** `1`.
 
-- Each field supports **one rule**, referencing an **unconditional field in the same group**. AND/OR groups, cross-group references and conditional chains are not implemented.
+- Each field supports **one rule**, referencing an **unconditional non-repeater field in the same group**. AND/OR groups, cross-group references and conditional chains are not implemented.
 - Supported operators: **Is equal to**, **Is not equal to**, **Is empty**, **Is not empty**.
 - Equality is case-sensitive string matching, not numeric comparison. Use stored choice keys (not labels), `1` / `0` for True / False, and attachment IDs for media.
 - Checkbox equality tests whether the comparison key is selected; inequality tests absence. An unchecked True / False field counts as empty; number/text `0` does not.
@@ -103,18 +140,18 @@ Expand a field card and enable **Conditional Logic**, then select a source field
 - Renaming a field does not migrate existing values. Removing fields/groups or deactivating the plugin does not delete saved content. No uninstall deletion is performed.
 - Required scalar fields use browser validation. Required checkbox groups are checked on the server. Invalid/empty required submissions retain the previous stored value rather than blocking publication. Invalid nonempty optional scalar submissions also retain previous values. Save-error notices list affected fields on the next post-edit page load (reload after a block-editor save if needed). Other valid fields still save. Rejected input is not repopulated.
 - Checkbox defaults are not supported. For True / False defaults use `1` or `0`. Setting a True / False field as required means it must be enabled.
-- No Repeater, Gallery, Flexible Content, Options Pages, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
+- No nested repeaters, Gallery, Flexible Content, Options Pages, import/export, REST integration, programmatic registration, revision restoration or ACF data/API compatibility yet.
 - UI strings are English in this initial release; full localization is pending.
 
 ## Verification
 
-Automated checks for 0.3.0:
+Automated checks for 0.4.0:
 
 ```sh
 npm ci
-npm test       # Ten jsdom tests for builder, media and conditional interactions
+npm test       # 13 jsdom tests for builder, media, conditions and repeaters
 npm run check # JavaScript syntax
-php tests/php-unit.php # 45 assertions with isolated WordPress stubs
+php tests/php-unit.php # 76 assertions with isolated WordPress stubs
 ```
 
 PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP files were also parsed against PHP 7.4 grammar. Tests use stubs for WordPress and the media frame, not a live WordPress database or browser. Activation, real media uploads, native sorting and editor integration still require staging checks below.
@@ -122,7 +159,7 @@ PHP contract tests were executed using a PHP 8.5 WebAssembly CLI runtime; PHP fi
 ### Manual staging checklist
 
 1. Activate with `WP_DEBUG` enabled. Confirm no PHP notices or errors in classic and block editors.
-2. As an administrator, create a group with all eleven types and a Posts location. Publish it; check field counts and location in the list.
+2. As an administrator, create a group with all twelve types and a Posts location. Publish it; check field counts and location in the list.
 3. Add, duplicate, delete, drag and move fields with the keyboard. Save/reload; confirm configuration/order persists. Try duplicate names and invalid names.
 4. Fill a post with Unicode text, decimals, multiline text, email, HTTPS URL, date and choice values. Save/reload and check helper output.
 5. Clear optional fields and uncheck all checkboxes. Save/reload; confirm old selections are cleared. Verify defaults, including a false toggle.

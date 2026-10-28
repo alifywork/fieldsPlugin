@@ -1,6 +1,44 @@
 /* global wp */
 (function () {
     'use strict';
+    function refreshRows(repeater) {
+        const rows = Array.from(repeater.querySelector('.alify-rows').children);
+        const hidden = !!repeater.closest('.alify-value[hidden]');
+        rows.forEach((row, index) => {
+            row.querySelector('.alify-row-label').textContent = 'Row ' + (index + 1);
+            row.querySelector('[data-row-action="up"]').disabled = hidden || index === 0;
+            row.querySelector('[data-row-action="down"]').disabled = hidden || index === rows.length - 1;
+        });
+        repeater.querySelector('[data-row-action="add"]').disabled = hidden || rows.length >= Number(repeater.dataset.limit);
+        repeater.querySelector('.alify-row-count').textContent = rows.length + ' / ' + repeater.dataset.limit + ' rows';
+    }
+    let rowSequence = 0;
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-row-action]');
+        if (!button || button.disabled) return;
+        const repeater = button.closest('.alify-repeater');
+        const rows = repeater.querySelector('.alify-rows');
+        const row = button.closest('.alify-row');
+        const action = button.dataset.rowAction;
+        if (action === 'add' && rows.children.length < Number(repeater.dataset.limit)) {
+            const token = 'new_' + Date.now() + '_' + (++rowSequence);
+            const template = repeater.querySelector('.alify-row-template');
+            const fragment = template.content.cloneNode(true);
+            fragment.querySelectorAll('[name], [id], [for], [aria-describedby]').forEach(element => {
+                ['name', 'id', 'for', 'aria-describedby'].forEach(attr => {
+                    if (element.hasAttribute(attr)) element.setAttribute(attr, element.getAttribute(attr).replace(/__ROW__/g, token));
+                });
+            });
+            rows.appendChild(fragment);
+            const input = rows.lastElementChild.querySelector('input:not([type="hidden"]), select, textarea');
+            if (input) input.focus();
+        }
+        if (action === 'remove' && window.confirm('Remove this row? Save the post to apply the change.')) { row.remove(); repeater.querySelector('[data-row-action="add"]').focus(); }
+        if (action === 'up' && row.previousElementSibling) rows.insertBefore(row, row.previousElementSibling);
+        if (action === 'down' && row.nextElementSibling) rows.insertBefore(row.nextElementSibling, row);
+        refreshRows(repeater);
+        repeater.dispatchEvent(new Event('change', {bubbles: true}));
+    });
     function refreshConditions() {
         document.querySelectorAll('.alify-values').forEach(group => {
             const fields = Array.from(group.querySelectorAll('.alify-value'));
@@ -11,7 +49,7 @@
                 if (rule) {
                     const source = fields.find(item => item.dataset.fieldKey === rule.field);
                     visible = false;
-                    if (source && !JSON.parse(source.dataset.condition || 'null')) {
+                    if (source && source.dataset.fieldType !== 'repeater' && !JSON.parse(source.dataset.condition || 'null')) {
                         const inputs = Array.from(source.querySelectorAll('input, select, textarea'));
                         let values;
                         if (['checkbox', 'true_false'].includes(source.dataset.fieldType)) {
@@ -25,6 +63,7 @@
                 }
                 field.hidden = !visible;
                 field.querySelectorAll('input, select, textarea, button').forEach(input => { input.disabled = !visible; });
+                field.querySelectorAll('.alify-repeater').forEach(refreshRows);
             });
         });
     }

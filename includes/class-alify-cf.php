@@ -1,5 +1,6 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
+require_once __DIR__ . '/class-alify-cf-repeater.php';
 
 final class Alify_CF {
     const GROUP = 'alify_field_group';
@@ -18,7 +19,7 @@ final class Alify_CF {
     }
 
     public static function types() {
-        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'image' => 'Image', 'file' => 'File');
+        return array('text' => 'Text', 'textarea' => 'Text Area', 'number' => 'Number', 'email' => 'Email', 'url' => 'URL', 'select' => 'Select', 'checkbox' => 'Checkbox', 'true_false' => 'True / False', 'date' => 'Date', 'image' => 'Image', 'file' => 'File', 'repeater' => 'Repeater');
     }
 
     public static function register() {
@@ -105,7 +106,7 @@ final class Alify_CF {
         foreach ($schema as $candidate) {
             if ($candidate['key'] === $rule['field']) { $source = $candidate; break; }
         }
-        if (!$source || !empty($source['condition'])) { return false; }
+        if (!$source || $source['type'] === 'repeater' || !empty($source['condition'])) { return false; }
         $value = $values[$source['key']] ?? '';
         $items = is_array($value) ? array_map('strval', $value) : array((string) $value);
         $empty = !$items || $items === array('') || ($source['type'] === 'true_false' && $items === array('0'));
@@ -135,32 +136,40 @@ final class Alify_CF {
             $required = $field['required'] ? ' required' : '';
             echo '<div class="alify-value" data-field-key="' . esc_attr($field['key']) . '" data-field-type="' . esc_attr($field['type']) . '" data-condition="' . esc_attr(wp_json_encode($field['condition'] ?? null)) . '"' . (self::visible($field, $schema, $current) ? '' : ' hidden') . '><label class="alify-label" for="' . esc_attr($id) . '">' . esc_html($field['label']) . ($field['required'] ? ' <span class="alify-required">*</span>' : '') . '</label>';
             if ($field['instructions']) { echo '<p id="' . esc_attr($id . '-help') . '" class="description">' . esc_html($field['instructions']) . '</p>'; }
-            $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help') . '"';
-            switch ($field['type']) {
-                case 'image':
-                case 'file':
-                    self::media_field($field, $value, $id, $input); break;
-                case 'textarea':
-                    echo '<textarea' . $attrs . $required . ' rows="4">' . esc_textarea(is_scalar($value) ? $value : '') . '</textarea>'; break;
-                case 'select':
-                    echo '<select' . $attrs . $required . '><option value="">Select an option</option>';
-                    foreach (self::choices($field) as $key => $label) { echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>'; }
-                    echo '</select>'; break;
-                case 'checkbox':
-                    echo '<fieldset id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
-                    foreach (self::choices($field) as $key => $label) { echo '<label class="alify-choice"><input type="checkbox" name="' . esc_attr($input) . '[]" value="' . esc_attr($key) . '" ' . checked(in_array((string) $key, (array) $value, true), true, false) . '> ' . esc_html($label) . '</label>'; }
-                    echo '</fieldset>'; break;
-                case 'true_false':
-                    echo '<label class="alify-choice"><input type="checkbox"' . $attrs . ' value="1" ' . checked($value, '1', false) . $required . '> Enabled</label>'; break;
-                default:
-                    echo '<input type="' . esc_attr($field['type']) . '"' . $attrs . ' value="' . esc_attr(is_scalar($value) ? $value : '') . '"' . ($field['type'] === 'number' ? ' step="any"' : '') . $required . '>'; break;
-            }
+            self::control($field, $value, $id, $input);
             echo '</div>';
         }
         echo '</div>';
     }
 
+    public static function control($field, $value, $id, $input) {
+        $required = !empty($field['required']) ? ' required' : '';
+        $attrs = ' id="' . esc_attr($id) . '" name="' . esc_attr($input) . '" aria-describedby="' . esc_attr($id . '-help') . '"';
+        switch ($field['type']) {
+            case 'repeater':
+                Alify_CF_Repeater::render($field, $value, $id, $input); break;
+            case 'image':
+            case 'file':
+                self::media_field($field, $value, $id, $input); break;
+            case 'textarea':
+                echo '<textarea' . $attrs . $required . ' rows="4">' . esc_textarea(is_scalar($value) ? $value : '') . '</textarea>'; break;
+            case 'select':
+                echo '<select' . $attrs . $required . '><option value="">Select an option</option>';
+                foreach (self::choices($field) as $key => $label) { echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>'; }
+                echo '</select>'; break;
+            case 'checkbox':
+                echo '<fieldset id="' . esc_attr($id) . '"><legend class="screen-reader-text">' . esc_html($field['label']) . '</legend>';
+                foreach (self::choices($field) as $key => $label) { echo '<label class="alify-choice"><input type="checkbox" name="' . esc_attr($input) . '[]" value="' . esc_attr($key) . '" ' . checked(in_array((string) $key, (array) $value, true), true, false) . '> ' . esc_html($label) . '</label>'; }
+                echo '</fieldset>'; break;
+            case 'true_false':
+                echo '<label class="alify-choice"><input type="checkbox"' . $attrs . ' value="1" ' . checked($value, '1', false) . $required . '> Enabled</label>'; break;
+            default:
+                echo '<input type="' . esc_attr($field['type']) . '"' . $attrs . ' value="' . esc_attr(is_scalar($value) ? $value : '') . '"' . ($field['type'] === 'number' ? ' step="any"' : '') . $required . '>'; break;
+        }
+    }
+
     public static function clean_value($field, $value) {
+        if ($field['type'] === 'repeater') { return Alify_CF_Repeater::clean($field, $value); }
         if ($field['type'] === 'checkbox') {
             return array_values(array_intersect(array_map('strval', array_keys(self::choices($field))), array_map('sanitize_text_field', is_array($value) ? $value : array())));
         }
@@ -210,7 +219,8 @@ final class Alify_CF {
                 if (isset($keys[$key])) { $errors[] = 'Duplicate internal field key.'; continue; }
                 $keys[$key] = true;
                 $clean = array('key' => $key, 'name' => $name, 'label' => sanitize_text_field($field['label']), 'type' => $type, 'instructions' => sanitize_textarea_field($field['instructions'] ?? ''), 'required' => !empty($field['required']), 'choices' => sanitize_textarea_field($field['choices'] ?? ''), 'default' => '');
-                $clean['default'] = self::clean_value($clean, $field['default'] ?? '');
+                if ($type === 'repeater') { $clean['sub_fields'] = Alify_CF_Repeater::schema($field['sub_fields'] ?? array(), $errors); }
+                $clean['default'] = $type === 'repeater' ? array() : self::clean_value($clean, $field['default'] ?? '');
                 $clean['condition'] = null;
                 if (!empty($field['condition'])) {
                     $rule = $field['condition'];
@@ -228,7 +238,7 @@ final class Alify_CF {
                 foreach ($fields as $candidate) {
                     if ($candidate['key'] === $field['condition']['field']) { $source = $candidate; break; }
                 }
-                if (!$source || $source['key'] === $field['key'] || $source['condition']) {
+                if (!$source || $source['type'] === 'repeater' || $source['key'] === $field['key'] || $source['condition']) {
                     $errors[] = $field['label'] . ': choose an unconditional field from this group as the condition source (no self-reference or chains).';
                 }
             }
@@ -257,10 +267,10 @@ final class Alify_CF {
             foreach ($schema as $field) {
                 // Hidden values are preserved, even if a forged request supplies them.
                 if (!self::visible($field, $schema, $submitted_values)) { continue; }
-                $value = self::clean_value($field, $values[$field['name']] ?? '');
+                $value = $field['type'] === 'repeater' ? Alify_CF_Repeater::clean($field, $values[$field['name']] ?? '', alify_get_field($field['name'], $id), true) : self::clean_value($field, $values[$field['name']] ?? '');
                 $submitted = $values[$field['name']] ?? '';
                 $empty = $value === '' || $value === array() || ($field['type'] === 'true_false' && $value !== '1');
-                $invalid = ($submitted !== '' && $submitted !== array() && $value === '');
+                $invalid = ($field['type'] === 'repeater' && $value === '') || ($submitted !== '' && $submitted !== array() && $value === '');
                 if (($field['required'] && $empty) || $invalid) {
                     $errors[] = $field['label'] . ': ' . ($field['required'] && $empty ? 'a valid value is required.' : 'invalid value.') . ' Previous value retained.';
                     continue;
